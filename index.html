@@ -1,10 +1,465 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>My Portfolio</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joshu Leonardy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            line-height: 1.8;
+            color: #1a1a1a;
+            background: #ffffff;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 50px;
+            text-align: left;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 400;
+            color: #000;
+            margin-bottom: 30px;
+            letter-spacing: -0.5px;
+        }
+
+        .bio {
+            font-size: 1.05rem;
+            line-height: 1.9;
+            color: #2a2a2a;
+            margin-bottom: 25px;
+        }
+
+        .bio a {
+            color: #0066cc;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-bottom 0.2s;
+        }
+
+        .bio a:hover {
+            border-bottom: 1px solid #0066cc;
+        }
+
+        .highlight {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .links {
+            margin-top: 25px;
+            font-size: 1rem;
+        }
+
+        .links a {
+            color: #0066cc;
+            text-decoration: none;
+            margin-right: 20px;
+            border-bottom: 1px solid transparent;
+            transition: border-bottom 0.2s;
+        }
+
+        .links a:hover {
+            border-bottom: 1px solid #0066cc;
+        }
+
+        section {
+            margin: 60px 0;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 400;
+            color: #000;
+            margin-bottom: 25px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        /* Modified .item with thumbnail support */
+        .item {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 35px;
+            align-items: flex-start;
+        }
+
+        /* Thumbnail styling - UKURAN LEBIH KECIL */
+        .item-thumbnail {
+            flex-shrink: 0;
+            width: 240px;
+            height: 180px;
+            overflow: hidden;
+            border-radius: 1px;
+            border: 1px solid #e0e0e0;
+            background: #f9f9f9;
+        }
+
+        .item-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #f9f9f9;
+            transition: transform 0.5s;
+        }
+
+        .item-thumbnail:hover img {
+            transform: scale(1.05);
+        }
+
+        /* Content wrapper */
+        .item-content {
+            flex: 1;
+        }
+
+        .item {
+            margin-bottom: 30px;
+        }
+
+        .paper-title {
+            font-size: 1.05rem;
+            color: #000;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .paper-title a {
+            color: #000;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .paper-title a:hover {
+            color: #0066cc;
+            border-bottom: 1px solid #0066cc;
+        }
+
+        .paper-venue {
+            color: #666;
+            font-style: italic;
+            font-size: 0.95rem;
+            margin-bottom: 5px;
+        }
+
+        .paper-links {
+            font-size: 0.9rem;
+            color: #0066cc;
+        }
+
+        .paper-links a {
+            color: #0066cc;
+            text-decoration: none;
+            margin-right: 15px;
+            border-bottom: 1px solid transparent;
+            transition: border-bottom 0.2s;
+        }
+
+        .paper-links a:hover {
+            border-bottom: 1px solid #0066cc;
+        }
+
+        .award {
+            color: #d90606;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .experience-item {
+            margin-bottom: 25px;
+        }
+
+        .exp-title {
+            font-weight: 600;
+            color: #000;
+            font-size: 1.05rem;
+        }
+
+        .exp-org {
+            color: #666;
+            font-size: 0.95rem;
+            margin-top: 3px;
+        }
+
+        .exp-date {
+            color: #999;
+            font-size: 0.9rem;
+            margin-top: 3px;
+        }
+
+        footer {
+            margin-top: 80px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            body {
+                padding: 30px 15px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Welcome to My Website</h1>
-    <p>This is my personal portfolio.</p>
+    <div class="container">
+        <header>
+            <h1>Joshu Leonardy</h1>
+            
+            <div class="bio">
+                I'm currently a MPhil student in <a href="https://fke.utm.my/" target="_blank"> Faculty of Electrical Engineering - Universiti Teknologi Malaysia</a>
+                under supervise by <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/74Y9" target="_blank">Dr. Mohd Rashidi Salim (Faculty of Electrical Engineering)</a>, 
+                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/wygw" target="_blank">Ir. Dr. Muhammad Yusof Mohd Noor (Faculty of Electrical Engineering)</a>,
+                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/Ek8X" target="_blank">Dr. Azizul Azizan (Faculty of Artificial Intelligence)</a>,
+                <a href="https://brin.go.id/ornm/en/pusat-riset-fotonik/page/wptresna" target="_blank">Dr. Eng. Wildan Panji Tresna (MOEMS - BRIN)</a>.
+                Now i'm working as a Graduate Research Assistant at the Photonics Research Center. Before that, I received my B.Sc in Physics 
+                (Electronics Instrumentation) from Universitas Negeri Semarang.
+            </div>
+
+            <div class="bio">
+                I also work as a Research Assistant at 
+                <a href="https://brin.go.id/ornm/en/pusat-riset-fotonik/page/fotonika" target="_blank">National Research and Innovation Agency (BRIN) Research Center for Photonics in the Micro-Opto-Electro-Mechanical System (MOEMS) research group</a> 
+ focusing on <strong> Develop GUI for Object Segmentation using Algorithms (Yolov11 and SAM-2) and smart weapon development </strong>.
+            </div>
+
+            <div class="bio">
+                My research focuses on <strong> Image Processing </strong>, 
+                <strong>Python-based Software Development</strong>, <strong> ML and DL Applications for Instrumentation Systems </strong>
+                , <strong>Optical Fiber Sensor Simulation and Fabrication</strong>.
+            </div>
+
+            <div class="links">
+                <a href="mailto:joshu@graduate.utm.my">Email</a>
+                <a href="files/CV.pdf" target="_blank">CV</a>
+                <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank">LinkedIn</a>
+                <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ&hl=id&oi=ao" target="_blank">Google Scholar</a>
+            </div>
+        </header>
+
+        <section id="publications">
+            <h2>Publications</h2>
+
+            <div class="item">
+                <div class="paper-title">
+                    <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank">
+                        Development of Color Detection Based on Camera Infrared Filter with Python Image Processing
+                    </a>
+                </div>
+                <div class="paper-venue">IEEE Conference, 2024 <span class="award">• <strong>Best Paper Award</strong></span></div>
+                <div class="paper-links">
+                    <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank">[Paper]</a>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="paper-title">
+                    <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank">
+                        Optimized selectivity in no-core fiber sensors for high refractive index detection
+                    </a>
+                </div>
+                <div class="paper-venue">Physica Scripta (Q2), 2025</div>
+                <div class="paper-links">
+                    <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank">[Paper]</a>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="paper-title">
+                    <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank">
+                        Optimizing Convolutional Layer in YOLOv8: Enhancing Accuracy and Efficiency for Camouflaged Object Detection in Complex Environments
+                    </a>
+                </div>
+                <div class="paper-venue">IEEE Conference, 2025</div>
+                <div class="paper-links">
+                    <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank">[Paper]</a>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="paper-title">
+                    <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank">
+                        Effect of Surrounding Refractive Index Changes on Amplitude Response in MMI-Based Fiber Optic Sensors
+                    </a>
+                </div>
+                <div class="paper-venue">IEEE Conference, 2025</div>
+                <div class="paper-links">
+                    <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank">[Paper]</a>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="paper-title">
+                    <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank">
+                        Fabrication and characterization of low-cost optical waveguides using recycled expanded polystyrene (EPS) as core material
+                    </a>
+                </div>
+                <div class="paper-venue">Results in Optics (Q2), 2025</div>
+                <div class="paper-links">
+                    <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank">[Paper]</a>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="paper-title">Design and Characterization of a Simple Temperature Sensor based-on a Polymer Sine S-Bend Optical Waveguide Structure</div>
+                <div class="paper-venue">Q2 Journal, 2025 (in press)</div>
+            </div>
+        </section>
+
+        <section id="Lastest Projects">
+            <h2>Lastest Projects</h2>
+
+            <div class="item">
+                <div class="item-thumbnail">
+                    <img src="D:\Riset BRIN\Code for life\Website\figure\Project OSA.jpg" alt="OSA Project">
+                </div>
+                <div class="item-content">
+                    <div class="paper-title"> Optical Spectrum Analyzer (OSA) Software with Fitting Plotter, Peak/Dip Detection, and Machine Learning/Deep Learning Training and Analysis Features</div>
+                    <div class="paper-venue">Thesis Project, 2026</div>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="item-thumbnail">
+                    <img src="D:\Riset BRIN\Code for life\Website\figure\Project ASU.jpg" alt="ASU Project">
+                </div>
+                <div class="item-content">
+                    <div class="paper-title">Augmented Segmentation Utility (ASU) for Object Segmentation Software</div>
+                    <div class="paper-venue">Collaboration Research with BRIN, Telkom University, and Kanazawa University, 2026</div>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="item-thumbnail">
+                    <img src="D:\Riset BRIN\Code for life\Website\figure\Project UBB.jpg" alt="UBB Project">
+                </div>
+                <div class="item-content">
+                    <div class="paper-title">Detection And Treatment of Heavy Metals in Tin Mining Wastewater Using an Environmentally Friendly Method
+    Based on Machine Learning and Smart Sensors</div>
+                    <div class="paper-venue">Pendanaan Kemendiktisaintek BIMA (BRIN and Bangka Belitung University), 2025</div>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="item-thumbnail">
+                    <img src="D:\Riset BRIN\Code for life\Website\figure\Project UNNES.jpg" alt="UNNES Project">
+                </div>
+                <div class="item-content">
+                    <div class="paper-title">Integration of Artificial Intelligence Systems in Surface Plasmon Resonance (SPR) Sensors for Accurate Gelatin
+Identification and Halal Licensing</div>
+                    <div class="paper-venue">Pendanaan Kemendiktisaintek BIMA (BRIN and Universitas Negeri Semarang), 2025</div>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="item-thumbnail">
+                    <img src="D:\Riset BRIN\Code for life\Website\figure\Project OPM.jpg" alt="OPM Project">
+                </div>
+                <div class="item-content">
+                    <div class="paper-title">Design and Characterization of Low Cost-Visible Light Optical Power Meter (LC-VLOPM)</div>
+                    <div class="paper-venue">Research Project BRIN and Universitas Negeri Semarang, 2023</div>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="Working Experience">
+            <h2>Experience</h2>
+
+            <div class="experience-item">
+                <div class="exp-title">Research Assistant</div>
+                <div class="exp-org">National Research and Innovation Agency (BRIN), Indonesia</div>
+                <div class="exp-date">September 2024 - Present</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title">Graduate Research Assistant</div>
+                <div class="exp-org">Photonics Research Center, Universiti Teknologi Malaysia</div>
+                <div class="exp-date">March 2025 - Present</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title">Electronics Development in Avionics Department</div>
+                <div class="exp-org">Rocketry Team, Universiti Teknologi Malaysia</div>
+                <div class="exp-date">August 2025 - Present</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title"> Management Trainee R&D Engineer - PCB Department</div>
+                <div class="exp-org">PT. Borine Technology Indonesia</div>
+                <div class="exp-date">April 2024 - August 2024</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title">Research & Teaching Assistant</div>
+                <div class="exp-org">Photonic Research Group, Universitas Negeri Semarang</div>
+                <div class="exp-date">January 2022 - January 2024</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title">Teaching Assistant in Computer Programming</div>
+                <div class="exp-org">Physics Department, Universitas Negeri Semarang</div>
+                <div class="exp-date">January 2024 - April 2024</div>
+            </div>
+
+             <div class="experience-item">
+                <div class="exp-title">Assistant Lecture in Microcontroller</div>
+                <div class="exp-org">Physics Department, Universitas Negeri Semarang</div>
+                <div class="exp-date">August 2022 - September 2023</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title">Assistant Lecture in Instrumentation System Programming</div>
+                <div class="exp-org">Physics Department, Universitas Negeri Semarang</div>
+                <div class="exp-date">August 2022 - September 2023</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title">3D Designer and Ground Control Station </div>
+                <div class="exp-org">Semarang State Univerity Flying Object Research (SUVIFOR) - Fixed Wing Deparment</div>
+                <div class="exp-date">September 2020 - March 2023</div>
+            </div>
+        </section>
+
+        <section id="education">
+            <h2>Education</h2>
+
+            <div class="experience-item">
+                <div class="exp-title">Master of Philosophy in Electrical Engineering</div>
+                <div class="exp-org">Universiti Teknologi Malaysia</div>
+                <div class="exp-date">2024 - Present</div>
+            </div>
+
+            <div class="experience-item">
+                <div class="exp-title">B.Sc in Physics (Electronics Instrumentation)</div>
+                <div class="exp-org">Universitas Negeri Semarang, Indonesia</div>
+                <div class="exp-date">August 2020 - January 2024 | GPA: 3.55/4.00</div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Last updated: February 2026</p>
+        </footer>
+    </div>
 </body>
 </html>
