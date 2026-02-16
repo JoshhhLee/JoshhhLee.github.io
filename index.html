@@ -3,40 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Page Title</title>
+    <title>My Personal Website</title>
     <style>
-        /* Add your CSS styling here */
-        .progress-container {
-            width: 100%;
-            background: #e0e0e0;
-            border-radius: 25px;
-            overflow: hidden;
+        body {
+            transition: background-color 0.5s, color 0.5s;
         }
-        .progress-bar {
-            height: 20px;
-            background: #76c7c0;
-            text-align: center;
+        .dark-mode {
+            background-color: #121212;
             color: white;
-            line-height: 20px;
-            transition: width 0.5s;
+        }
+        #pdfViewer {
+            width: 100%;
+            height: 600px;
+            border: none;
+            transition: opacity 0.5s;
+        }
+        button {
+            margin: 20px;
         }
     </style>
 </head>
 <body>
-    <h1>My Portfolio</h1>
-    <h2>Skills</h2>
-    <div class="progress-container">
-        <div class="progress-bar" style="width: 90%;">HTML 90%</div>
-    </div>
-    <div class="progress-container">
-        <div class="progress-bar" style="width: 80%;">CSS 80%</div>
-    </div>
-    <div class="progress-container">
-        <div class="progress-bar" style="width: 75%;">JavaScript 75%</div>
-    </div>
-    <div class="progress-container">
-        <div class="progress-bar" style="width: 70%;">Python 70%</div>
-    </div>
-    <p><a href="path/to/your/CV.pdf" download>Download My CV</a></p>
+    <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    <button onclick="openPDF('example.pdf')">Open PDF</button>
+    <iframe id="pdfViewer" src="" style="display:none;"></iframe>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+        }
+
+        function openPDF(pdfUrl) {
+            const viewer = document.getElementById('pdfViewer');
+            viewer.src = pdfUrl;
+            viewer.style.display = 'block';
+            viewer.style.opacity = 1;
+        }
+    </script>
 </body>
 </html>
