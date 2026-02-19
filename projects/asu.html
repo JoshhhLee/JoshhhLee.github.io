@@ -1,1 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASU - Annotation Segmentation Utility | Joshu Leonardy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9f9f9;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666;
+            --text-tertiary: #999;
+            --border-color: #e0e0e0;
+            --accent-color: #0066cc;
+            --accent-dark: #0052a3;
+        }
+
+        body.dark-mode {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #e8e8e8;
+            --text-secondary: #b0b0b0;
+            --text-tertiary: #888;
+            --border-color: #3d3d3d;
+            --accent-color: #4a9eff;
+            --accent-dark: #2e7fd9;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            line-height: 1.8;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            padding: 40px 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Dark Mode Toggle */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-toggle.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* Back Button */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.95em;
+            margin-bottom: 30px;
+            transition: gap 0.2s;
+        }
+
+        .back-btn:hover {
+            gap: 10px;
+        }
+
+        /* Header */
+        .project-header {
+            margin-bottom: 35px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .project-header h1 {
+            font-size: 1.6em;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .project-meta {
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 0.95em;
+            margin-bottom: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--accent-color);
+            color: white;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 0.78em;
+            font-family: Arial, sans-serif;
+            margin-right: 6px;
+        }
+
+        /* Sections */
+        section {
+            margin-bottom: 32px;
+        }
+
+        h2 {
+            font-size: 1.15em;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            font-size: 0.97em;
+        }
+
+        ul {
+            padding-left: 20px;
+            color: var(--text-secondary);
+        }
+
+        ul li {
+            margin-bottom: 6px;
+            font-size: 0.97em;
+        }
+
+        /* Tech Stack badges */
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .tech-tag {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.82em;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Screenshots */
+        .screenshots {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .screenshots img {
+            width: 100%;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+            cursor: zoom-in;
+        }
+
+        .screenshots img:hover {
+            transform: scale(1.02);
+        }
+
+        .screenshot-caption {
+            font-size: 0.8em;
+            color: var(--text-tertiary);
+            text-align: center;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        /* Lightbox */
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .lightbox.active {
+            display: flex;
+        }
+
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 20px; right: 30px;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+
+        /* Footer link */
+        .footer-link {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.9em;
+            color: var(--text-tertiary);
+        }
+
+        .footer-link a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Dark Mode Toggle -->
+    <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">🌙</button>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox">
+        <span class="lightbox-close" id="lightboxClose">&times;</span>
+        <img id="lightboxImg" src="" alt="">
+    </div>
+
+    <div class="container">
+        <a href="../index.html" class="back-btn">← Back to Home</a>
+
+        <!-- Project Header -->
+        <div class="project-header">
+            <h1>Annotation Segmentation Utility (ASU) for Object Segmentation Software</h1>
+            <div class="project-meta">Collaboration Research with BRIN, Telkom University, and Kanazawa University, 2026</div>
+            <span class="badge">Computer Vision</span>
+            <span class="badge">Medical Imaging</span>
+            <span class="badge">Deep Learning</span>
+        </div>
+
+        <!-- Overview -->
+        <section>
+            <h2>Overview</h2>
+            <p>
+                ASU (Annotation Segmentation Utility) is a desktop GUI application that integrates Meta AI's 
+                <strong>Segment Anything Model (SAM)</strong> for semi-automatic image annotation and segmentation. 
+                The tool is designed to accelerate and standardize ground-truth generation for deep learning model 
+                training, particularly in medical and scientific imaging workflows.
+            </p>
+            <p>
+                The application has been demonstrated on <strong>MRI brain tumor segmentation</strong>, 
+                where it significantly reduced annotation time compared to fully manual methods while 
+                maintaining high boundary accuracy.
+            </p>
+        </section>
+
+        <!-- Key Features -->
+        <section>
+            <h2>Key Features</h2>
+            <ul>
+                <li>SAM model integration with selectable variants (<strong>ViT-H</strong> and <strong>ViT-B</strong>)</li>
+                <li>Interactive click-based prompting (positive / negative points)</li>
+                <li>Project-based batch image management (New / Open / Save Project)</li>
+                <li>Multi-class labeling with customizable class names</li>
+                <li>Export annotations in <strong>YOLO format</strong> for downstream model training</li>
+                <li>CPU / GPU device selection with automatic fallback to CPU</li>
+                <li>Zoom and fit-to-window controls for detailed annotation</li>
+                <li>Undo / Redo and Delete Annotation controls</li>
+            </ul>
+        </section>
+
+        <!-- Tech Stack -->
+        <section>
+            <h2>Tech Stack</h2>
+            <div class="tech-stack">
+                <span class="tech-tag">Python</span>
+                <span class="tech-tag">SAM (Meta AI)</span>
+                <span class="tech-tag">SAM-2</span>
+                <span class="tech-tag">PyTorch</span>
+                <span class="tech-tag">OpenCV</span>
+                <span class="tech-tag">PyQt5</span>
+                <span class="tech-tag">NumPy</span>
+                <span class="tech-tag">YOLO Export</span>
+            </div>
+        </section>
+
+        <!-- Screenshots -->
+        <section>
+            <h2>Screenshots</h2>
+            <div class="screenshots">
+                <div>
+                    <img src="../images/asu_1.jpg" alt="ASU Interface" onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">Main interface</div>
+                </div>
+                <div>
+                    <img src="../images/asu_2.jpg" alt="MRI loaded" onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">MRI image loaded</div>
+                </div>
+                <div>
+                    <img src="../images/asu_3.jpg" alt="SAM model loaded" onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">SAM ViT-H loaded on CPU</div>
+                </div>
+                <div>
+                    <img src="../images/asu_4.jpg" alt="Segmentation result" onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">Tumor auto-segmented (9565 px²)</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Application -->
+        <section>
+            <h2>Application</h2>
+            <p>
+                This tool bridges the gap between foundation models and practical annotation workflows. 
+                It is particularly relevant for:
+            </p>
+            <ul>
+                <li>Generating training data for <strong>organ segmentation</strong> in radiotherapy planning</li>
+                <li>Semi-automatic delineation in <strong>low-contrast medical images</strong></li>
+                <li>Building labeled datasets for <strong>surgical scene understanding</strong></li>
+                <li>Rapid prototyping of segmentation pipelines in research environments</li>
+            </ul>
+        </section>
+
+        <div class="footer-link">
+            <a href="../index.html">← Back to Joshu Leonardy's Homepage</a>
+        </div>
+    </div>
+
+    <script>
+        // Dark Mode
+        const themeToggle = document.getElementById('themeToggle');
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            themeToggle.textContent = '☀️';
+            themeToggle.classList.add('active');
+        }
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            themeToggle.textContent = isDark ? '☀️' : '🌙';
+            themeToggle.classList.toggle('active');
+        });
+
+        // Lightbox
+        function openLightbox(src) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('lightbox').classList.add('active');
+        }
+        document.getElementById('lightboxClose').addEventListener('click', () => {
+            document.getElementById('lightbox').classList.remove('active');
+        });
+        document.getElementById('lightbox').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                e.currentTarget.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>
