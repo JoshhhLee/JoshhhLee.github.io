@@ -25,10 +25,10 @@
         body.dark-mode {
             --bg-primary: #1a1a1a;
             --bg-secondary: #2d2d2d;
-            --text-primary: #e8e8e8;
-            --text-secondary: #b0b0b0;
-            --text-tertiary: #888;
-            --border-color: #3d3d3d;
+            --text-primary: #f0f0f0;
+            --text-secondary: #c0c0c0;
+            --text-tertiary: #999;
+            --border-color: #444;
             --accent-color: #4a9eff;
             --accent-dark: #2e7fd9;
         }
@@ -67,6 +67,11 @@
             transform: scale(1.1);
         }
 
+        .theme-toggle:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
         .theme-toggle.active {
             background: var(--accent-color);
             color: white;
@@ -86,6 +91,11 @@
 
         .back-btn:hover {
             gap: 10px;
+        }
+
+        .back-btn:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
         }
 
         /* Header */
@@ -181,10 +191,16 @@
             border: 1px solid var(--border-color);
             transition: transform 0.2s;
             cursor: zoom-in;
+            loading: lazy;
         }
 
         .screenshots img:hover {
             transform: scale(1.02);
+        }
+
+        .screenshots img:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
         }
 
         .screenshot-caption {
@@ -223,6 +239,25 @@
             color: white;
             font-size: 2rem;
             cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .lightbox-close:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        .lightbox-close:focus {
+            outline: 2px solid white;
+            outline-offset: -2px;
         }
 
         /* Footer link */
@@ -238,22 +273,39 @@
             color: var(--accent-color);
             text-decoration: none;
         }
+
+        .footer-link a:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
     </style>
 </head>
 <body>
-    <!-- Dark Mode Toggle -->
-    <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">🌙</button>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle Dark Mode">🌙</button>
 
-    <!-- Lightbox -->
-    <div class="lightbox" id="lightbox">
-        <span class="lightbox-close" id="lightboxClose">&times;</span>
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lightbox-title">
+        <h2 id="lightbox-title" class="sr-only">Image preview</h2>
+        <button class="lightbox-close" id="lightboxClose" aria-label="Close image preview">&times;</button>
         <img id="lightboxImg" src="" alt="">
     </div>
 
     <div class="container">
-        <a href="../index.html" class="back-btn">← Back to Home</a>
+        <nav>
+            <a href="../index.html" class="back-btn" aria-label="Back to home page">← Back to Home</a>
+        </nav>
 
-        <!-- Project Header -->
         <div class="project-header">
             <h1>Annotation Segmentation Utility (ASU) for Object Segmentation Software</h1>
             <div class="project-meta">Collaboration Research with BRIN, Telkom University, and Kanazawa University, 2026</div>
@@ -262,7 +314,6 @@
             <span class="badge">Deep Learning</span>
         </div>
 
-        <!-- Overview -->
         <section>
             <h2>Overview</h2>
             <p>
@@ -273,12 +324,11 @@
             </p>
             <p>
                 The application has been demonstrated on <strong>MRI brain tumor segmentation</strong>, 
-                where it significantly reduced annotation time compared to fully manual methods while 
+                where it significantly reduced annotation time compared to fully manual methods, while 
                 maintaining high boundary accuracy.
             </p>
         </section>
 
-        <!-- Key Features -->
         <section>
             <h2>Key Features</h2>
             <ul>
@@ -308,30 +358,40 @@
             </div>
         </section>
 
-        <!-- Screenshots -->
         <section>
             <h2>Screenshots</h2>
             <div class="screenshots">
                 <div>
-                    <img src="../images/asu_1.jpg" alt="ASU Interface" onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">Main interface</div>
+                    <img src="images/ASU%20Project/Main%20Interface.png" 
+                         alt="ASU Interface - Main application window" 
+                         loading="lazy" 
+                         onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">Main Interface</div>
                 </div>
                 <div>
-                    <img src="../images/asu_2.jpg" alt="MRI loaded" onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">MRI image loaded</div>
+                    <img src="images/ASU%20Project/Image%20Uploaded.png" 
+                         alt="MRI image loaded into ASU" 
+                         loading="lazy" 
+                         onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">Image Uploaded</div>
                 </div>
                 <div>
-                    <img src="../images/asu_3.jpg" alt="SAM model loaded" onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">SAM ViT-H loaded on CPU</div>
+                    <img src="images/ASU%20Project/Model%20Uploading.png" 
+                         alt="SAM ViT-H model loaded on CPU" 
+                         loading="lazy" 
+                         onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">Model Uploading</div>
                 </div>
                 <div>
-                    <img src="../images/asu_4.jpg" alt="Segmentation result" onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">Tumor auto-segmented (9565 px²)</div>
+                    <img src="images/ASU%20Project/Segmentation%20Success.png" 
+                         alt="Tumor auto-segmented" 
+                         loading="lazy" 
+                         onclick="openLightbox(this.src)">
+                    <div class="screenshot-caption">Segmentation Success</div>
                 </div>
             </div>
         </section>
-
-        <!-- Application -->
+        
         <section>
             <h2>Application</h2>
             <p>
@@ -352,13 +412,13 @@
     </div>
 
     <script>
-        // Dark Mode
         const themeToggle = document.getElementById('themeToggle');
         const currentTheme = localStorage.getItem('theme') || 'light';
         if (currentTheme === 'dark') {
             document.body.classList.add('dark-mode');
             themeToggle.textContent = '☀️';
             themeToggle.classList.add('active');
+            themeToggle.setAttribute('aria-pressed', 'true');
         }
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
@@ -366,19 +426,32 @@
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             themeToggle.textContent = isDark ? '☀️' : '🌙';
             themeToggle.classList.toggle('active');
+            themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
         });
 
         // Lightbox
         function openLightbox(src) {
             document.getElementById('lightboxImg').src = src;
             document.getElementById('lightbox').classList.add('active');
+            document.getElementById('lightbox').setAttribute('aria-hidden', 'false');
         }
-        document.getElementById('lightboxClose').addEventListener('click', () => {
+        
+        function closeLightbox() {
             document.getElementById('lightbox').classList.remove('active');
-        });
+            document.getElementById('lightbox').setAttribute('aria-hidden', 'true');
+        }
+        
+        document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+
         document.getElementById('lightbox').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
-                e.currentTarget.classList.remove('active');
+                closeLightbox();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('lightbox').classList.contains('active')) {
+                closeLightbox();
             }
         });
     </script>
