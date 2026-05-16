@@ -1,459 +1,759 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASU - Annotation Segmentation Utility | Joshu Leonardy</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Augmented Segmentation Utility (ASU) — Joshu Leonardy</title>
+<meta name="description" content="Augmented Segmentation Utility (ASU) — A collaboration project between BRIN, Telkom University, and Kanazawa University featuring SAM-based semi-automatic image annotation." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4ede0;
+    --paper-dark: #ebe1cf;
+    --ink: #1a1a1a;
+    --ink-soft: #3d3d3d;
+    --ink-light: #6b6b6b;
+    --vermillion: #b8412e;
+    --vermillion-dark: #8a2e20;
+    --sage: #6b7a5a;
+    --gold: #a88848;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Cormorant Garamond', 'Noto Serif JP', serif;
+    overflow-x: hidden;
+    position: relative;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at top right, rgba(184, 65, 46, 0.04), transparent 60%),
+      radial-gradient(ellipse at bottom left, rgba(107, 122, 90, 0.05), transparent 60%);
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: 0.4; z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0 0.05 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .watermark {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80vmin; height: 80vmin;
+    z-index: 0; opacity: 0.06; pointer-events: none;
+  }
+  .watermark svg { width: 100%; height: 100%; }
 
-        :root {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f9f9f9;
-            --text-primary: #1a1a1a;
-            --text-secondary: #666;
-            --text-tertiary: #999;
-            --border-color: #e0e0e0;
-            --accent-color: #0066cc;
-            --accent-dark: #0052a3;
-        }
+  /* Top nav */
+  .top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1.2rem 3rem;
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(244, 237, 224, 0.88);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.4s ease;
+  }
+  .top-bar.scrolled { border-bottom-color: rgba(26, 26, 26, 0.1); }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem; letter-spacing: 0.25em;
+    text-transform: uppercase; color: var(--ink-soft);
+    text-decoration: none;
+    transition: all 0.3s ease;
+  }
+  .back-link:hover { color: var(--vermillion); gap: 0.9rem; }
+  .back-link .arrow { font-family: serif; font-size: 1rem; transition: transform 0.3s; }
+  .back-link:hover .arrow { transform: translateX(-3px); }
+  .brand {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.85rem; letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--ink); font-weight: 500; text-decoration: none;
+  }
+  .seal {
+    width: 42px; height: 42px;
+    background: var(--vermillion); color: var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 700; font-size: 1rem;
+    transform: rotate(-3deg); position: relative;
+  }
+  .seal::before {
+    content: ""; position: absolute; inset: 4px;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
 
-        body.dark-mode {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #2d2d2d;
-            --text-primary: #f0f0f0;
-            --text-secondary: #c0c0c0;
-            --text-tertiary: #999;
-            --border-color: #444;
-            --accent-color: #4a9eff;
-            --accent-dark: #2e7fd9;
-        }
+  /* Layout */
+  main { position: relative; z-index: 3; padding-top: 5rem; }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
 
-        body {
-            font-family: 'Georgia', 'Times New Roman', serif;
-            line-height: 1.8;
-            color: var(--text-primary);
-            background: var(--bg-primary);
-            padding: 40px 20px;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
+  /* Project hero */
+  .project-hero {
+    padding: 5rem 2rem 4rem;
+    text-align: center;
+    position: relative;
+  }
+  .project-meta-top {
+    display: flex; justify-content: center; align-items: center;
+    gap: 0.8rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--vermillion);
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeUp 0.9s ease-out 0.1s forwards;
+  }
+  .project-meta-top .dot {
+    width: 4px; height: 4px;
+    background: var(--vermillion);
+    border-radius: 50%;
+  }
+  .project-kanji {
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 300;
+    font-size: 1.1rem;
+    color: var(--vermillion);
+    letter-spacing: 0.5em;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeUp 0.9s ease-out 0.2s forwards;
+  }
+  .project-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 1.5rem;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    opacity: 0;
+    animation: fadeUp 1s ease-out 0.35s forwards;
+  }
+  .project-title em {
+    font-style: italic;
+    color: var(--vermillion);
+  }
+  .project-subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    color: var(--ink-soft);
+    max-width: 600px;
+    margin: 0 auto 2rem;
+    line-height: 1.5;
+    opacity: 0;
+    animation: fadeUp 1s ease-out 0.5s forwards;
+  }
+  .project-tags {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    opacity: 0;
+    animation: fadeUp 1s ease-out 0.65s forwards;
+  }
+  .project-tag {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 0.45rem 1rem;
+    border: 1px solid rgba(26,26,26,0.2);
+    color: var(--ink-soft);
+    background: rgba(255,255,255,0.3);
+    transition: all 0.3s;
+  }
+  .project-tag:hover {
+    border-color: var(--vermillion);
+    color: var(--vermillion);
+  }
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(15px); }
+  }
 
-        .container {
-            max-width: 700px;
-            margin: 0 auto;
-        }
+  /* Hero image */
+  .hero-image-wrap {
+    max-width: 1000px;
+    margin: 3rem auto 6rem;
+    padding: 0 2rem;
+    opacity: 0;
+    animation: fadeUp 1.2s ease-out 0.8s forwards;
+  }
+  .hero-image {
+    position: relative;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+    border: 1px solid rgba(26,26,26,0.12);
+    background: var(--paper-dark);
+  }
+  .hero-image::before {
+    content: "";
+    position: absolute;
+    inset: 12px;
+    border: 1px solid rgba(26,26,26,0.12);
+    z-index: 2;
+    pointer-events: none;
+  }
+  .hero-image img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: saturate(0.92);
+    transition: transform 1.5s cubic-bezier(0.2, 0.6, 0.2, 1);
+  }
+  .hero-image:hover img { transform: scale(1.04); }
 
-        /* Dark Mode Toggle */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--bg-secondary);
-            border: 2px solid var(--border-color);
-            border-radius: 50px;
-            padding: 10px 15px;
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: all 0.3s ease;
-            z-index: 1000;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+  /* Content sections */
+  .content {
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+  .section { margin-bottom: 5rem; }
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--vermillion);
+    margin-bottom: 1.2rem;
+    font-weight: 500;
+  }
+  .section-label::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--vermillion);
+  }
+  .section-heading {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 2rem;
+    letter-spacing: -0.01em;
+  }
+  .section p {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    line-height: 1.75;
+    color: var(--ink-soft);
+    margin-bottom: 1.2rem;
+  }
+  .section p strong {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .section p em {
+    color: var(--vermillion);
+    font-style: italic;
+  }
 
-        .theme-toggle:hover {
-            transform: scale(1.1);
-        }
+  /* Feature list */
+  .feature-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 1rem;
+  }
+  .feature-list li {
+    position: relative;
+    padding: 1rem 0 1rem 2.5rem;
+    border-bottom: 1px solid rgba(26,26,26,0.08);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    transition: padding 0.3s;
+  }
+  .feature-list li:last-child { border-bottom: none; }
+  .feature-list li:hover { padding-left: 3rem; }
+  .feature-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 1.5rem;
+    width: 14px;
+    height: 1px;
+    background: var(--vermillion);
+    transition: width 0.3s;
+  }
+  .feature-list li:hover::before { width: 24px; }
+  .feature-list li strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .feature-list .feature-kanji {
+    position: absolute;
+    left: 0;
+    top: 1rem;
+    width: 1.5rem;
+    font-family: 'Noto Serif JP', serif;
+    color: var(--vermillion);
+    font-size: 0.9rem;
+    opacity: 0.6;
+  }
 
-        .theme-toggle:focus {
-            outline: 2px solid var(--accent-color);
-            outline-offset: 2px;
-        }
+  /* Tech stack grid */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .tech-item {
+    padding: 1.2rem 1.4rem;
+    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(26,26,26,0.1);
+    transition: all 0.3s;
+  }
+  .tech-item:hover {
+    border-color: var(--vermillion);
+    background: rgba(255,255,255,0.7);
+    transform: translateY(-2px);
+  }
+  .tech-item .tech-cat {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--vermillion);
+    margin-bottom: 0.4rem;
+    display: block;
+  }
+  .tech-item .tech-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--ink);
+  }
 
-        .theme-toggle.active {
-            background: var(--accent-color);
-            color: white;
-        }
+  /* Collaborators */
+  .collab-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .collab-card {
+    padding: 1.8rem 1.5rem;
+    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(26,26,26,0.1);
+    text-align: center;
+    transition: all 0.3s;
+  }
+  .collab-card:hover {
+    border-color: var(--vermillion);
+    background: rgba(255,255,255,0.7);
+  }
+  .collab-kanji {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 1.8rem;
+    color: var(--vermillion);
+    margin-bottom: 0.6rem;
+    opacity: 0.7;
+  }
+  .collab-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 0.3rem;
+    line-height: 1.3;
+  }
+  .collab-role {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+  }
 
-        /* Back Button */
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.95em;
-            margin-bottom: 30px;
-            transition: gap 0.2s;
-        }
+  /* Reveal */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.9s ease-out, transform 0.9s cubic-bezier(0.2, 0.6, 0.2, 1);
+  }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
 
-        .back-btn:hover {
-            gap: 10px;
-        }
+  /* CTA section */
+  .cta-section {
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+    border-top: 1px solid rgba(26,26,26,0.1);
+    margin: 4rem 2rem 0;
+  }
+  .cta-section .end-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    background: var(--vermillion);
+    color: var(--paper);
+    font-family: 'Noto Serif JP', serif;
+    font-size: 1.2rem;
+    transform: rotate(-3deg);
+    margin-bottom: 2rem;
+    position: relative;
+  }
+  .cta-section .end-mark::before {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .cta-tagline {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.25rem;
+    color: var(--ink-soft);
+    margin-bottom: 2rem;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+  }
+  .cta-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.95rem 2.2rem;
+    border: 1px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+    transition: color 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
+  }
+  .cta-button::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--vermillion);
+    transform: translateY(101%);
+    transition: transform 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
+    z-index: 0;
+  }
+  .cta-button > span {
+    position: relative;
+    z-index: 1;
+    transition: color 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
+  }
+  .cta-button:hover {
+    border-color: var(--vermillion);
+    color: var(--paper);
+  }
+  .cta-button:hover::before { transform: translateY(0); }
 
-        .back-btn:focus {
-            outline: 2px solid var(--accent-color);
-            outline-offset: 2px;
-        }
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 3rem 2rem;
+    position: relative;
+    z-index: 3;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+  }
+  footer a {
+    color: var(--vermillion);
+    text-decoration: none;
+    margin: 0 0.5rem;
+    transition: color 0.3s;
+  }
+  footer a:hover { color: var(--vermillion-dark); }
 
-        /* Header */
-        .project-header {
-            margin-bottom: 35px;
-            padding-bottom: 25px;
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        .project-header h1 {
-            font-size: 1.6em;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-            line-height: 1.4;
-        }
-
-        .project-meta {
-            color: var(--text-secondary);
-            font-style: italic;
-            font-size: 0.95em;
-            margin-bottom: 14px;
-        }
-
-        .badge {
-            display: inline-block;
-            background: var(--accent-color);
-            color: white;
-            padding: 3px 12px;
-            border-radius: 12px;
-            font-size: 0.78em;
-            font-family: Arial, sans-serif;
-            margin-right: 6px;
-        }
-
-        /* Sections */
-        section {
-            margin-bottom: 32px;
-        }
-
-        h2 {
-            font-size: 1.15em;
-            color: var(--text-primary);
-            margin-bottom: 12px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        p {
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-            font-size: 0.97em;
-        }
-
-        ul {
-            padding-left: 20px;
-            color: var(--text-secondary);
-        }
-
-        ul li {
-            margin-bottom: 6px;
-            font-size: 0.97em;
-        }
-
-        /* Tech Stack badges */
-        .tech-stack {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .tech-tag {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.82em;
-            font-family: Arial, sans-serif;
-        }
-
-        /* Screenshots */
-        .screenshots {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 14px;
-        }
-
-        .screenshots img {
-            width: 100%;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            transition: transform 0.2s;
-            cursor: zoom-in;
-            loading: lazy;
-        }
-
-        .screenshots img:hover {
-            transform: scale(1.02);
-        }
-
-        .screenshots img:focus {
-            outline: 2px solid var(--accent-color);
-            outline-offset: 2px;
-        }
-
-        .screenshot-caption {
-            font-size: 0.8em;
-            color: var(--text-tertiary);
-            text-align: center;
-            margin-top: 4px;
-            font-style: italic;
-        }
-
-        /* Lightbox */
-        .lightbox {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .lightbox.active {
-            display: flex;
-        }
-
-        .lightbox img {
-            max-width: 90%;
-            max-height: 90vh;
-            border-radius: 8px;
-        }
-
-        .lightbox-close {
-            position: absolute;
-            top: 20px; right: 30px;
-            color: white;
-            font-size: 2rem;
-            cursor: pointer;
-            background: none;
-            border: none;
-            padding: 0;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-
-        .lightbox-close:hover {
-            background-color: rgba(255,255,255,0.1);
-        }
-
-        .lightbox-close:focus {
-            outline: 2px solid white;
-            outline-offset: -2px;
-        }
-
-        /* Footer link */
-        .footer-link {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
-            font-size: 0.9em;
-            color: var(--text-tertiary);
-        }
-
-        .footer-link a {
-            color: var(--accent-color);
-            text-decoration: none;
-        }
-
-        .footer-link a:focus {
-            outline: 2px solid var(--accent-color);
-            outline-offset: 2px;
-        }
-        
-        .sr-only {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border-width: 0;
-        }
-    </style>
+  /* Responsive */
+  @media (max-width: 768px) {
+    .top-bar { padding: 1rem 1.5rem; }
+    .back-link { font-size: 0.7rem; letter-spacing: 0.2em; }
+    .brand { display: none; }
+    .project-hero { padding: 4rem 1.5rem 3rem; }
+    .hero-image-wrap { padding: 0 1.5rem; margin: 2rem auto 4rem; }
+    .content { padding: 0 1.5rem; }
+    .section { margin-bottom: 4rem; }
+    .section p { font-size: 1.08rem; }
+  }
+</style>
 </head>
 <body>
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle Dark Mode">🌙</button>
 
-    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lightbox-title">
-        <h2 id="lightbox-title" class="sr-only">Image preview</h2>
-        <button class="lightbox-close" id="lightboxClose" aria-label="Close image preview">&times;</button>
-        <img id="lightboxImg" src="" alt="">
+  <!-- Classical watermark -->
+  <div class="watermark" aria-hidden="true">
+    <svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="560" cy="220" r="90" fill="none" stroke="#1a1a1a" stroke-width="1.5"/>
+      <path d="M 50 480 Q 180 300 260 380 Q 340 280 420 360 Q 500 250 600 340 Q 700 280 750 360 L 750 600 L 50 600 Z" fill="none" stroke="#1a1a1a" stroke-width="1.2" opacity="0.7"/>
+      <path d="M 30 540 Q 150 400 250 460 Q 330 380 400 440 Q 480 360 580 440 Q 660 400 770 460 L 770 700 L 30 700 Z" fill="#1a1a1a" opacity="0.18"/>
+      <g stroke="#1a1a1a" stroke-width="1.5" fill="none" opacity="0.8">
+        <path d="M 0 620 Q 80 600 160 620 T 320 620 T 480 620 T 640 620 T 800 620"/>
+        <path d="M 0 650 Q 80 630 160 650 T 320 650 T 480 650 T 640 650 T 800 650"/>
+        <path d="M 0 680 Q 100 660 200 680 T 400 680 T 600 680 T 800 680"/>
+      </g>
+      <g stroke="#1a1a1a" stroke-width="2" fill="none" opacity="0.6">
+        <line x1="120" y1="120" x2="115" y2="450"/>
+        <line x1="115" y1="180" x2="155" y2="160"/>
+        <line x1="118" y1="240" x2="160" y2="225"/>
+        <line x1="116" y1="300" x2="150" y2="285"/>
+        <line x1="115" y1="360" x2="155" y2="345"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- ============ TOP NAV ============ -->
+  <header class="top-bar" id="topBar">
+    <a href="../index.html" class="back-link">
+      <span class="arrow">&larr;</span>
+      <span>Back to Main</span>
+    </a>
+    <a href="../index.html" class="brand">Joshu &middot; Leonardy</a>
+    <div class="seal" title="印">印</div>
+  </header>
+
+  <main>
+
+    <!-- ============ PROJECT HERO ============ -->
+    <section class="project-hero">
+      <div class="project-meta-top">
+        <span>2026</span>
+        <span class="dot"></span>
+        <span>Ongoing</span>
+        <span class="dot"></span>
+        <span>Collaboration</span>
+      </div>
+
+      <div class="project-kanji">作 &middot; 品</div>
+
+      <h1 class="project-title">
+        Augmented Segmentation <em>Utility</em>
+      </h1>
+
+      <p class="project-subtitle">
+        A semi-automatic image annotation tool integrating Meta AI&rsquo;s
+        Segment Anything Model (SAM) for medical and scientific imaging.
+      </p>
+
+      <div class="project-tags">
+        <span class="project-tag">Computer Vision</span>
+        <span class="project-tag">Deep Learning</span>
+        <span class="project-tag">Medical Imaging</span>
+        <span class="project-tag">GUI Software</span>
+        <span class="project-tag">Python</span>
+      </div>
+    </section>
+
+    <!-- ============ HERO IMAGE ============ -->
+    <div class="hero-image-wrap">
+      <div class="hero-image">
+        <img src="../images/Project ASU.jpg" alt="Augmented Segmentation Utility (ASU)" loading="eager">
+      </div>
     </div>
 
-    <div class="container">
-        <nav>
-            <a href="../index.html" class="back-btn" aria-label="Back to home page">← Back to Home</a>
-        </nav>
+    <!-- ============ CONTENT ============ -->
+    <div class="content">
 
-        <div class="project-header">
-            <h1>Annotation Segmentation Utility (ASU) for Object Segmentation Software</h1>
-            <div class="project-meta">Collaboration Research with BRIN, Telkom University, and Kanazawa University, 2026</div>
-            <span class="badge">Computer Vision</span>
-            <span class="badge">Medical Imaging</span>
-            <span class="badge">Deep Learning</span>
+      <!-- Overview -->
+      <section class="section reveal">
+        <div class="section-label">Overview</div>
+        <h2 class="section-heading">About the Project</h2>
+        <p>
+          <strong>ASU (Augmented Segmentation Utility)</strong> is a desktop GUI
+          application that integrates Meta AI&rsquo;s <em>Segment Anything Model (SAM)</em>
+          for semi-automatic image annotation and segmentation. The tool is designed
+          to accelerate and standardize ground-truth generation for deep learning
+          model training, particularly in medical and scientific imaging workflows.
+        </p>
+        <p>
+          The application has been demonstrated on <strong>MRI brain tumor
+          segmentation</strong>, where it significantly reduced annotation time
+          compared to fully manual methods, while maintaining high boundary
+          accuracy.
+        </p>
+      </section>
+
+      <!-- Key Features -->
+      <section class="section reveal">
+        <div class="section-label">Capabilities</div>
+        <h2 class="section-heading">Key Features</h2>
+        <ul class="feature-list">
+          <li>
+            <strong>SAM model integration</strong> with selectable variants
+            (ViT-H and ViT-B) for different speed/accuracy trade-offs
+          </li>
+          <li>
+            <strong>Interactive click-based prompting</strong> using positive and
+            negative point inputs for refined segmentation control
+          </li>
+          <li>
+            <strong>Project-based batch image management</strong> with New, Open,
+            and Save Project workflows
+          </li>
+          <li>
+            <strong>Multi-class labeling</strong> with fully customizable class
+            names for any annotation taxonomy
+          </li>
+          <li>
+            <strong>YOLO-format export</strong> for direct compatibility with
+            downstream object detection model training
+          </li>
+          <li>
+            <strong>CPU / GPU device selection</strong> with automatic fallback
+            to CPU for accessibility across hardware
+          </li>
+          <li>
+            <strong>Zoom and fit-to-window controls</strong> for precise pixel-level
+            annotation work
+          </li>
+          <li>
+            <strong>Undo / Redo and Delete annotation controls</strong> for an
+            efficient correction workflow
+          </li>
+        </ul>
+      </section>
+
+      <!-- Tech Stack -->
+      <section class="section reveal">
+        <div class="section-label">Technology</div>
+        <h2 class="section-heading">Built With</h2>
+        <div class="tech-grid">
+          <div class="tech-item">
+            <span class="tech-cat">Language</span>
+            <span class="tech-name">Python</span>
+          </div>
+          <div class="tech-item">
+            <span class="tech-cat">AI Model</span>
+            <span class="tech-name">SAM &amp; SAM-2</span>
+          </div>
+          <div class="tech-item">
+            <span class="tech-cat">Detection</span>
+            <span class="tech-name">YOLOv11</span>
+          </div>
+          <div class="tech-item">
+            <span class="tech-cat">DL Framework</span>
+            <span class="tech-name">PyTorch</span>
+          </div>
+          <div class="tech-item">
+            <span class="tech-cat">Image Processing</span>
+            <span class="tech-name">OpenCV</span>
+          </div>
+          <div class="tech-item">
+            <span class="tech-cat">GUI Framework</span>
+            <span class="tech-name">PyQt / Tkinter</span>
+          </div>
         </div>
+      </section>
 
-        <section>
-            <h2>Overview</h2>
-            <p>
-                ASU (Annotation Segmentation Utility) is a desktop GUI application that integrates Meta AI's 
-                <strong>Segment Anything Model (SAM)</strong> for semi-automatic image annotation and segmentation. 
-                The tool is designed to accelerate and standardize ground-truth generation for deep learning model 
-                training, particularly in medical and scientific imaging workflows.
-            </p>
-            <p>
-                The application has been demonstrated on <strong>MRI brain tumor segmentation</strong>, 
-                where it significantly reduced annotation time compared to fully manual methods, while 
-                maintaining high boundary accuracy.
-            </p>
-        </section>
-
-        <section>
-            <h2>Key Features</h2>
-            <ul>
-                <li>SAM model integration with selectable variants (<strong>ViT-H</strong> and <strong>ViT-B</strong>)</li>
-                <li>Interactive click-based prompting (positive / negative points)</li>
-                <li>Project-based batch image management (New / Open / Save Project)</li>
-                <li>Multi-class labeling with customizable class names</li>
-                <li>Export annotations in <strong>YOLO format</strong> for downstream model training</li>
-                <li>CPU / GPU device selection with automatic fallback to CPU</li>
-                <li>Zoom and fit-to-window controls for detailed annotation</li>
-                <li>Undo / Redo and Delete Annotation controls</li>
-            </ul>
-        </section>
-
-        <section>
-            <h2>Tech Stack</h2>
-            <div class="tech-stack">
-                <span class="tech-tag">Python</span>
-                <span class="tech-tag">SAM (Meta AI)</span>
-                <span class="tech-tag">SAM-2</span>
-                <span class="tech-tag">PyTorch</span>
-                <span class="tech-tag">OpenCV</span>
-                <span class="tech-tag">PyQt5</span>
-                <span class="tech-tag">NumPy</span>
-                <span class="tech-tag">YOLO Export</span>
-            </div>
-        </section>
-
-        <section>
-            <h2>Screenshots</h2>
-            <div class="screenshots">
-                <div>
-                    <img src="../images/ASU%20Project/Main%20Interface.png" 
-                         alt="ASU Interface - Main application window" 
-                         loading="lazy" 
-                         onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">Main Interface</div>
-                </div>
-                <div>
-                    <img src="../images/ASU%20Project/Image%20Uploaded.png" 
-                         alt="Image loaded into ASU" 
-                         loading="lazy" 
-                         onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">Image Uploaded</div>
-                </div>
-                <div>
-                    <img src="../images/ASU%20Project/Model%20Uploading.png" 
-                         alt="SAM model loading" 
-                         loading="lazy" 
-                         onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">Model Uploading</div>
-                </div>
-                <div>
-                    <img src="../images/ASU%20Project/Segmentation%20Success.png" 
-                         alt="Segmentation result" 
-                         loading="lazy" 
-                         onclick="openLightbox(this.src)">
-                    <div class="screenshot-caption">Segmentation Success</div>
-                </div>
-            </div>
-        </section>
-
-        
-        <section>
-            <h2>Application</h2>
-            <p>
-                This tool bridges the gap between foundation models and practical annotation workflows. 
-                It is particularly relevant for:
-            </p>
-            <ul>
-                <li>Generating training data for <strong>organ segmentation</strong> in radiotherapy planning</li>
-                <li>Semi-automatic delineation in <strong>low-contrast medical images</strong></li>
-                <li>Building labeled datasets for <strong>surgical scene understanding</strong></li>
-                <li>Rapid prototyping of segmentation pipelines in research environments</li>
-            </ul>
-        </section>
-
-        <div class="footer-link">
-            <a href="../index.html">← Back to Joshu Leonardy's Homepage</a>
+      <!-- Collaboration -->
+      <section class="section reveal">
+        <div class="section-label">Partnership</div>
+        <h2 class="section-heading">Collaborators</h2>
+        <p>
+          This project is a tripartite collaboration spanning Indonesia, Malaysia,
+          and Japan, bringing together expertise in photonics research, AI
+          systems, and medical imaging.
+        </p>
+        <div class="collab-list">
+          <div class="collab-card">
+            <div class="collab-kanji">研</div>
+            <div class="collab-name">BRIN</div>
+            <div class="collab-role">Indonesia &middot; Photonics</div>
+          </div>
+          <div class="collab-card">
+            <div class="collab-kanji">大</div>
+            <div class="collab-name">Telkom University</div>
+            <div class="collab-role">Indonesia &middot; AI Systems</div>
+          </div>
+          <div class="collab-card">
+            <div class="collab-kanji">学</div>
+            <div class="collab-name">Kanazawa University</div>
+            <div class="collab-role">Japan &middot; Medical Imaging</div>
+          </div>
         </div>
+      </section>
+
+      <!-- Status -->
+      <section class="section reveal">
+        <div class="section-label">Status</div>
+        <h2 class="section-heading">Current Progress</h2>
+        <p>
+          The software has been registered for copyright protection in 2026.
+          Development is ongoing, with the team currently working on expanding
+          dataset support, integrating SAM-2 for video segmentation, and
+          publishing findings from the MRI brain tumor segmentation case study.
+        </p>
+      </section>
+
     </div>
 
-    <script>
-        const themeToggle = document.getElementById('themeToggle');
-        const currentTheme = localStorage.getItem('theme') || 'light';
-        if (currentTheme === 'dark') {
-            document.body.classList.add('dark-mode');
-            themeToggle.textContent = '☀️';
-            themeToggle.classList.add('active');
-            themeToggle.setAttribute('aria-pressed', 'true');
-        }
-        themeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            const isDark = document.body.classList.contains('dark-mode');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            themeToggle.textContent = isDark ? '☀️' : '🌙';
-            themeToggle.classList.toggle('active');
-            themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-        });
+    <!-- ============ CTA ============ -->
+    <div class="cta-section">
+      <div class="end-mark">了</div>
+      <p class="cta-tagline">
+        Thank you for reading. Explore my other research projects or get in touch.
+      </p>
+      <a href="../index.html#project" class="cta-button">
+        <span>More Projects</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
 
-        // Lightbox
-        function openLightbox(src) {
-            document.getElementById('lightboxImg').src = src;
-            document.getElementById('lightbox').classList.add('active');
-            document.getElementById('lightbox').setAttribute('aria-hidden', 'false');
-        }
-        
-        function closeLightbox() {
-            document.getElementById('lightbox').classList.remove('active');
-            document.getElementById('lightbox').setAttribute('aria-hidden', 'true');
-        }
-        
-        document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+  </main>
 
-        document.getElementById('lightbox').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                closeLightbox();
-            }
-        });
+  <footer>
+    <div>&copy; 2026 &mdash; Joshu Leonardy</div>
+    <div style="margin-top: 0.6rem;">
+      <a href="mailto:joshu@graduate.utm.my">Email</a> &middot;
+      <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank">LinkedIn</a> &middot;
+      <a href="https://github.com/JoshhhLee" target="_blank">GitHub</a> &middot;
+      <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank">Scholar</a>
+    </div>
+  </footer>
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.getElementById('lightbox').classList.contains('active')) {
-                closeLightbox();
-            }
-        });
-    </script>
+  <script>
+    // Reveal on scroll
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Top bar shadow on scroll
+    const topBar = document.getElementById('topBar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 30) topBar.classList.add('scrolled');
+      else topBar.classList.remove('scrolled');
+    });
+  </script>
+
 </body>
 </html>
