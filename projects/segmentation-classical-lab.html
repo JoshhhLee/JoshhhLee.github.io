@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Edges &amp; Segmentation Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive image processing lab following Gonzalez & Woods chapter 10: derivatives and edge models, point and line detection, Marr-Hildreth and Canny edge detectors step by step, the Hough transform, iterative, multi-level and moving-average thresholding, region growing, k-means and watershed segmentation — on sample images or your own photograph." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+section{scroll-margin-top:64px}
+.prof canvas{display:block;width:100%}
+.hough{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.4rem 1.6rem;margin-top:1.2rem;align-items:start}
+.hough .hcell{min-width:0}
+.hough canvas{display:block;width:100%;border:1px solid var(--line);background:var(--paper-dark)}
+.hough canvas.acc{image-rendering:pixelated;cursor:crosshair}
+.hough .cap{font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-light);display:block;margin-bottom:.4rem}
+.hough .cap em{font-style:normal;color:var(--vermillion);text-transform:none;letter-spacing:.04em}
+.readout-line{font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink-soft);margin-top:.6rem;line-height:1.8}
+.readout-line b{color:var(--vermillion);font-weight:500}
+.iters{font-family:'Inter',sans-serif;font-size:.74rem;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:.3rem .9rem;margin-top:.4rem}
+.iters span b{color:var(--vermillion);font-weight:500}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#models">Edge models</a><a href="#detectors">Canny</a><a href="#hough">Hough</a>
+    <a href="#threshold">Thresholding</a><a href="#regions">Regions</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">輪 · 郭 · と · 分 · 割</div>
+  <h1>Edges &amp; <em>Segmentation</em> Lab</h1>
+  <div class="hero-divider"></div>
+  <p>Segmentation divides an image into the regions it is made of. There are two ways in. One looks for <em>discontinuities</em>, the edges where brightness changes abruptly. The other looks for <em>similarity</em>, groups of pixels that belong together. This last lab of the series follows Chapter 10 of Gonzalez &amp; Woods through both approaches. It also returns to the uneven page that no single threshold could handle in lab 02.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="models">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">微 · 分 · と · 輪 · 郭</div>
+    <h2 class="section-heading-text">Derivatives and edge models</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §10.2: Background (p. 702), Detection of Isolated Points (p. 706), Line Detection (p. 707), Edge Models (p. 710), eqs. 10-4 to 10-15</p>
+  <p class="lede reveal d1">Every edge detector is built from derivatives, so start with a single row of pixels. The first derivative is nonzero along the whole slope of an edge. The second derivative gives a pair of spikes, one positive and one negative, and the point where it crosses zero between them marks the middle of the edge. Now add a little noise and watch what happens to each derivative.</p>
+
+  <div class="eqbox">
+    <div class="eqmath">∂<i>f</i>/∂<i>x</i>&nbsp;=&nbsp;[<i>f</i>(<i>x</i>+1) − <i>f</i>(<i>x</i>−1)] / 2&nbsp;&nbsp;&nbsp;&nbsp;∂²<i>f</i>/∂<i>x</i>²&nbsp;=&nbsp;<i>f</i>(<i>x</i>+1) − 2<i>f</i>(<i>x</i>) + <i>f</i>(<i>x</i>−1)</div>
+    <div class="eqkey" id="p-key"></div>
+    <p class="eqgloss">These are the central differences of eqs. 10-6 and 10-7. Noise that is barely visible in <i>f</i> becomes large in the first derivative and overwhelming in the second, because each difference subtracts neighbouring values and so strengthens any rapid change, including noise. That is why every serious edge detector smooths the image first.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:span 2"><span class="label">Edge model</span><div class="seg" id="p-model"></div></div>
+    <div><span class="label">Ramp width <span class="mono" id="p-w-v"></span></span><input type="range" id="p-w" min="1" max="30" value="10" aria-label="Ramp width"></div>
+    <div><span class="label">Noise σ <span class="mono" id="p-n-v"></span></span><input type="range" id="p-n" min="0" max="10" step="0.1" value="0" aria-label="Noise"></div>
+    <div><span class="label">Smooth first</span><div class="seg" id="p-s"></div></div>
+  </div>
+  <div class="ip-charts">
+    <div class="ip-chart prof" style="grid-column:1/-1"><span class="cap">Profile <em>f(x)</em>, first derivative, second derivative</span><canvas id="p-c"></canvas></div>
+  </div>
+
+  <h3 class="sub-h">Points and lines on a real image</h3>
+  <p class="lede">A point detector is the Laplacian (eq. 10-14) followed by a threshold on |<i>Z</i>| (eq. 10-15). A line detector weights one direction more heavily: a line running in the same direction as the kernel gives the strongest response.</p>
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:span 2"><span class="label">Kernel</span><div class="seg" id="l-k"></div></div>
+    <div><span class="label">Threshold <span class="mono" id="l-t-v"></span></span><input type="range" id="l-t" min="1" max="100" value="40" aria-label="Threshold as a percentage of the largest response"></div>
+    <div><span class="label">Show</span><div class="seg" id="l-v"></div></div>
+  </div>
+  <div id="pick1"></div>
+  <div id="st1" style="margin-top:1rem"></div>
+  <div id="t1"></div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="detectors">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">検 · 出 · 器</div>
+    <h2 class="section-heading-text">Marr–Hildreth and Canny, step by step</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §10.2: More Advanced Techniques for Edge Detection (p. 724), eqs. 10-27 to 10-41</p>
+  <p class="lede reveal d1">Lab 03's Sobel magnitude gave thick edges that were broken and noisy. The two detectors here repair those problems in different ways. Marr–Hildreth smooths the image, takes the Laplacian, and marks where the result changes sign. Canny smooths the image, then thins each edge to its single strongest pixel, and finally links edges using two thresholds. Step through each stage with the buttons below the controls.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="c-eq"></div>
+    <div class="eqkey" id="c-key"></div>
+    <p class="eqgloss" id="c-gloss"></p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Detector</span><div class="seg" id="c-det"></div></div>
+    <div><span class="label">Gaussian σ <span class="mono" id="c-s-v"></span></span><input type="range" id="c-s" min="0.5" max="5" step="0.25" value="2" aria-label="Gaussian sigma"></div>
+    <div id="c-th-w"><span class="label">High threshold T<sub>H</sub> <span class="mono" id="c-th-v"></span></span><input type="range" id="c-th" min="2" max="60" value="15" aria-label="High threshold, percent of maximum"></div>
+    <div id="c-r-w"><span class="label">T<sub>H</sub> : T<sub>L</sub> <span class="mono" id="c-r-v"></span></span><input type="range" id="c-r" min="1" max="4" step="0.25" value="2.5" aria-label="High to low threshold ratio"></div>
+    <div id="c-z-w"><span class="label">Zero-crossing threshold <span class="mono" id="c-z-v"></span></span><input type="range" id="c-z" min="0" max="30" value="4" aria-label="Zero crossing threshold, percent of maximum"></div>
+    <div style="grid-column:1/-1"><span class="label">Stage</span><div class="chiprow" id="c-stage"></div></div>
+  </div>
+  <div id="pick2"></div>
+  <div id="st2" style="margin-top:1rem"></div>
+  <div class="scoreboard" id="sb2"></div>
+  <div id="t2"></div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="hough">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">ハ · フ · 変 · 換</div>
+    <h2 class="section-heading-text">Linking edges: the Hough transform</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §10.2: Linking Edge Points (p. 735), eq. 10-44</p>
+  <p class="lede reveal d1">An edge map is still just a scatter of pixels. The Hough transform asks which straight lines those pixels support. Every edge pixel votes for all the lines that could pass through it. In the (<i>ρ</i>, <i>θ</i>) plane those votes trace out a sinusoid, one per pixel. Where many sinusoids cross, many pixels share one line. Hover over the accumulator to see which line a point stands for, and click to add it or take it away.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>x</i>&nbsp;cos&nbsp;<i>θ</i>&nbsp;+&nbsp;<i>y</i>&nbsp;sin&nbsp;<i>θ</i>&nbsp;=&nbsp;<i>ρ</i></div>
+    <div class="eqkey" id="h-key"><span>Hover over the accumulator.</span></div>
+    <p class="eqgloss">This is the normal form of a line (eq. 10-44). Unlike <i>y</i> = <i>ax</i> + <i>b</i>, it can also describe vertical lines. <i>θ</i> runs from −90° to 90°, and <i>ρ</i> from −<i>D</i> to <i>D</i>, where <i>D</i> is the image diagonal. As in lab 03, <i>x</i> runs across the columns here, whereas the book measures it down the rows. The edge map is the Canny output from section 02, with its current settings.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Lines to find <span class="mono" id="h-k-v"></span></span><input type="range" id="h-k" min="1" max="20" value="8" aria-label="Number of peaks"></div>
+    <div><span class="label">Minimum votes <span class="mono" id="h-m-v"></span></span><input type="range" id="h-m" min="5" max="80" value="25" aria-label="Minimum votes as a percentage of the highest peak"></div>
+  </div>
+  <div id="pick3"></div>
+  <div class="hough">
+    <div class="hcell"><span class="cap">Edges and detected lines</span><canvas id="h-img"></canvas></div>
+    <div class="hcell"><span class="cap">Accumulator <em>· θ across, ρ down · click to add or remove a line</em></span><canvas id="h-acc" class="acc" aria-label="Hough accumulator. Hover to preview a line, click to toggle it."></canvas>
+      <div class="readout-line" id="h-read"></div></div>
+  </div>
+  <div class="scoreboard" id="sb3"></div>
+  <div id="t3"></div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="threshold">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">閾 · 値 · 処 · 理</div>
+    <h2 class="section-heading-text">Thresholding, beyond a single T</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §10.3: Basic Global Thresholding (p. 746), Multiple Thresholds (p. 757), Variable Thresholding (p. 761), eqs. 10-46, 10-66 to 10-77, 10-80, 10-83</p>
+  <p class="lede reveal d1">Lab 02 introduced Otsu's method. This section covers three things around it. The first is the book's simple iterative method, which usually lands close to Otsu's threshold. The second extends Otsu to two thresholds, which splits the image into three classes. The third is the fix promised in lab 02: a threshold that changes across the image, computed from a moving average of nearby pixels. Try it on <i>Uneven page</i>.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="th-eq"></div>
+    <div class="eqkey" id="th-key"></div>
+    <p class="eqgloss" id="th-gloss"></p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Method</span><div class="chiprow" id="th-m"></div></div>
+    <div id="th-n-w"><span class="label">Window n <span class="mono" id="th-n-v"></span></span><input type="range" id="th-n" min="3" max="60" value="15" aria-label="Moving average length"></div>
+    <div id="th-c-w"><span class="label">c <span class="mono" id="th-c-v"></span></span><input type="range" id="th-c" min="0.2" max="1" step="0.02" value="0.5" aria-label="Moving average factor c"></div>
+  </div>
+  <div id="pick4"></div>
+  <div id="st4" style="margin-top:1rem"></div>
+  <div class="ip-charts"><div class="ip-chart"><span class="cap">Histogram <em>· thresholds marked</em></span><canvas id="th-h"></canvas></div></div>
+  <div class="scoreboard" id="sb4"></div>
+  <div id="t4"></div>
+</section>
+
+<!-- ══════ 05 ══════ -->
+<section id="regions">
+  <div class="section-heading reveal">
+    <span class="section-num">— 05 —</span>
+    <div class="section-heading-kanji">領 · 域 · 分 · 割</div>
+    <h2 class="section-heading-text">Regions: growing, clustering, flooding</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §10.4: Region Growing (p. 764); §10.5: Region Segmentation Using K-Means Clustering (p. 770), eq. 10-85; §10.7 Segmentation Using Morphological Watersheds (p. 786)</p>
+  <p class="lede reveal d1">These methods build regions directly instead of looking for edges. Region growing starts from seeds you click and keeps adding neighbouring pixels that pass a similarity test. k-means sorts every pixel into one of <i>k</i> groups by brightness. The watershed treats the gradient image as a landscape and floods it from its lowest points. Each flooded basin becomes a region, and dams are built where two basins would merge.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="rg-eq"></div>
+    <div class="eqkey" id="rg-key"></div>
+    <p class="eqgloss" id="rg-gloss"></p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Method</span><div class="seg" id="rg-m"></div></div>
+    <div id="rg-t-w"><span class="label">Similarity T <span class="mono" id="rg-t-v"></span></span><input type="range" id="rg-t" min="1" max="80" value="25" aria-label="Region growing threshold"></div>
+    <div id="rg-clear-w"><span class="label">Seeds</span><button type="button" class="chip" id="rg-clear">Clear seeds</button></div>
+    <div id="rg-k-w"><span class="label">Clusters k <span class="mono" id="rg-k-v"></span></span><input type="range" id="rg-k" min="2" max="8" value="3" aria-label="Number of clusters"></div>
+    <div id="rg-s-w"><span class="label">Smoothing σ <span class="mono" id="rg-s-v"></span></span><input type="range" id="rg-s" min="0" max="6" step="0.5" value="0" aria-label="Smoothing before the watershed"></div>
+  </div>
+  <div id="pick5"></div>
+  <div id="st5" style="margin-top:1rem"></div>
+  <div class="scoreboard" id="sb5"></div>
+  <div class="note">This is where classical segmentation ends and learned segmentation begins. Every method in this lab relies on a rule a person chose: a threshold, a similarity test, a σ. The <a href="segmentation-lab.html">Segmentation Lab</a> in the Computer Vision series asks a network to learn those rules from examples instead.</div>
+  <div id="t5"></div>
+</section>
+
+<nav class="lab-pager">
+  <a href="morphology-lab.html" class="prev">
+    <span class="pager-dir">← Previous</span>
+    <span class="pager-title">06 · Morphology</span>
+  </a>
+  <a href="segmentation-lab.html" class="next">
+    <span class="pager-dir">Where this leads →</span>
+    <span class="pager-title">Learned segmentation: the Segmentation Lab</span>
+  </a>
+</nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+    <p style="margin-top:.6rem">Your images never leave the browser. Everything runs on your own machine.</p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script src="../assets/imgproc.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Edges & Segmentation Lab — Gonzalez & Woods, 4th ed., chapter 10
+   ═══════════════════════════════════════════════════════════════════ */
+
+let IMG = null;
+const $ = id => document.getElementById(id);
+const f1 = v => v.toFixed(1).replace('-', '−');
+const smooth = (img, s) => s > 0 ? IP.separable(img, IP.gauss1d(s), 'replicate') : img;
+const SOBX = [-1, 0, 1, -2, 0, 2, -1, 0, 1], SOBY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+const LAP8 = [1, 1, 1, 1, -8, 1, 1, 1, 1], LAP4 = [0, 1, 0, 1, -4, 1, 0, 1, 0];
+
+/* ═════ 01 — edge models in one dimension ═════ */
+
+const P1 = { model: 'ramp', w: 10, noise: 0, smooth: 0 };
+function buildP1() {
+  seg('p-model', ['step', 'ramp', 'roof', 'line'], P1.model, v => { P1.model = v; buildP1(); renderP1(); }, ['Step', 'Ramp', 'Roof', 'Line']);
+  seg('p-s', [0, 2], P1.smooth, v => { P1.smooth = v; buildP1(); renderP1(); }, ['No', 'Gaussian σ 2']);
+}
+$('p-w').addEventListener('input', e => { P1.w = +e.target.value; renderP1(); });
+$('p-n').addEventListener('input', e => { P1.noise = +e.target.value; renderP1(); });
+function renderP1() {
+  const n = 120, f = [], r = IP.rng(31), c = 60;
+  for (let x = 0; x < n; x++) {
+    let v;
+    if (P1.model === 'step') v = x < c ? 60 : 180;
+    else if (P1.model === 'ramp') v = 60 + 120 * clamp((x - c + P1.w / 2) / P1.w, 0, 1);
+    else if (P1.model === 'roof') v = 60 + 120 * Math.max(0, 1 - Math.abs(x - c) / Math.max(1, P1.w / 2));
+    else v = Math.abs(x - c) <= Math.max(0, Math.floor(P1.w / 8)) ? 180 : 60;
+    const u = Math.max(r(), 1e-12), w = r();
+    f.push(v + P1.noise * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * w));
+  }
+  let g = f;
+  if (P1.smooth) { const k = IP.gauss1d(P1.smooth), h = k.length >> 1; g = f.map((_, x) => k.reduce((s, kv, i) => s + kv * f[clamp(x + i - h, 0, n - 1)], 0)); }
+  const d1 = g.map((_, x) => (g[clamp(x + 1, 0, n - 1)] - g[clamp(x - 1, 0, n - 1)]) / 2);
+  const d2 = g.map((_, x) => g[clamp(x + 1, 0, n - 1)] - 2 * g[x] + g[clamp(x - 1, 0, n - 1)]);
+  drawStack($('p-c'), [
+    { data: g, label: P1.smooth ? 'f, smoothed' : 'f(x)', color: IP.col('ink') },
+    { data: d1, label: 'first derivative', color: IP.col('vermillion'), zero: true },
+    { data: d2, label: 'second derivative', color: IP.col('sage'), zero: true, zc: true }
+  ]);
+  const zc = zeroCrossings(d2, 0.2);
+  $('p-w-v').textContent = '= ' + P1.w + ' px'; $('p-n-v').textContent = '= ' + P1.noise;
+  $('p-key').innerHTML = '<span>max |∂<i>f</i>/∂<i>x</i>| = ' + f1(Math.max(...d1.map(Math.abs))) + '</span><span>max |∂²<i>f</i>/∂<i>x</i>²| = ' + f1(Math.max(...d2.map(Math.abs))) + '</span><span>zero crossings between lobes ≥ 20% of the peak: <b>' + zc.length + '</b></span>';
+  P1.zc = zc.length;
+}
+/**
+ * Zero crossings of a sampled signal. Split it into runs of one sign (skipping
+ * exact zeros, so a clean ramp's +spike, zeros, −spike still counts), and count
+ * a crossing between two runs only if both lobes are substantial — the 1-D form
+ * of the book's "difference must exceed a threshold". The crossing sits midway.
+ */
+function zeroCrossings(d, frac) {
+  const mx = Math.max(...d.map(Math.abs)) || 1, runs = [];
+  for (let x = 0; x < d.length; x++) {
+    const v = d[x]; if (Math.abs(v) < 1e-6 * mx) continue;
+    const sg = v > 0 ? 1 : -1, r = runs[runs.length - 1];
+    if (r && r.sg === sg) { r.end = x; r.peak = Math.max(r.peak, Math.abs(v)); }
+    else runs.push({ sg, start: x, end: x, peak: Math.abs(v) });
+  }
+  const out = [];
+  for (let i = 1; i < runs.length; i++) if (runs[i - 1].peak >= frac * mx && runs[i].peak >= frac * mx) out.push((runs[i - 1].end + runs[i].start) / 2);
+  return out;
+}
+/** Three stacked plots on one canvas, sharing the x axis. */
+function drawStack(canvas, rows) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 600, rh = 92, h = rh * rows.length + 14;
+  canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  ctx.font = '10px Inter, sans-serif';
+  rows.forEach((r, k) => {
+    const top = k * rh + 14, bot = top + rh - 20, n = r.data.length;
+    let lo = Math.min(...r.data), hi = Math.max(...r.data);
+    if (r.zero) { const m = Math.max(Math.abs(lo), Math.abs(hi), 1); lo = -m; hi = m; } else { lo = Math.min(lo, 0); hi = Math.max(hi, 255); }
+    const X = i => 8 + i / (n - 1) * (w - 16), Y = v => bot - (v - lo) / (hi - lo) * (bot - top);
+    ctx.strokeStyle = 'rgba(26,26,26,.15)'; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(8, Y(r.zero ? 0 : lo)); ctx.lineTo(w - 8, Y(r.zero ? 0 : lo)); ctx.stroke(); ctx.setLineDash([]);
+    if (r.zc) { ctx.fillStyle = 'rgba(184,65,46,.9)'; zeroCrossings(r.data, 0.2).forEach(z => ctx.fillRect(X(z) - 1, Y(0) - 6, 2, 12)); }
+    ctx.strokeStyle = r.color; ctx.lineWidth = 1.6; ctx.beginPath();
+    r.data.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))); ctx.stroke();
+    ctx.fillStyle = r.color; ctx.textAlign = 'left'; ctx.fillText(r.label + (r.zc ? '  · red ticks = zero crossings' : ''), 10, top - 3);
+  });
+}
+
+/* ═════ 01 — points and lines on the image ═════ */
+
+const LK = {
+  point: { label: 'Point', k: LAP8, eq: 'Laplacian, eq. 10-14' },
+  h: { label: 'Line —', k: [-1, -1, -1, 2, 2, 2, -1, -1, -1] },
+  d45: { label: 'Line ╱', k: [-1, -1, 2, -1, 2, -1, 2, -1, -1] },
+  v: { label: 'Line |', k: [-1, 2, -1, -1, 2, -1, -1, 2, -1] },
+  dm45: { label: 'Line ╲', k: [2, -1, -1, -1, 2, -1, -1, -1, 2] }
+};
+const L1 = { k: 'h', T: 40, view: 'thresh', seen: new Set() };
+function buildL1() {
+  seg('l-k', Object.keys(LK), L1.k, v => { L1.k = v; buildL1(); render1(); }, Object.values(LK).map(o => o.label));
+  seg('l-v', ['resp', 'thresh'], L1.view, v => { L1.view = v; buildL1(); render1(); }, ['|Z|', 'Thresholded']);
+}
+$('l-t').addEventListener('input', e => { L1.T = +e.target.value; render1(); });
+const st1 = IP.stage('st1', { afterLabel: 'Detected',
+  explain: (r, s, x, y) => { const z = L1.Z.data[y * IMG.w + x]; return '<i>Z</i> = Σ <i>w<sub>k</sub> z<sub>k</sub></i> = <b>' + f1(z) + '</b>; |<i>Z</i>| ' + (Math.abs(z) > L1.Tv ? '&gt;' : '≤') + ' <i>T</i> = ' + f1(L1.Tv) + ' → ' + (Math.abs(z) > L1.Tv ? '<b>detected</b>' : 'not detected'); } });
+function render1() {
+  if (!IMG) return;
+  const Z = IP.correlate(IMG, LK[L1.k].k, 3, 3, 'replicate');
+  let mx = 0; for (const v of Z.data) mx = Math.max(mx, Math.abs(v));
+  L1.Z = Z; L1.Tv = L1.T / 100 * mx;
+  const out = IP.make(IMG.w, IMG.h);
+  for (let i = 0; i < out.data.length; i++) out.data[i] = L1.view === 'resp' ? Math.abs(Z.data[i]) / mx * 255 : Math.abs(Z.data[i]) > L1.Tv ? 255 : 0;
+  st1.set(IMG, out);
+  $('l-t-v').textContent = '= ' + L1.T + '% of max |Z| (' + f1(L1.Tv) + ')';
+  L1.seen.add(L1.k + ':' + IP.key);
+  tries1.check();
+}
+const tries1 = IP.tries('t1', [
+  { text: 'Choose a <i>Ramp</i> and add noise σ ≈ 3. Count the zero crossings of the second derivative, then switch on smoothing and count them again.',
+    test: () => P1.model === 'ramp' && P1.noise >= 2.5 && P1.smooth === 2 },
+  { text: 'On the test chart, try the four line kernels. Which one picks out the line gratings, and which one picks out the thin diagonal?',
+    test: () => L1.seen.has('v:chart') && (L1.seen.has('d45:chart') || L1.seen.has('dm45:chart')) }
+]);
+
+/* ═════ 02 — Marr–Hildreth and Canny ═════ */
+
+const C2 = { det: 'canny', s: 2, th: 15, ratio: 2.5, z: 4, stage: 'final', seen: new Set(), ratios: new Set() };
+const STAGES = { canny: [['smooth', '1 · Smooth'], ['mag', '2 · Gradient magnitude'], ['nms', '3 · Non-maxima suppression'], ['final', '4 · Hysteresis + linking']],
+                 mh: [['smooth', '1 · Smooth'], ['log', '2 · Laplacian of the smoothed image'], ['final', '3 · Zero crossings']] };
+function buildC2() {
+  seg('c-det', ['mh', 'canny'], C2.det, v => { C2.det = v; C2.stage = 'final'; buildC2(); render2(); }, ['Marr–Hildreth', 'Canny']);
+  chips('c-stage', STAGES[C2.det], C2.stage, v => { C2.stage = v; buildC2(); render2(); });
+  const can = C2.det === 'canny';
+  $('c-th-w').style.display = $('c-r-w').style.display = can ? '' : 'none';
+  $('c-z-w').style.display = can ? 'none' : '';
+}
+$('c-s').addEventListener('input', e => { C2.s = +e.target.value; render2(); render3(); });
+$('c-th').addEventListener('input', e => { C2.th = +e.target.value; render2(); render3(); });
+$('c-r').addEventListener('input', e => { C2.ratio = +e.target.value; render2(); render3(); });
+$('c-z').addEventListener('input', e => { C2.z = +e.target.value; render2(); });
+
+/** Canny's four steps. Returns every intermediate so the lab can show each one. */
+function canny(img, s, thPct, ratio) {
+  const fs = smooth(img, s), gx = IP.correlate(fs, SOBX, 3, 3, 'replicate'), gy = IP.correlate(fs, SOBY, 3, 3, 'replicate');
+  const { w, h } = img, n = w * h, M = new Float32Array(n), A = new Float32Array(n);
+  let mx = 0;
+  for (let i = 0; i < n; i++) { M[i] = Math.hypot(gx.data[i], gy.data[i]); A[i] = Math.atan2(gy.data[i], gx.data[i]); if (M[i] > mx) mx = M[i]; }
+  // 3: keep a pixel only if it is at least as strong as both neighbours along the gradient direction
+  const N = new Float32Array(n), dirs = [[1, 0], [1, 1], [0, 1], [-1, 1]];
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x; let a = A[i] * 180 / Math.PI; if (a < 0) a += 180;
+    const [dx, dy] = dirs[Math.round(a / 45) % 4];
+    const K = M[i];
+    N[i] = K < M[i + dy * w + dx] || K < M[i - dy * w - dx] ? 0 : K;
+  }
+  // 4: hysteresis — strong pixels, plus weak pixels 8-connected to a strong one
+  const TH = thPct / 100 * mx, TL = TH / ratio, E = new Uint8Array(n), st = [];
+  let strong = 0, weakKept = 0;
+  for (let i = 0; i < n; i++) if (N[i] >= TH) { E[i] = 1; st.push(i); strong++; }
+  while (st.length) {
+    const p = st.pop(), x = p % w, y = (p / w) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+      const j = yy * w + xx; if (!E[j] && N[j] >= TL) { E[j] = 1; st.push(j); weakKept++; }
+    }
+  }
+  let weakAll = 0; for (let i = 0; i < n; i++) if (N[i] >= TL && N[i] < TH) weakAll++;
+  return { fs, gx, gy, M, A, N, E, mx, TH, TL, strong, weakKept, weakAll };
+}
+/** Marr–Hildreth: ∇²(G ★ f) (eq. 10-31), then zero crossings across opposite neighbours. */
+function marrHildreth(img, s, zPct) {
+  const fs = smooth(img, s), L = IP.correlate(fs, LAP8, 3, 3, 'replicate'), { w, h } = img, n = w * h, E = new Uint8Array(n);
+  let mx = 0; for (const v of L.data) mx = Math.max(mx, Math.abs(v));
+  const T = zPct / 100 * mx, pairs = [[1, 0], [0, 1], [1, 1], [1, -1]];
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    for (const [dx, dy] of pairs) {
+      const a = L.data[i + dy * w + dx], b = L.data[i - dy * w - dx];
+      if (a * b < 0 && Math.abs(a - b) > T) { E[i] = 1; break; }
+    }
+  }
+  return { fs, L, E, mx, T };
+}
+const st2 = IP.stage('st2', { afterLabel: 'Stage',
+  explain: (r, s, x, y) => {
+    const i = y * IMG.w + x, R = C2.res;
+    if (C2.det === 'canny') {
+      const a = R.A[i] * 180 / Math.PI;
+      return '|∇<i>f<sub>s</sub></i>| = <b>' + f1(R.M[i]) + '</b>, <i>α</i> = ' + f1(a) + '°' +
+        '<br>after suppression: ' + (R.N[i] ? '<b>kept</b> (a local maximum across the edge)' : 'suppressed') +
+        '<br><i>T<sub>H</sub></i> = ' + f1(R.TH) + ', <i>T<sub>L</sub></i> = ' + f1(R.TL) + ' → ' + (R.E[i] ? '<b>edge</b>' : R.N[i] >= R.TL ? 'weak, but not connected to a strong edge' : 'not an edge');
+    }
+    return '∇²<i>f<sub>s</sub></i> = <b>' + f1(R.L.data[i]) + '</b>' + (R.E[i] ? ' → <b>zero crossing</b> (opposite neighbours differ in sign by more than ' + f1(R.T) + ')' : '');
+  } });
+function render2() {
+  if (!IMG) return;
+  const can = C2.det === 'canny', R = can ? canny(IMG, C2.s, C2.th, C2.ratio) : marrHildreth(IMG, C2.s, C2.z);
+  C2.res = R;
+  const { w, h } = IMG, n = w * h, out = IP.make(w, h);
+  if (C2.stage === 'smooth') for (let i = 0; i < n; i++) out.data[i] = R.fs.data[i];
+  else if (C2.stage === 'mag') for (let i = 0; i < n; i++) out.data[i] = R.M[i] / R.mx * 255 * 2;
+  else if (C2.stage === 'nms') for (let i = 0; i < n; i++) out.data[i] = R.N[i] / R.mx * 255 * 2;
+  else if (C2.stage === 'log') { const d = IP.toDisplay(R.L, 'offset').img; out.data.set(d.data); }
+  else for (let i = 0; i < n; i++) out.data[i] = R.E[i] ? 255 : 0;
+  st2.set(IMG, out);
+  $('c-s-v').textContent = '= ' + C2.s;
+  $('c-th-v').textContent = '= ' + C2.th + '% of max';
+  $('c-r-v').textContent = '= ' + C2.ratio + ' : 1';
+  $('c-z-v').textContent = '= ' + C2.z + '% of max';
+  let ne = 0; for (const v of R.E) ne += v;
+  if (can) {
+    $('c-eq').innerHTML = '<i>f<sub>s</sub></i>&nbsp;=&nbsp;<i>G</i>&nbsp;★&nbsp;<i>f</i>,&nbsp;&nbsp;<i>M<sub>s</sub></i>&nbsp;=&nbsp;√(<i>g<sub>x</sub></i>² + <i>g<sub>y</sub></i>²),&nbsp;&nbsp;<i>α</i>&nbsp;=&nbsp;tan<sup>−1</sup>(<i>g<sub>y</sub></i>/<i>g<sub>x</sub></i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(10-35 to 10-38)</span>';
+    $('c-key').innerHTML = '<span><i>T<sub>H</sub></i> = ' + f1(R.TH) + '</span><span><i>T<sub>L</sub></i> = ' + f1(R.TL) + '</span><span>strong ' + R.strong + ', weak linked ' + R.weakKept + ' of ' + R.weakAll + '</span>';
+    $('c-gloss').innerHTML = 'Step 3 checks each pixel against its two neighbours along the gradient direction <i>α</i>, rounded to the nearest of four directions, and keeps it only if it is the largest. Step 4 applies two thresholds, <i>g<sub>NH</sub></i> = <i>g<sub>N</sub></i> ≥ <i>T<sub>H</sub></i> and <i>g<sub>NL</sub></i> = <i>g<sub>N</sub></i> ≥ <i>T<sub>L</sub></i> (eqs. 10-39, 10-40). Weak pixels are kept only if they connect to a strong one. Canny recommended a <i>T<sub>H</sub></i> : <i>T<sub>L</sub></i> ratio between 2:1 and 3:1. Gradients here use the Sobel kernels.';
+  } else {
+    $('c-eq').innerHTML = '<i>g</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;∇²[&nbsp;<i>G</i>(<i>x</i>, <i>y</i>)&nbsp;★&nbsp;<i>f</i>(<i>x</i>, <i>y</i>)&nbsp;]&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(10-31)</span>';
+    $('c-key').innerHTML = '<span><i>σ</i> = ' + C2.s + '</span><span>zero-crossing threshold ' + f1(R.T) + '</span><span>' + ne + ' edge pixels</span>';
+    $('c-gloss').innerHTML = 'Smoothing and then taking the Laplacian gives the same result as convolving with the Laplacian of a Gaussian (LoG, eq. 10-30), but it is cheaper. A pixel is a zero crossing when at least one pair of opposite neighbours differ in sign, and their difference is larger than the threshold. Without that threshold, every tiny ripple of noise counts as an edge.';
+  }
+  $('sb2').innerHTML =
+    score('Edge pixels', ne, pctOf(ne, n) + ' of the image', true) +
+    score('Detector', can ? 'Canny' : 'Marr–Hildreth', 'σ = ' + C2.s) +
+    (can ? score('Linked weak pixels', R.weakKept, 'of ' + R.weakAll + ' between T_L and T_H') : score('Threshold', f1(R.T), C2.z + '% of max |∇²f_s|'));
+  C2.seen.add(C2.det + ':' + C2.stage + ':' + C2.z);
+  if (can && C2.stage === 'final') C2.ratios.add(C2.ratio);
+  tries2.check();
+}
+const pctOf = (a, b) => (a / b * 100).toFixed(1) + '%';
+const tries2 = IP.tries('t2', [
+  { text: 'Canny: step through all four stages on the test chart. At which stage do the thick Sobel edges from lab 03 become one pixel wide?',
+    test: () => ['smooth', 'mag', 'nms', 'final'].every(s => C2.seen.has('canny:' + s + ':' + C2.z)) },
+  { text: 'Set the ratio to 1 : 1 (a single threshold), then move it to 3 : 1. What does hysteresis add?',
+    test: () => C2.ratios.has(1) && [...C2.ratios].some(r => r >= 3) },
+  { text: 'Marr–Hildreth: set the zero-crossing threshold to 0. Why does the book (p. 727) call this the "spaghetti effect"?',
+    test: () => C2.seen.has('mh:final:0') }
+]);
+
+/* ═════ 03 — Hough transform ═════ */
+
+const H3 = { K: 8, minPct: 25, acc: null, peaks: [], manual: new Map(), hover: null, D: 0, toggled: false };
+$('h-k').addEventListener('input', e => { H3.K = +e.target.value; render3(); });
+$('h-m').addEventListener('input', e => { H3.minPct = +e.target.value; render3(); });
+function render3() {
+  if (!IMG) return;
+  const { w, h } = IMG;
+  const E = canny(IMG, C2.s, C2.th, C2.ratio).E;
+  const D = Math.ceil(Math.hypot(w, h)), NR = 2 * D + 1, acc = new Uint32Array(180 * NR);
+  const cs = [], sn = [];
+  for (let t = 0; t < 180; t++) { const th = (t - 90) * Math.PI / 180; cs.push(Math.cos(th)); sn.push(Math.sin(th)); }
+  let ne = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (E[y * w + x]) {
+    ne++;
+    for (let t = 0; t < 180; t++) acc[(Math.round(x * cs[t] + y * sn[t]) + D) * 180 + t]++;
+  }
+  let mx = 0; for (const v of acc) if (v > mx) mx = v;
+  // peaks: local maxima in a 9×9 neighbourhood, above the vote floor
+  const cand = [], floor = H3.minPct / 100 * mx;
+  for (let r = 0; r < NR; r++) for (let t = 0; t < 180; t++) {
+    const v = acc[r * 180 + t]; if (v < floor || v < 2) continue;
+    let best = true;
+    for (let dr = -4; dr <= 4 && best; dr++) for (let dt = -4; dt <= 4; dt++) {
+      const rr = r + dr, tt = (t + dt + 180) % 180; if (rr < 0 || rr >= NR || (!dr && !dt)) continue;
+      const u = acc[rr * 180 + tt]; if (u > v || (u === v && (dr < 0 || (dr === 0 && dt < 0)))) { best = false; break; }
+    }
+    if (best) cand.push({ r, t, v });
+  }
+  cand.sort((a, b) => b.v - a.v);
+  H3.acc = acc; H3.D = D; H3.NR = NR; H3.mx = mx; H3.E = E; H3.ne = ne;
+  H3.peaks = cand.slice(0, H3.K);
+  drawAcc(); drawLines();
+  $('h-k-v').textContent = '= ' + H3.K; $('h-m-v').textContent = '= ' + H3.minPct + '% of the top peak';
+  $('sb3').innerHTML =
+    score('Lines found', H3.peaks.length + H3.manual.size, H3.manual.size ? H3.manual.size + ' added by hand' : 'automatic', true) +
+    score('Edge pixels voting', ne, 'each casts 180 votes') +
+    score('Top peak', mx, 'votes = pixels on that line');
+  tries3.check();
+}
+function drawAcc() {
+  const c = $('h-acc'), { acc, NR, mx } = H3, img = IP.make(180, NR);
+  for (let i = 0; i < acc.length; i++) img.data[i] = mx ? Math.log(1 + acc[i]) / Math.log(1 + mx) * 255 : 0;
+  IP.drawGray(c, img);
+  c.style.aspectRatio = '180 / ' + Math.min(NR, 360);
+  const ctx = c.getContext('2d');
+  const mark = (p, col) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(p.t - 4, p.r - 4, 9, 9); };
+  H3.peaks.forEach(p => mark(p, '#b8412e'));
+  H3.manual.forEach(p => mark(p, '#6b7a5a'));
+  if (H3.hover) mark(H3.hover, '#f4ede0');
+}
+function drawLines() {
+  const c = $('h-img'), { w, h } = IMG, E = H3.E, base = IP.make(w, h);
+  for (let i = 0; i < base.data.length; i++) base.data[i] = E[i] ? 235 : IMG.data[i] * 0.25;
+  IP.drawGray(c, base);
+  c.style.aspectRatio = w + ' / ' + h;
+  const ctx = c.getContext('2d');
+  const line = (p, col, lw) => {
+    const th = (p.t - 90) * Math.PI / 180, rho = p.r - H3.D, co = Math.cos(th), si = Math.sin(th);
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
+    if (Math.abs(si) > Math.abs(co)) { ctx.moveTo(0, rho / si); ctx.lineTo(w, (rho - w * co) / si); }
+    else { ctx.moveTo(rho / co, 0); ctx.lineTo((rho - h * si) / co, h); }
+    ctx.stroke();
+  };
+  H3.peaks.forEach(p => line(p, 'rgba(184,65,46,.9)', 1.5));
+  H3.manual.forEach(p => line(p, 'rgba(107,122,90,.95)', 1.8));
+  if (H3.hover) line(H3.hover, 'rgba(244,237,224,.95)', 1.2);
+}
+(function () {
+  const c = $('h-acc');
+  const at = e => { const r = c.getBoundingClientRect(); return { t: clamp(Math.floor((e.clientX - r.left - c.clientLeft) / c.clientWidth * 180), 0, 179), r: clamp(Math.floor((e.clientY - r.top - c.clientTop) / c.clientHeight * H3.NR), 0, H3.NR - 1) }; };
+  c.addEventListener('pointermove', e => {
+    if (!H3.acc) return;
+    const p = at(e); H3.hover = p;
+    const v = H3.acc[p.r * 180 + p.t];
+    $('h-key').innerHTML = '<span><i>θ</i> = ' + (p.t - 90) + '°</span><span><i>ρ</i> = ' + (p.r - H3.D) + '</span><span>votes = <b>' + v + '</b></span>';
+    $('h-read').innerHTML = '<b>' + v + '</b> edge pixels lie on the line ' + '<i>x</i> cos(' + (p.t - 90) + '°) + <i>y</i> sin(' + (p.t - 90) + '°) = ' + (p.r - H3.D) + '.';
+    drawAcc(); drawLines();
+  });
+  c.addEventListener('pointerleave', () => { H3.hover = null; drawAcc(); drawLines(); });
+  c.addEventListener('click', e => {
+    const p = at(e), key = p.r + ',' + p.t;
+    // snap to the strongest cell within ±3, so a click near a peak lands on it
+    let best = p;
+    for (let dr = -3; dr <= 3; dr++) for (let dt = -3; dt <= 3; dt++) { const rr = p.r + dr, tt = p.t + dt; if (rr < 0 || rr >= H3.NR || tt < 0 || tt >= 180) continue; if (H3.acc[rr * 180 + tt] > H3.acc[best.r * 180 + best.t]) best = { r: rr, t: tt }; }
+    const auto = H3.peaks.findIndex(q => Math.abs(q.r - best.r) <= 3 && Math.abs(q.t - best.t) <= 3);
+    const man = [...H3.manual.keys()].find(k => { const [r, t] = k.split(',').map(Number); return Math.abs(r - best.r) <= 3 && Math.abs(t - best.t) <= 3; });
+    if (auto >= 0) H3.peaks.splice(auto, 1);
+    else if (man) H3.manual.delete(man);
+    else H3.manual.set(best.r + ',' + best.t, best);
+    H3.toggled = true;
+    drawAcc(); drawLines(); tries3.check();
+  });
+})();
+const tries3 = IP.tries('t3', [
+  { text: 'On the test chart, hover over the brightest points in the accumulator. What is special about lines with <i>θ</i> = 0° and ±90°?',
+    test: () => IP.key === 'chart' && H3.hover !== null },
+  { text: 'Click in the accumulator to add a line the automatic search missed, or to remove a wrong one.',
+    test: () => H3.toggled },
+  { text: '<i>Coins</i>: there are no straight edges, yet the accumulator still has peaks. What are they?',
+    test: () => IP.key === 'coins' && H3.peaks.length > 0 }
+]);
+
+/* ═════ 04 — thresholding ═════ */
+
+const T4 = { m: 'moving', n: 15, c: 0.5, seen: new Set() };
+const TM = [['iter', 'Basic global (iterative)'], ['otsu2', 'Otsu, two thresholds'], ['moving', 'Moving average (variable)']];
+function buildT4() {
+  chips('th-m', TM, T4.m, v => { T4.m = v; buildT4(); render4(); });
+  $('th-n-w').style.display = $('th-c-w').style.display = T4.m === 'moving' ? '' : 'none';
+}
+$('th-n').addEventListener('input', e => { T4.n = +e.target.value; render4(); });
+$('th-c').addEventListener('input', e => { T4.c = +e.target.value; render4(); });
+
+function iterative(img) {
+  const h = IP.histogram(img), n = img.data.length;
+  let T = 0; for (let k = 0; k < 256; k++) T += k * h[k] / n;          // step 1: start at the mean
+  const seq = [T];
+  for (let it = 0; it < 100; it++) {
+    let s1 = 0, c1 = 0, s2 = 0, c2 = 0;
+    for (let k = 0; k < 256; k++) { if (k > T) { s1 += k * h[k]; c1 += h[k]; } else { s2 += k * h[k]; c2 += h[k]; } }
+    const m1 = c1 ? s1 / c1 : T, m2 = c2 ? s2 / c2 : T, Tn = (m1 + m2) / 2;
+    seq.push(Tn);
+    if (Math.abs(Tn - T) < 0.5) { T = Tn; break; }                        // ΔT₀ = 0.5
+    T = Tn;
+  }
+  return { T, seq };
+}
+function otsu2(img) {
+  const h = IP.histogram(img), n = img.data.length, P = new Float64Array(257), S = new Float64Array(257);
+  for (let k = 0; k < 256; k++) { P[k + 1] = P[k] + h[k] / n; S[k + 1] = S[k] + k * h[k] / n; }
+  const mG = S[256];
+  let vG = 0; for (let k = 0; k < 256; k++) vG += (k - mG) ** 2 * h[k] / n;
+  let best = -1, k1 = 0, k2 = 0;
+  for (let a = 1; a < 254; a++) for (let b = a + 1; b < 255; b++) {
+    const p1 = P[a + 1], p2 = P[b + 1] - P[a + 1], p3 = 1 - P[b + 1];
+    if (p1 <= 0 || p2 <= 0 || p3 <= 0) continue;
+    const m1 = S[a + 1] / p1, m2 = (S[b + 1] - S[a + 1]) / p2, m3 = (mG - S[b + 1]) / p3;
+    const sB = p1 * (m1 - mG) ** 2 + p2 * (m2 - mG) ** 2 + p3 * (m3 - mG) ** 2;           // eq. 10-70
+    if (sB > best) { best = sB; k1 = a; k2 = b; }
+  }
+  return { k1, k2, eta: vG ? best / vG : 0 };
+}
+/** Moving average along a zigzag scan (eq. 10-83), T_xy = c·m_xy, g = f > T_xy (eq. 10-80). */
+function movingAvg(img, n, c) {
+  const { w, h, data } = img, out = IP.make(w, h), Tm = new Float32Array(w * h), buf = [];
+  let sum = 0;
+  for (let y = 0; y < h; y++) for (let j = 0; j < w; j++) {
+    const x = y % 2 ? w - 1 - j : j, i = y * w + x, z = data[i];
+    buf.push(z); sum += z; if (buf.length > n) sum -= buf.shift();
+    const m = sum / buf.length; Tm[i] = c * m;
+    out.data[i] = z > c * m ? 255 : 0;
+  }
+  return { out, Tm };
+}
+const st4 = IP.stage('st4', { afterLabel: 'Segmented',
+  explain: (r, s, x, y) => {
+    if (T4.m === 'moving') { const T = T4.res.Tm[y * IMG.w + x]; return '<i>m<sub>xy</sub></i> = ' + f1(T / T4.c) + ', <i>T<sub>xy</sub></i> = ' + T4.c + ' × ' + f1(T / T4.c) + ' = <b>' + f1(T) + '</b>; <i>f</i> = ' + r + (r > T ? ' &gt; ' : ' ≤ ') + '<i>T<sub>xy</sub></i> → ' + (s ? '1' : '0'); }
+    if (T4.m === 'otsu2') return '<i>f</i> = ' + r + ' → class ' + (r <= T4.res.k1 ? '1 (≤ ' + T4.res.k1 + ')' : r <= T4.res.k2 ? '2' : '3 (&gt; ' + T4.res.k2 + ')');
+    return '<i>f</i> = ' + r + (r > T4.res.T ? ' &gt; ' : ' ≤ ') + '<i>T</i> = ' + f1(T4.res.T) + ' → ' + (s ? '1' : '0');
+  } });
+function render4() {
+  if (!IMG) return;
+  const hist = IP.histogram(IMG), n = IMG.data.length;
+  let out, markers = [];
+  const og = otsuT(IMG);
+  if (T4.m === 'iter') {
+    const R = iterative(IMG); T4.res = R;
+    out = IP.make(IMG.w, IMG.h); for (let i = 0; i < n; i++) out.data[i] = IMG.data[i] > R.T ? 255 : 0;
+    markers = [{ v: Math.round(R.T), label: 'T = ' + f1(R.T) }, { v: og, dash: [4, 3], color: IP.col('ink'), label: 'Otsu ' + og }];
+    $('th-eq').innerHTML = '<i>T</i>&nbsp;←&nbsp;½(<i>m</i><sub>1</sub> + <i>m</i><sub>2</sub>)&nbsp;&nbsp;until&nbsp;|Δ<i>T</i>| &lt; Δ<i>T</i><sub>0</sub>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(p. 746; segmentation by eq. 10-46)</span>';
+    $('th-key').innerHTML = '<span class="iters">' + R.seq.map((t, i) => '<span>T<sub>' + i + '</sub> = <b>' + f1(t) + '</b></span>').join('') + '</span>';
+    $('th-gloss').innerHTML = 'Start with <i>T</i> at the mean. Split the pixels at <i>T</i>, average each group to get <i>m</i><sub>1</sub> and <i>m</i><sub>2</sub>, and move <i>T</i> to the midpoint of those two averages. Repeat until <i>T</i> changes by less than Δ<i>T</i><sub>0</sub> = 0.5. On clearly two-class histograms this lands close to Otsu (the dashed line).';
+  } else if (T4.m === 'otsu2') {
+    const R = otsu2(IMG); T4.res = R;
+    out = IP.make(IMG.w, IMG.h); for (let i = 0; i < n; i++) out.data[i] = IMG.data[i] <= R.k1 ? 0 : IMG.data[i] <= R.k2 ? 128 : 255;
+    markers = [{ v: R.k1, label: 'k₁* = ' + R.k1 }, { v: R.k2, label: 'k₂* = ' + R.k2 }];
+    $('th-eq').innerHTML = '<i>σ</i><sub>B</sub><sup>2</sup>&nbsp;=&nbsp;<i>P</i><sub>1</sub>(<i>m</i><sub>1</sub> − <i>m<sub>G</sub></i>)²&nbsp;+&nbsp;<i>P</i><sub>2</sub>(<i>m</i><sub>2</sub> − <i>m<sub>G</sub></i>)²&nbsp;+&nbsp;<i>P</i><sub>3</sub>(<i>m</i><sub>3</sub> − <i>m<sub>G</sub></i>)²&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(10-70)</span>';
+    $('th-key').innerHTML = '<span><i>k</i><sub>1</sub>* = <b>' + R.k1 + '</b></span><span><i>k</i><sub>2</sub>* = <b>' + R.k2 + '</b></span><span><i>η</i> = ' + R.eta.toFixed(3) + ' (10-77)</span>';
+    $('th-gloss').innerHTML = 'The same idea as lab 02, extended to three classes: try every pair <i>k</i><sub>1</sub> &lt; <i>k</i><sub>2</sub> and keep the pair with the largest between-class variance (eq. 10-75). The output has three levels (eq. 10-76). Every extra threshold makes the search slower and less reliable, which is why the book rarely goes beyond two.';
+  } else {
+    const R = movingAvg(IMG, T4.n, T4.c); T4.res = R; out = R.out;
+    markers = [{ v: og, dash: [4, 3], color: IP.col('ink'), label: 'global Otsu ' + og + ' (for comparison)' }];
+    $('th-eq').innerHTML = '<i>m</i>(<i>k</i>+1)&nbsp;=&nbsp;<i>m</i>(<i>k</i>)&nbsp;+&nbsp;(1/<i>n</i>)(<i>z</i><sub><i>k</i>+1</sub> − <i>z</i><sub><i>k</i>−<i>n</i></sub>),&nbsp;&nbsp;<i>T<sub>xy</sub></i>&nbsp;=&nbsp;<i>c</i>&nbsp;<i>m<sub>xy</sub></i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(10-83, 10-80)</span>';
+    $('th-key').innerHTML = '<span><i>n</i> = ' + T4.n + ' pixels</span><span><i>c</i> = ' + T4.c + '</span><span>book&rsquo;s rule of thumb: <i>n</i> ≈ 5 × stroke width, <i>c</i> = 0.5</span>';
+    $('th-gloss').innerHTML = 'The image is read one row at a time, alternating direction (a zigzag), and the average of the last <i>n</i> pixels follows the local brightness. Each pixel is compared with a fraction <i>c</i> of that local average instead of one global <i>T</i>. The threshold therefore falls where the page is in shadow and rises where it is lit, which is exactly what the uneven page needed.';
+  }
+  $('th-n-v').textContent = '= ' + T4.n; $('th-c-v').textContent = '= ' + T4.c;
+  st4.set(IMG, out);
+  IP.drawHist($('th-h'), hist, { height: 130, markers });
+  // agreement with a clean reference is unknown for real images, so report class balance instead
+  let fg = 0; for (const v of out.data) if (v === 255) fg++;
+  $('sb4').innerHTML =
+    score('Foreground', pctOf(fg, n), 'pixels above the threshold', true) +
+    score('Global Otsu', og, 'from lab 02') +
+    (T4.m === 'iter' ? score('Iterations', T4.res.seq.length - 1, '|ΔT| < 0.5') : T4.m === 'otsu2' ? score('η', T4.res.eta.toFixed(3), 'with two thresholds') : score('Window', T4.n, '≈ ' + f1(T4.n / 5) + ' px strokes'));
+  T4.seen.add(T4.m + ':' + IP.key);
+  tries4.check();
+}
+function otsuT(img) {
+  const h = IP.histogram(img), n = img.data.length; let mG = 0; for (let k = 0; k < 256; k++) mG += k * h[k] / n;
+  let P = 0, m = 0, best = -1, bk = 0;
+  for (let k = 0; k < 255; k++) { P += h[k] / n; m += k * h[k] / n; if (P <= 0 || P >= 1) continue; const s = (mG * P - m) ** 2 / (P * (1 - P)); if (s > best) { best = s; bk = k; } }
+  return bk;
+}
+const tries4 = IP.tries('t4', [
+  { text: '<i>Uneven page</i>: segment it with the moving average. This is the problem lab 02 could not solve with any single <i>T</i>. Which <i>n</i> and <i>c</i> work best?',
+    test: () => T4.seen.has('moving:page') },
+  { text: 'Compare the iterative threshold with Otsu (dashed line) on <i>Coins</i> and on <i>Night street</i>. When do they agree?',
+    test: () => T4.seen.has('iter:coins') && T4.seen.has('iter:night') },
+  { text: '<i>Foggy hills</i>: use two thresholds. What do the three classes correspond to in the scene?',
+    test: () => T4.seen.has('otsu2:fog') }
+]);
+
+/* ═════ 05 — regions ═════ */
+
+const R5 = { m: 'grow', T: 25, seeds: [], k: 3, s: 0, seen: new Set() };
+const RM = [['grow', 'Region growing'], ['kmeans', 'k-means'], ['water', 'Watershed']];
+function buildR5() {
+  seg('rg-m', RM.map(r => r[0]), R5.m, v => { R5.m = v; buildR5(); render5(); }, RM.map(r => r[1]));
+  $('rg-t-w').style.display = $('rg-clear-w').style.display = R5.m === 'grow' ? '' : 'none';
+  $('rg-k-w').style.display = R5.m === 'kmeans' ? '' : 'none';
+  $('rg-s-w').style.display = R5.m === 'water' ? '' : 'none';
+}
+$('rg-t').addEventListener('input', e => { R5.T = +e.target.value; render5(); });
+$('rg-k').addEventListener('input', e => { R5.k = +e.target.value; render5(); });
+$('rg-s').addEventListener('input', e => { R5.s = +e.target.value; render5(); });
+$('rg-clear').addEventListener('click', () => { R5.seeds = []; render5(); });
+document.querySelector('#st5').addEventListener('pointerdown', e => {
+  if (R5.m !== 'grow') return;
+  const f = e.target.closest('.ip-frame'); if (!f || e.target.closest('.ip-divider')) return;
+  const r = f.getBoundingClientRect();
+  R5.seeds.push({ x: clamp(Math.floor((e.clientX - r.left) / r.width * IMG.w), 0, IMG.w - 1), y: clamp(Math.floor((e.clientY - r.top) / r.height * IMG.h), 0, IMG.h - 1) });
+  render5();
+});
+
+/** Region growing (§10.4): each seed takes the 8-connected pixels with |f − f(seed)| ≤ T. */
+function grow(img, seeds, T) {
+  const { w, h, data } = img, lab = new Int32Array(w * h);
+  seeds.forEach((s, si) => {
+    const i0 = s.y * w + s.x, v0 = data[i0];
+    if (lab[i0]) return;
+    const st = [i0]; lab[i0] = si + 1;
+    while (st.length) {
+      const p = st.pop(), x = p % w, y = (p / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx; if (!lab[j] && Math.abs(data[j] - v0) <= T) { lab[j] = si + 1; st.push(j); }
+      }
+    }
+  });
+  return lab;
+}
+/** k-means on intensity (eq. 10-85), centres started evenly across the histogram. */
+function kmeans(img, k) {
+  const h = IP.histogram(img);
+  let lo = 0, hi = 255; while (!h[lo]) lo++; while (!h[hi]) hi--;
+  let c = Array.from({ length: k }, (_, i) => lo + (i + 0.5) * (hi - lo) / k), it = 0;
+  const assign = v => { let b = 0; for (let j = 1; j < k; j++) if (Math.abs(v - c[j]) < Math.abs(v - c[b])) b = j; return b; };
+  for (; it < 100; it++) {
+    const s = new Float64Array(k), n = new Float64Array(k);
+    for (let v = 0; v < 256; v++) if (h[v]) { const a = assign(v); s[a] += v * h[v]; n[a] += h[v]; }
+    const nc = c.map((cv, j) => n[j] ? s[j] / n[j] : cv);
+    const moved = nc.some((v, j) => Math.abs(v - c[j]) > 0.01);
+    c = nc; if (!moved) break;
+  }
+  const lab = new Int32Array(img.data.length);
+  for (let i = 0; i < lab.length; i++) lab[i] = assign(img.data[i]) + 1;
+  return { lab, c, it: it + 1 };
+}
+/** Watershed by flooding (priority queue on gradient levels), markers = regional minima of the gradient. */
+function watershed(img, s) {
+  const fs = smooth(img, s), gx = IP.correlate(fs, SOBX, 3, 3, 'replicate'), gy = IP.correlate(fs, SOBY, 3, 3, 'replicate');
+  const { w, h } = img, n = w * h, g = new Uint8Array(n);
+  let mx = 0; const M = new Float32Array(n);
+  for (let i = 0; i < n; i++) { M[i] = Math.hypot(gx.data[i], gy.data[i]); if (M[i] > mx) mx = M[i]; }
+  for (let i = 0; i < n; i++) g[i] = Math.round(M[i] / (mx || 1) * 255);
+  const lab = new Int32Array(n), nb = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  // regional minima: plateaus with no lower neighbour
+  let L = 0; const seen = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (!seen[i]) {
+    const v = g[i], plat = [i], st = [i]; seen[i] = 1; let isMin = true;
+    while (st.length) {
+      const p = st.pop(), x = p % w, y = (p / w) | 0;
+      for (const [dx, dy] of nb) {
+        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (g[j] < v) isMin = false;
+        else if (g[j] === v && !seen[j]) { seen[j] = 1; st.push(j); plat.push(j); }
+      }
+    }
+    if (isMin) { L++; for (const p of plat) lab[p] = L; }
+  }
+  // flood in order of gradient level; pixels where two basins meet become dams (−1)
+  const buckets = Array.from({ length: 256 }, () => []), queued = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (lab[i] > 0) {
+    const x = i % w, y = (i / w) | 0;
+    for (const [dx, dy] of nb) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx; if (!lab[j] && !queued[j]) { queued[j] = 1; buckets[g[j]].push(j); } }
+  }
+  for (let lev = 0; lev < 256; lev++) {
+    const q = buckets[lev];
+    while (q.length) {
+      const p = q.pop(), x = p % w, y = (p / w) | 0; let l = 0, dam = false;
+      for (const [dx, dy] of nb) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const m = lab[yy * w + xx]; if (m > 0) { if (!l) l = m; else if (m !== l) dam = true; } }
+      lab[p] = dam ? -1 : l || -1;
+      if (dam) continue;
+      for (const [dx, dy] of nb) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx; if (!lab[j] && !queued[j]) { queued[j] = 1; buckets[Math.max(lev, g[j])].push(j); } }
+    }
+  }
+  return { lab, L, g };
+}
+const st5 = IP.stage('st5', { afterLabel: 'Regions',
+  explain: (r, s, x, y) => {
+    const i = y * IMG.w + x, l = R5.lab[i];
+    if (R5.m === 'grow') return R5.seeds.length ? (l > 0 ? 'Region <b>' + l + '</b>: |' + r + ' − ' + IMG.data[R5.seeds[l - 1].y * IMG.w + R5.seeds[l - 1].x] + '| ≤ ' + R5.T : 'Not reached by any seed') : 'Click the image to add a seed.';
+    if (R5.m === 'kmeans') return '<i>f</i> = ' + r + ' → nearest centre <b>' + f1(R5.km.c[l - 1]) + '</b> (cluster ' + l + ')';
+    return l === -1 ? '<b>Dam</b>: two catchment basins meet here' : 'Basin <b>' + l + '</b> of ' + R5.ws.L + ' · gradient level ' + R5.ws.g[i];
+  } });
+function render5() {
+  if (!IMG) return;
+  const { w, h } = IMG, n = w * h, out = IP.make(w, h);
+  if (R5.m === 'grow') {
+    const lab = grow(IMG, R5.seeds, R5.T); R5.lab = lab;
+    let got = 0;
+    for (let i = 0; i < n; i++) { out.data[i] = lab[i] ? 90 + (lab[i] * 53) % 165 : IMG.data[i] * 0.2; if (lab[i]) got++; }
+    for (const sd of R5.seeds) for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = sd.x + dx, yy = sd.y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h && (Math.abs(dx) === 2 || Math.abs(dy) === 2)) out.data[yy * w + xx] = 0; }
+    $('rg-eq').innerHTML = '<i>Q</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;TRUE&nbsp;if&nbsp;|<i>f</i>(<i>x</i>, <i>y</i>) − <i>f</i>(seed)| ≤ <i>T</i>,&nbsp;&nbsp;grown 8-connected from each seed';
+    $('rg-key').innerHTML = '<span>' + R5.seeds.length + ' seed' + (R5.seeds.length === 1 ? '' : 's') + '</span><span><i>T</i> = ' + R5.T + '</span><span>' + pctOf(got, n) + ' of the image assigned</span>';
+    $('rg-gloss').innerHTML = 'The book&rsquo;s algorithm (p. 766): form the predicate image <i>f<sub>Q</sub></i>, then attach to each seed every 1-valued pixel of <i>f<sub>Q</sub></i> that is 8-connected to it. The predicate here compares each pixel with the seed&rsquo;s own intensity. Click on the image to add seeds.';
+    $('sb5').innerHTML = score('Regions', R5.seeds.length, 'one per seed', true) + score('Assigned', pctOf(got, n), 'of all pixels');
+  } else if (R5.m === 'kmeans') {
+    const K = kmeans(IMG, R5.k); R5.km = K; R5.lab = K.lab;
+    for (let i = 0; i < n; i++) out.data[i] = K.c[K.lab[i] - 1];
+    $('rg-eq').innerHTML = 'arg&nbsp;min<sub><i>C</i></sub>&nbsp;Σ<sub><i>i</i>=1</sub><sup><i>k</i></sup>&nbsp;Σ<sub><i>z</i>∈<i>C<sub>i</sub></i></sub>&nbsp;‖<i>z</i> − <i>m<sub>i</sub></i>‖²&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(10-85)</span>';
+    $('rg-key').innerHTML = '<span>centres: ' + K.c.map(v => '<b>' + f1(v) + '</b>').join(', ') + '</span><span>converged in ' + K.it + ' iterations</span>';
+    $('rg-gloss').innerHTML = 'Assign every pixel to its nearest centre, move each centre to the mean of the pixels assigned to it, and repeat until nothing moves. Clustering on brightness alone ignores <em>where</em> each pixel is, just like a threshold. That is why the book goes on to superpixels (§10.5), which cluster on colour and position together.';
+    $('sb5').innerHTML = score('Clusters', R5.k, 'each shown as its mean', true) + score('Iterations', K.it, 'until the centres stop moving');
+  } else {
+    const W = watershed(IMG, R5.s); R5.ws = W; R5.lab = W.lab;
+    let dams = 0;
+    for (let i = 0; i < n; i++) { if (W.lab[i] === -1) { out.data[i] = 255; dams++; } else out.data[i] = IMG.data[i] * 0.55; }
+    $('rg-eq').innerHTML = 'flood the gradient |∇<i>f<sub>s</sub></i>| from its regional minima; build a dam wherever two basins would merge';
+    $('rg-key').innerHTML = '<span><b>' + W.L + '</b> regional minima → ' + W.L + ' regions</span><span>smoothing σ = ' + R5.s + '</span>';
+    $('rg-gloss').innerHTML = 'Every regional minimum of the gradient starts its own basin, and on a real image that means hundreds of tiny regions. The book calls this oversegmentation (§10.7: The Use of Markers). Its cure is to choose <em>markers</em> first and flood only from those. Here, smoothing before taking the gradient plays that role: it removes the shallow minima, so fewer and more meaningful basins remain. This implementation floods by gradient level with a priority queue, which gives the same catchment basins as the book&rsquo;s dam-building description.';
+    $('sb5').innerHTML = score('Regions', W.L, 'one per regional minimum', true) + score('Dam pixels', dams, 'watershed lines');
+  }
+  st5.set(IMG, out);
+  $('rg-t-v').textContent = '= ' + R5.T; $('rg-k-v').textContent = '= ' + R5.k; $('rg-s-v').textContent = '= ' + R5.s;
+  R5.seen.add(R5.m + ':' + (R5.m === 'water' ? R5.s : '') + ':' + (R5.m === 'grow' ? R5.seeds.length : ''));
+  if (R5.m === 'water') { if (R5.s === 0) R5.w0 = R5.ws.L; else R5.ws1 = R5.ws.L; }
+  tries5.check();
+}
+const tries5 = IP.tries('t5', [
+  { text: 'Region growing: click a seed in two different objects and raise <i>T</i> until the regions leak into the background. What does <i>T</i> trade off?',
+    test: () => R5.m === 'grow' && R5.seeds.length >= 2 && R5.T >= 40 },
+  { text: 'Watershed with no smoothing: how many regions? Then raise σ until the count falls below a tenth of that.',
+    test: () => R5.w0 && R5.ws1 && R5.ws1 <= R5.w0 / 10 },
+  { text: 'k-means with <i>k</i> = 2 on <i>Coins</i>: compare the centres with Otsu\'s threshold. Where does the boundary between the two clusters sit?',
+    test: () => R5.m === 'kmeans' && R5.k === 2 && IP.key === 'coins' }
+]);
+
+/* ═════ wiring ═════ */
+
+['pick1', 'pick2', 'pick3', 'pick4', 'pick5'].forEach(id => IP.picker(id));
+IP.onImage(img => { IMG = img; R5.seeds = []; H3.manual.clear(); render1(); render2(); render3(); render4(); render5(); });
+IP.onResize(() => { renderP1(); if (H3.acc) { drawAcc(); drawLines(); } });
+
+buildP1(); renderP1(); buildL1(); buildC2(); buildT4(); buildR5();
+IP.useSample('chart');
+</script>
+</body>
+</html>
