@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Intensity &amp; Histograms Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive image processing lab: histograms, point transformations (negative, log, gamma, contrast stretching), histogram equalization, CLAHE and Otsu's threshold — on sample images or your own photograph." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+section{scroll-margin-top:64px}
+/* ── 01: the 8×8 grid and its histogram ── */
+.g-wrap{display:flex;flex-wrap:wrap;gap:2.6rem;align-items:flex-end;margin-top:.4rem}
+.g-grid{display:grid;grid-template-columns:repeat(8,38px);grid-auto-rows:38px;gap:2px}
+.gpx{border:0;padding:0;font-family:'Inter',sans-serif;font-size:.72rem;cursor:pointer;position:relative}
+.gpx.lit{outline:2px solid var(--vermillion);outline-offset:1px;z-index:1}
+.g-bars{display:flex;gap:6px;align-items:flex-end;height:236px}
+.gbar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:40px;height:100%;
+  cursor:pointer;background:none;border:0;padding:0;font-family:'Inter',sans-serif;color:var(--ink-soft)}
+.gbar .n{font-size:.7rem;margin-bottom:.25rem}
+.gbar .col{width:100%;background:var(--ink);transition:height .4s var(--ease-out),background .2s}
+.gbar.lit .col{background:var(--vermillion)}
+.gbar.lit .n,.gbar.lit .k{color:var(--vermillion)}
+.gbar .k{font-size:.7rem;width:100%;text-align:center;border-top:1px solid var(--ink);padding-top:.3rem;margin-top:0}
+.gbar .sw{width:14px;height:8px;border:1px solid rgba(26,26,26,.2);margin-top:.25rem}
+.g-tools{display:flex;flex-wrap:wrap;gap:.6rem 1.4rem;align-items:center;margin-top:1.4rem}
+
+/* ── 03: worked equalization table ── */
+.eq-work{display:flex;flex-wrap:wrap;gap:2rem 2.6rem;align-items:flex-start;margin-top:.6rem}
+.table-scroll{overflow-x:auto;max-width:100%}
+.eqt{border-collapse:collapse;font-family:'Inter',sans-serif;font-size:.78rem;min-width:420px}
+.eqt th,.eqt td{border-bottom:1px solid var(--line);padding:.42rem .65rem;text-align:right;font-variant-numeric:tabular-nums}
+.eqt th{font-size:.6rem;letter-spacing:.08em;color:var(--ink-light);font-weight:400;
+  font-family:'Cormorant Garamond',serif;font-size:1rem;font-style:italic}
+.eqt td.s{color:var(--vermillion);font-weight:500}
+.eqt tr.zero td{color:var(--ink-light);opacity:.55}
+.minis{display:flex;gap:1.2rem;flex-wrap:wrap}
+.mini{display:grid;grid-template-columns:repeat(8,22px);grid-auto-rows:22px;gap:1px}
+.mini div{font-family:'Inter',sans-serif;font-size:.58rem;display:flex;align-items:center;justify-content:center}
+
+@media(max-width:820px){
+  .g-grid{grid-template-columns:repeat(8,minmax(0,36px));grid-auto-rows:36px}
+  .g-bars{gap:4px;height:200px}
+  .gbar{width:30px}
+}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#count">Histogram</a><a href="#point">Transforms</a>
+    <a href="#equalize">Equalization</a><a href="#threshold">Otsu</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">階 · 調 · 変 · 換</div>
+  <h1>Intensity &amp; <em>Histograms</em> Lab</h1>
+  <div class="hero-divider"></div>
+  <p>Every image processing course starts with operations that look at one pixel at a time. This lab covers the four ideas the rest of the subject builds on: the histogram, point transformations, histogram equalization and Otsu's threshold. Each one is on screen as an equation and as a result, and you can use your own photograph for all of them.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="count">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">度 · 数 · 分 · 布</div>
+    <h2 class="section-heading-text">A histogram is a count</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.3 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Histograms and image statistics</p>
+  <p class="lede reveal d1">Below is an 8×8 image with only eight grey levels (3 bits). The bars count how many pixels hold each level, and that is the whole idea. Click a pixel to raise its value and right-click to lower it. Point at a bar to see which pixels it is counting.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>p</i><sub>r</sub>(<i>r<sub>k</sub></i>)&nbsp;=&nbsp;<i>n<sub>k</sub></i>&nbsp;/&nbsp;<i>MN</i></div>
+    <div class="eqkey" id="eq1"></div>
+    <p class="eqgloss"><i>n<sub>k</sub></i> is the number of pixels with grey level <i>r<sub>k</sub></i>. <i>M</i>×<i>N</i> is the size of the image, so dividing by it turns counts into fractions. That lets you compare images of different sizes, and the fractions always add up to exactly 1. Read <i>p</i><sub>r</sub>(<i>r<sub>k</sub></i>) as the probability that a randomly chosen pixel has level <i>r<sub>k</sub></i>.</p>
+  </div>
+
+  <div class="g-wrap">
+    <div>
+      <span class="label">Image · 8 × 8, L = 8</span>
+      <div class="g-grid" id="g-grid"></div>
+    </div>
+    <div>
+      <span class="label">Histogram · n<sub>k</sub></span>
+      <div class="g-bars" id="g-bars"></div>
+    </div>
+  </div>
+  <div class="g-tools">
+    <div><span class="label">Start from</span><div class="chiprow" id="g-pre"></div></div>
+    <div><span class="label">Positions</span><button type="button" class="chip" id="g-shuffle">Shuffle the pixels</button></div>
+  </div>
+
+  <h3 class="sub-h">The same count, on a real photograph</h3>
+  <p class="lede">A photograph uses 256 levels instead of 8, but it is counted the same way. The tall bars show which levels dominate the picture, and the width of the histogram shows how much of the 0–255 range the picture actually uses.</p>
+  <div id="pick1"></div>
+  <div id="st1"></div>
+  <div class="ip-charts">
+    <div class="ip-chart"><span class="cap">Histogram <em id="h1-cap"></em></span><canvas id="h1"></canvas></div>
+  </div>
+  <div class="scoreboard" id="sb1"></div>
+  <div class="g-tools"><button type="button" class="chip" id="scr1" aria-pressed="false">Scramble the pixels</button></div>
+  <div class="note">A histogram keeps <em>how many</em> pixels have each level and throws away <em>where</em> they are. Shuffling the pixels destroys the picture but leaves the histogram, the mean and the standard deviation unchanged. Every global method in the rest of this lab works from this count alone, so none of them can tell a face from the same pixels scrambled.</div>
+  <div id="t1"></div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="point">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">点 · 処 · 理</div>
+    <h2 class="section-heading-text">Point transformations: s = T(r)</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.2 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Point operations</p>
+  <p class="lede reveal d1">A point transformation replaces each grey level <i>r</i> with a new level <i>s</i>. The output depends only on the pixel's own value, never on its neighbours or its position. That means the whole operation is one curve, drawn below. Point at any pixel in the image and its path through the curve is traced for you.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="eq2"></div>
+    <div class="eqkey" id="eq2-at"><span>Point at the image to put a real pixel through the equation.</span></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Transformation</span><div class="seg" id="op-seg"></div></div>
+  </div>
+  <div class="controls" id="op-param" style="margin-top:1.2rem"></div>
+
+  <div id="pick2"></div>
+  <div id="st2"></div>
+  <div class="ip-charts">
+    <div class="ip-chart ip-curve"><span class="cap">Transfer function <em>s = T(r)</em></span><canvas id="curve" aria-label="Transfer function. In contrast stretching, drag the two handles."></canvas></div>
+    <div class="ip-chart"><span class="cap">Histogram before</span><canvas id="h2a"></canvas>
+      <span class="cap" style="margin-top:1rem">Histogram after</span><canvas id="h2b"></canvas></div>
+  </div>
+  <div class="scoreboard" id="sb2"></div>
+  <div class="note">Look at <em>levels used</em>. A point transformation can merge grey levels, but it can never split one level into two, so this number can stay the same or fall but never rise. Whatever detail was lost when two levels were merged cannot be brought back by any later curve.</div>
+  <div id="t2"></div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="equalize">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">平 · 坦 · 化</div>
+    <h2 class="section-heading-text">Histogram equalization</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.3.1, §3.3.4 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Point operations: histogram equalization</p>
+  <p class="lede reveal d1">In section 02 you chose the curve yourself. Equalization builds the curve from the image's own histogram: the transformation is the cumulative histogram, scaled up to the full range. Levels that many pixels share get pulled apart, and levels that few pixels use get squeezed together.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>s<sub>k</sub></i>&nbsp;=&nbsp;<i>T</i>(<i>r<sub>k</sub></i>)&nbsp;=&nbsp;(<i>L</i> − 1)<span class="sigma"><small>k</small><span class="big">Σ</span><small>j = 0</small></span><i>p</i><sub>r</sub>(<i>r<sub>j</sub></i>)</div>
+    <p class="eqgloss">The sum is the fraction of pixels at or below level <i>k</i>. That fraction is always between 0 and 1 and never decreases as <i>k</i> rises. Multiplying by <i>L</i> − 1 stretches it to the full grey scale, and rounding gives an integer output level. Below, the table works through the 8×8 grid from section 01 one step at a time. Edit that grid and the table recalculates.</p>
+  </div>
+
+  <div class="eq-work">
+    <div class="table-scroll"><table class="eqt" id="eqt"></table></div>
+    <div>
+      <div class="minis">
+        <div><span class="label">Before</span><div class="mini" id="mini-a"></div></div>
+        <div><span class="label">After</span><div class="mini" id="mini-b"></div></div>
+      </div>
+      <div style="margin-top:1rem"><span class="label">Start from</span><div class="chiprow" id="g-pre2"></div></div>
+    </div>
+  </div>
+  <div class="note">The result is flatter but not flat. With discrete levels, equalization can only move whole bars, and it cannot split one level's pixels across two output levels. Several input levels often round to the same output, which is why the <i>after</i> column has empty rows.</div>
+
+  <h3 class="sub-h">Global versus local (CLAHE)</h3>
+  <p class="lede">Global equalization uses one curve for the entire image, so a bright window and a dark corner get the same treatment. CLAHE (contrast-limited adaptive histogram equalization) computes a separate curve for each tile and blends neighbouring curves together so no seams show. Its <i>clip limit</i> caps how tall any one bar can grow before its curve is built. This stops a nearly uniform region, such as clear sky, from having its faint noise stretched into strong texture.</p>
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Method</span><div class="seg" id="he-mode"></div></div>
+    <div><span class="label">Tiles</span><div class="seg" id="he-tiles"></div></div>
+    <div><span class="label">Clip limit <span class="mono" id="he-clip-v"></span></span><input type="range" id="he-clip" min="1" max="10" step="0.5" value="3" aria-label="Clip limit"></div>
+  </div>
+  <div id="pick3"></div>
+  <div id="st3"></div>
+  <div class="ip-charts">
+    <div class="ip-chart"><span class="cap">Before · <em>line = cumulative histogram = T(r)</em></span><canvas id="h3a"></canvas></div>
+    <div class="ip-chart"><span class="cap">After · <em>line = its cumulative histogram</em></span><canvas id="h3b"></canvas></div>
+  </div>
+  <div id="t3"></div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="threshold">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">二 · 値 · 化</div>
+    <h2 class="section-heading-text">Choosing a threshold: Otsu's method</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §10.3.3 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Automatic thresholding</p>
+  <p class="lede reveal d1">Thresholding is the most extreme point transformation: every level at or below <i>T</i> becomes 0, and every level above it becomes 255. The hard part is choosing <i>T</i>. Otsu's method tries every possible threshold. For each one it measures how far apart the means of the two resulting classes are, weighted by how many pixels fall in each class. It keeps the threshold where that separation is largest, and it needs nothing except the histogram.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>σ</i><sub>B</sub><sup>2</sup>(<i>k</i>)&nbsp;=&nbsp;<span>[<i>m</i><sub>G</sub><i>P</i><sub>1</sub>(<i>k</i>) − <i>m</i>(<i>k</i>)]<sup>2</sup></span>&nbsp;/&nbsp;<span><i>P</i><sub>1</sub>(<i>k</i>)[1 − <i>P</i><sub>1</sub>(<i>k</i>)]</span></div>
+    <div class="eqkey" id="eq4"></div>
+    <p class="eqgloss"><i>P</i><sub>1</sub>(<i>k</i>) is the fraction of pixels at or below <i>k</i>. <i>m</i>(<i>k</i>) is the cumulative mean up to <i>k</i>, and <i>m</i><sub>G</sub> is the mean of the whole image. The between-class variance <i>σ</i><sub>B</sub><sup>2</sup> is large when the two classes sit far apart. Dividing it by the image's total variance <i>σ</i><sub>G</sub><sup>2</sup> gives <i>η</i>, a score from 0 to 1 for how well the image splits into two groups at all.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:span 2"><span class="label">Threshold T <span class="mono" id="th-v"></span></span><input type="range" id="th" min="0" max="254" value="128" aria-label="Threshold"></div>
+    <div><span class="label">Automatic</span><button type="button" class="chip" id="th-snap">Snap to Otsu</button></div>
+    <div><span class="label">Pre-process</span><button type="button" class="chip" id="th-pre" aria-pressed="false">CLAHE first (from 03)</button></div>
+  </div>
+  <div id="pick4"></div>
+  <div id="st4"></div>
+  <div class="ip-charts">
+    <div class="ip-chart"><span class="cap">Histogram · <em>two classes</em></span><canvas id="h4"></canvas></div>
+    <div class="ip-chart"><span class="cap">Between-class variance <em>σ²<sub>B</sub>(k)</em></span><canvas id="s4"></canvas></div>
+  </div>
+  <div class="scoreboard" id="sb4"></div>
+  <div class="note">Try the uneven page. Its histogram has no clean valley, because the text in the shadow is as dark as the paper in the shadow. No single <i>T</i> can separate them. The real fix is a threshold that changes across the image (local or adaptive thresholding), which is planned for lab 07 of this series.</div>
+  <div id="t4"></div>
+</section>
+
+<nav class="lab-pager">
+  <a href="labs.html" class="prev">
+    <span class="pager-dir">← The series</span>
+    <span class="pager-title">All labs</span>
+  </a>
+  <a href="convolution-lab.html" class="next">
+    <span class="pager-dir">Where this leads →</span>
+    <span class="pager-title">Neighbourhoods: the Convolution Lab</span>
+  </a>
+</nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+    <p style="margin-top:.6rem">Your images never leave the browser. Everything runs on your own machine.</p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script src="../assets/imgproc.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Intensity & Histograms Lab
+   ═══════════════════════════════════════════════════════════════════ */
+
+let IMG = null;
+const $ = id => document.getElementById(id);
+const f1 = v => v.toFixed(1);
+
+function mulberry32(a) {
+  return () => {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ═════ 01 — the 8×8 grid ═════ */
+
+const GN = 8, GL = 8;
+const G = { px: new Uint8Array(GN * GN), pre: 'low', hi: -1, from: 'low', edits: 0, shuffled: false };
+
+const PRESETS = [['dark', 'Dark'], ['bright', 'Bright'], ['low', 'Low contrast'], ['high', 'High contrast'], ['flat', 'Flat']];
+
+function loadPreset(key) {
+  // one smooth "scene": a lit blob on a gentle ramp, then remapped per preset
+  const raw = [];
+  for (let y = 0; y < GN; y++)
+    for (let x = 0; x < GN; x++)
+      raw.push(0.7 * (1 - Math.hypot(x - 2.5, y - 3) / 6) + 0.05 * x + 0.03 * y + (hash2(x, y, 7) - 0.5) * 0.12);
+  const lo = Math.min(...raw), hi = Math.max(...raw);
+  const p = raw.map(v => (v - lo) / (hi - lo));
+  // Rank the pixels by brightness, then hand out levels by quantile — the picture
+  // keeps its layout while the histogram takes the preset's shape.
+  const order = p.map((v, i) => i).sort((a, b) => p[a] - p[b]);
+  const cuts = {                       // upper quantile edge for each level, from 0 upward
+    dark: [[0, .3], [1, .7], [2, .9], [3, 1]],
+    bright: [[4, .1], [5, .3], [6, .7], [7, 1]],
+    low: [[3, .3], [4, .7], [5, 1]],
+    high: [[0, .16], [1, .28], [2, .38], [3, .47], [4, .56], [5, .68], [6, .82], [7, 1]],
+    flat: [[0, .125], [1, .25], [2, .375], [3, .5], [4, .625], [5, .75], [6, .875], [7, 1]]
+  }[key];
+  order.forEach((i, rank) => {
+    const q = (rank + 0.5) / (GN * GN);
+    G.px[i] = cuts.find(c => q < c[1])[0];
+  });
+  G.pre = key; G.from = key; G.edits = 0; G.shuffled = false;
+}
+
+function gCounts(px) {
+  const n = new Array(GL).fill(0);
+  px.forEach(v => n[v]++);
+  return n;
+}
+const shade = v => Math.round(v * 255 / (GL - 1));
+
+function buildGrid() {
+  const el = $('g-grid');
+  for (let i = 0; i < GN * GN; i++) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'gpx';
+    b.addEventListener('click', () => { G.px[i] = (G.px[i] + 1) % GL; edited(i); });
+    b.addEventListener('contextmenu', e => { e.preventDefault(); G.px[i] = (G.px[i] + GL - 1) % GL; edited(i); });
+    b.addEventListener('keydown', e => {
+      if (e.key === '-' || e.key === 'ArrowDown') { e.preventDefault(); G.px[i] = (G.px[i] + GL - 1) % GL; edited(i); }
+      else if (e.key === '+' || e.key === '=' || e.key === 'ArrowUp') { e.preventDefault(); G.px[i] = (G.px[i] + 1) % GL; edited(i); }
+    });
+    b.addEventListener('pointerenter', () => { G.hi = G.px[i]; renderGrid(); });
+    b.addEventListener('focus', () => { G.hi = G.px[i]; renderGrid(); });
+    el.appendChild(b);
+  }
+  el.addEventListener('pointerleave', () => { G.hi = -1; renderGrid(); });
+
+  const bars = $('g-bars');
+  for (let k = 0; k < GL; k++) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'gbar';
+    b.innerHTML = '<span class="n"></span><span class="col"></span><span class="k">' + k +
+      '</span><span class="sw" style="background:rgb(' + shade(k) + ',' + shade(k) + ',' + shade(k) + ')"></span>';
+    b.addEventListener('pointerenter', () => { G.hi = k; renderGrid(); });
+    b.addEventListener('focus', () => { G.hi = k; renderGrid(); });
+    bars.appendChild(b);
+  }
+  bars.addEventListener('pointerleave', () => { G.hi = -1; renderGrid(); });
+
+  $('g-shuffle').addEventListener('click', () => {
+    const r = Math.random;
+    for (let i = G.px.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1)); const t = G.px[i]; G.px[i] = G.px[j]; G.px[j] = t;
+    }
+    G.shuffled = true; renderGrid(); renderTable();
+  });
+}
+function edited(i) {
+  G.edits++; G.pre = null; G.hi = G.px[i];
+  buildPresets(); renderGrid(); renderTable();
+}
+function buildPresets() {
+  const pick = k => { loadPreset(k); buildPresets(); renderGrid(); renderTable(); };
+  chips('g-pre', PRESETS, G.pre, pick);
+  chips('g-pre2', PRESETS, G.pre, pick);
+}
+
+function renderGrid() {
+  const n = gCounts(G.px), max = Math.max(...n, 1);
+  Array.from($('g-grid').children).forEach((b, i) => {
+    const v = G.px[i], s = shade(v);
+    b.textContent = v;
+    b.style.background = 'rgb(' + s + ',' + s + ',' + s + ')';
+    b.style.color = v < 4 ? '#f4ede0' : '#1a1a1a';
+    b.classList.toggle('lit', v === G.hi);
+    b.setAttribute('aria-label', 'Pixel ' + (i % GN) + ', ' + Math.floor(i / GN) + ' = ' + v);
+  });
+  Array.from($('g-bars').children).forEach((b, k) => {
+    b.querySelector('.n').textContent = n[k];
+    b.querySelector('.col').style.height = (n[k] / max * 170) + 'px';
+    b.classList.toggle('lit', k === G.hi);
+    b.setAttribute('aria-label', 'Level ' + k + ': ' + n[k] + ' pixels');
+  });
+  const k = G.hi >= 0 ? G.hi : n.indexOf(max);
+  $('eq1').innerHTML =
+    '<span><b>r<sub>' + k + '</sub></b> = ' + k + '</span>' +
+    '<span><i>n</i><sub>' + k + '</sub> = <b>' + n[k] + '</b></span>' +
+    '<span><i>MN</i> = 8 × 8 = 64</span>' +
+    '<span><i>p</i><sub>r</sub>(<i>r</i><sub>' + k + '</sub>) = ' + n[k] + ' / 64 = <b>' + (n[k] / 64).toFixed(3) + '</b></span>' +
+    '<span>Σ <i>p</i> = ' + (n.reduce((a, b) => a + b, 0) / 64).toFixed(3) + '</span>';
+  tries1.check();
+}
+
+/* ═════ 01 — on a photograph ═════ */
+
+const S1 = { scr: false, scrOf: null, scrImg: null, hist: null };
+function scrambled(img) {
+  if (S1.scrOf === img) return S1.scrImg;
+  const out = IP.clone(img), d = out.data, rnd = mulberry32(11);
+  for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = d[i]; d[i] = d[j]; d[j] = t; }
+  S1.scrOf = img; S1.scrImg = out;
+  return out;
+}
+const st1 = IP.stage('st1', {
+  compare: false,
+  explain: r => '<i>r</i> = <b>' + r + '</b>. This pixel is one of <b>' + S1.hist[r].toLocaleString() +
+    '</b> with that value, which is the height of bin ' + r + ' (' + (S1.hist[r] / IMG.data.length * 100).toFixed(2) + '% of the image).'
+});
+st1.onProbe = r => drawH1(r);
+function drawH1(probe) {
+  IP.drawHist($('h1'), S1.hist, { markers: probe != null ? [{ v: probe, label: 'r = ' + probe }] : [] });
+}
+function render1() {
+  S1.hist = IP.histogram(IMG);
+  const s = IP.stats(IMG, S1.hist);
+  st1.set(S1.scr ? scrambled(IMG) : IMG);
+  drawH1(null);
+  $('h1-cap').textContent = '· ' + s.levels + ' of 256 levels used';
+  $('sb1').innerHTML =
+    score('Mean', f1(s.mean), 'average level', true) +
+    score('Std dev', f1(s.std), 'spread = contrast') +
+    score('Min', s.min, 'darkest pixel') +
+    score('Max', s.max, 'brightest pixel') +
+    score('Range used', ((s.max - s.min + 1) / 256 * 100).toFixed(0) + '%', 'of 0–255');
+  tries1.check();
+}
+$('scr1').addEventListener('click', () => {
+  S1.scr = !S1.scr;
+  $('scr1').setAttribute('aria-pressed', String(S1.scr));
+  $('scr1').textContent = S1.scr ? 'Unscramble' : 'Scramble the pixels';
+  if (S1.scr) S1.didScramble = true;
+  render1();
+});
+
+const tries1 = IP.tries('t1', [
+  { text: 'Start from <i>Dark</i> and click pixels until the histogram is flat, with exactly 8 pixels at every level.',
+    test: () => G.from === 'dark' && G.edits > 0 && gCounts(G.px).every(c => c === 8) },
+  { text: 'Shuffle the grid. Check that not one bar changed height.', test: () => G.shuffled },
+  { text: 'Scramble the photograph. Mean and standard deviation stay the same too. Why?', test: () => S1.didScramble },
+  { text: 'Load a photograph of your own, drop it anywhere on the page, and find its darkest and brightest pixel.', test: () => IP.key === 'own' }
+]);
+
+/* ═════ 02 — point transformations ═════ */
+
+const P = { op: 'gamma', g: 30, r1: 70, s1: 20, r2: 185, s2: 235, probe: null, out: null, lut: null, a: null, drag: -1 };
+const gammaOf = v => Math.pow(10, (v - 50) / 50);        // slider 0–100 → γ 0.1 … 10
+const LOGC = 255 / Math.log(256);
+
+function stretchAt(r) {
+  const k = [[0, 0], [P.r1, P.s1], [P.r2, P.s2], [255, 255]];
+  for (let i = 0; i < 3; i++) {
+    const [xa, ya] = k[i], [xb, yb] = k[i + 1];
+    if (r <= xb) return xb === xa ? yb : ya + (r - xa) * (yb - ya) / (xb - xa);
+  }
+  return 255;
+}
+function stretchSeg(r) {
+  const k = [[0, 0], [P.r1, P.s1], [P.r2, P.s2], [255, 255]];
+  for (let i = 0; i < 3; i++) if (r <= k[i + 1][0] && k[i + 1][0] !== k[i][0]) return [k[i], k[i + 1]];
+  return [k[2], k[3]];
+}
+
+const OPS = {
+  negative: {
+    label: 'Negative',
+    fn: r => 255 - r,
+    eq: () => '<i>s</i>&nbsp;=&nbsp;(<i>L</i> − 1) − <i>r</i>&nbsp;=&nbsp;255 − <i>r</i>',
+    at: (r, s) => '<span><i>r</i> = <b>' + r + '</b></span><span><i>s</i> = 255 − ' + r + ' = <b>' + s + '</b></span>' +
+      '<span>Dark becomes light. Used for reading detail in dark regions, e.g. medical films.</span>'
+  },
+  log: {
+    label: 'Log',
+    fn: r => LOGC * Math.log(1 + r),
+    eq: () => '<i>s</i>&nbsp;=&nbsp;<i>c</i>&nbsp;ln(1 + <i>r</i>),&nbsp;&nbsp;<i>c</i> = 255 / ln 256 = ' + LOGC.toFixed(2),
+    at: (r, s) => '<span><i>r</i> = <b>' + r + '</b></span><span><i>s</i> = ' + LOGC.toFixed(2) + ' × ln(' + (1 + r) + ') = ' +
+      LOGC.toFixed(2) + ' × ' + Math.log(1 + r).toFixed(3) + ' = <b>' + s + '</b></span>' +
+      '<span>The slope near <i>r</i> = 0 is steep: dark levels spread out, bright ones pack together.</span>'
+  },
+  gamma: {
+    label: 'Gamma (power law)',
+    fn: r => 255 * Math.pow(r / 255, gammaOf(P.g)),
+    eq: () => '<i>s</i>&nbsp;=&nbsp;<i>c</i>&nbsp;<i>r</i><sup><i>γ</i></sup>&nbsp;→&nbsp;<i>s</i>&nbsp;=&nbsp;255&nbsp;·&nbsp;(<i>r</i> / 255)<sup>' + gammaOf(P.g).toFixed(2) + '</sup>',
+    at: (r, s) => {
+      const g = gammaOf(P.g), u = r / 255;
+      return '<span><i>r</i> = <b>' + r + '</b></span><span><i>r</i>/255 = ' + u.toFixed(3) + '</span>' +
+        '<span>(' + u.toFixed(3) + ')<sup>' + g.toFixed(2) + '</sup> = ' + Math.pow(u, g).toFixed(3) + '</span>' +
+        '<span><i>s</i> = 255 × ' + Math.pow(u, g).toFixed(3) + ' = <b>' + s + '</b></span>' +
+        '<span>' + (g < 1 ? 'γ < 1 lifts the darks.' : g > 1 ? 'γ > 1 pushes the mid-tones down.' : 'γ = 1 leaves the image unchanged.') + '</span>';
+    }
+  },
+  stretch: {
+    label: 'Contrast stretch',
+    fn: stretchAt,
+    eq: () => 'piecewise linear through&nbsp;(0, 0),&nbsp;(<i>r</i><sub>1</sub>, <i>s</i><sub>1</sub>) = (' + P.r1 + ', ' + P.s1 +
+      '),&nbsp;(<i>r</i><sub>2</sub>, <i>s</i><sub>2</sub>) = (' + P.r2 + ', ' + P.s2 + '),&nbsp;(255, 255)',
+    at: (r, s) => {
+      const [[xa, ya], [xb, yb]] = stretchSeg(r), slope = (yb - ya) / (xb - xa);
+      return '<span><i>r</i> = <b>' + r + '</b> lies between ' + xa + ' and ' + xb + '</span>' +
+        '<span><i>s</i> = ' + ya + ' + (' + r + ' − ' + xa + ') × ' + (yb - ya) + ' / ' + (xb - xa) + ' = <b>' + s + '</b></span>' +
+        '<span>Slope ' + slope.toFixed(2) + (slope > 1 ? ': contrast is increased here.' : slope < 1 ? ': contrast is reduced here.' : '.') + '</span>';
+    }
+  }
+};
+
+function buildOps() {
+  seg('op-seg', Object.keys(OPS), P.op, k => { P.op = k; buildOps(); render2(); }, Object.values(OPS).map(o => o.label));
+  const el = $('op-param');
+  if (P.op === 'gamma') {
+    el.innerHTML =
+      '<div style="grid-column:span 2"><span class="label">Gamma <span class="mono" id="g-v"></span></span>' +
+      '<input type="range" id="g-r" min="0" max="100" value="' + P.g + '" aria-label="Gamma"></div>' +
+      '<div><span class="label">Try</span><div class="chiprow" id="g-quick"></div></div>';
+    $('g-r').addEventListener('input', e => { P.g = +e.target.value; render2(); });
+    const q = [[0.4, 'γ 0.4'], [1, 'γ 1'], [2.5, 'γ 2.5']];
+    chips('g-quick', q.map(([g, l]) => [g, l]), null, g => { P.g = Math.round(50 + 50 * Math.log10(g)); $('g-r').value = P.g; render2(); });
+  } else if (P.op === 'stretch') {
+    const sl = (id, lab, v) => '<div><span class="label">' + lab + ' <span class="mono" id="' + id + '-v">' + v + '</span></span>' +
+      '<input type="range" id="' + id + '" min="0" max="255" value="' + v + '" aria-label="' + lab.replace(/<[^>]+>/g, '') + '"></div>';
+    el.innerHTML = sl('k-r1', 'r<sub>1</sub>', P.r1) + sl('k-s1', 's<sub>1</sub>', P.s1) + sl('k-r2', 'r<sub>2</sub>', P.r2) + sl('k-s2', 's<sub>2</sub>', P.s2) +
+      '<div style="grid-column:1/-1"><span class="label">Presets · or drag the handles on the curve</span><div class="chiprow">' +
+      '<button type="button" class="chip" id="k-auto">Auto: min → 0, max → 255</button>' +
+      '<button type="button" class="chip" id="k-thr">Threshold at the mean</button>' +
+      '<button type="button" class="chip" id="k-reset">Reset</button></div></div>';
+    ['r1', 's1', 'r2', 's2'].forEach(k => $('k-' + k).addEventListener('input', e => {
+      P[k] = +e.target.value;
+      if (k === 'r1' && P.r1 > P.r2) P.r2 = P.r1;
+      if (k === 'r2' && P.r2 < P.r1) P.r1 = P.r2;
+      syncKnots(); render2();
+    }));
+    $('k-auto').addEventListener('click', () => {
+      const s = IP.stats(IMG); Object.assign(P, { r1: s.min, s1: 0, r2: s.max, s2: 255 }); syncKnots(); render2();
+    });
+    $('k-thr').addEventListener('click', () => {
+      const m = Math.round(IP.stats(IMG).mean); Object.assign(P, { r1: m, s1: 0, r2: m, s2: 255 }); syncKnots(); render2();
+    });
+    $('k-reset').addEventListener('click', () => { Object.assign(P, { r1: 70, s1: 20, r2: 185, s2: 235 }); syncKnots(); render2(); });
+  } else {
+    el.innerHTML = '<p class="eqgloss" style="grid-column:1/-1;margin:0">This curve has no parameters. Its shape is fixed, so the only thing to change is the image.</p>';
+  }
+}
+function syncKnots() {
+  ['r1', 's1', 'r2', 's2'].forEach(k => {
+    const i = $('k-' + k); if (!i) return;
+    i.value = P[k]; $('k-' + k + '-v').textContent = P[k];
+  });
+}
+
+const st2 = IP.stage('st2', {
+  explain: (r, s) => '<i>r</i> = <b>' + r + '</b> → <i>s</i> = <b>' + s + '</b>. Only the centre value was used. The neighbours around it made no difference.'
+});
+st2.onProbe = (r, s) => {
+  P.probe = r;
+  $('eq2-at').innerHTML = OPS[P.op].at(r, s);
+  drawCharts2();
+};
+
+function render2() {
+  const op = OPS[P.op], lut = new Uint8ClampedArray(256);
+  for (let r = 0; r < 256; r++) lut[r] = Math.round(op.fn(r));
+  P.lut = lut;
+  P.out = IP.applyLUT(IMG, lut);
+  st2.set(IMG, P.out);
+  $('eq2').innerHTML = op.eq();
+  if (P.op === 'gamma' && $('g-v')) $('g-v').textContent = 'γ = ' + gammaOf(P.g).toFixed(2);
+  if (P.probe != null) $('eq2-at').innerHTML = op.at(P.probe, lut[P.probe]);
+  const hA = IP.histogram(IMG), hB = IP.histogram(P.out), a = IP.stats(IMG, hA), b = IP.stats(P.out, hB);
+  P.hA = hA; P.hB = hB; P.sB = b; P.sA = a;
+  const clipped = (hB[0] + hB[255]) / b.n;
+  $('sb2').innerHTML =
+    score('Mean', f1(b.mean), 'was ' + f1(a.mean), true) +
+    score('Std dev', f1(b.std), 'was ' + f1(a.std)) +
+    score('Levels used', b.levels, 'was ' + a.levels) +
+    score('At 0 or 255', (clipped * 100).toFixed(1) + '%', 'clipped pixels');
+  drawCharts2();
+  tries2.check();
+}
+function drawCharts2() {
+  if (!P.lut) return;
+  const pr = P.probe;
+  P.a = IP.drawCurve($('curve'), P.lut, {
+    probe: pr,
+    knots: P.op === 'stretch' ? [{ r: P.r1, s: P.s1 }, { r: P.r2, s: P.s2 }] : null
+  });
+  IP.drawHist($('h2a'), P.hA, { height: 110, markers: pr != null ? [{ v: pr, label: 'r = ' + pr }] : [] });
+  IP.drawHist($('h2b'), P.hB, { height: 110, markers: pr != null ? [{ v: P.lut[pr], label: 's = ' + P.lut[pr] }] : [] });
+}
+
+// dragging the contrast-stretch handles on the curve
+(function () {
+  const c = $('curve');
+  const toRS = e => {
+    const rc = c.getBoundingClientRect(), a = P.a, x = e.clientX - rc.left, y = e.clientY - rc.top;
+    return { r: clamp(Math.round((x - a.L) / a.S * 255), 0, 255), s: clamp(Math.round((a.B - y) / a.S * 255), 0, 255), x, y };
+  };
+  c.addEventListener('pointerdown', e => {
+    if (P.op !== 'stretch' || !P.a) return;
+    const p = toRS(e), a = P.a;
+    const d1 = Math.hypot(p.x - a.X(P.r1), p.y - a.Y(P.s1)), d2 = Math.hypot(p.x - a.X(P.r2), p.y - a.Y(P.s2));
+    if (Math.min(d1, d2) > 18) return;
+    P.drag = d1 <= d2 ? 1 : 2;
+    c.setPointerCapture(e.pointerId);
+  });
+  c.addEventListener('pointermove', e => {
+    if (P.op === 'stretch' && P.a && P.drag < 0) {
+      const p = toRS(e), a = P.a;
+      const near = Math.min(Math.hypot(p.x - a.X(P.r1), p.y - a.Y(P.s1)), Math.hypot(p.x - a.X(P.r2), p.y - a.Y(P.s2))) < 18;
+      c.style.cursor = near ? 'grab' : '';
+    }
+    if (P.drag < 0) return;
+    const p = toRS(e);
+    if (P.drag === 1) { P.r1 = Math.min(p.r, P.r2); P.s1 = p.s; }
+    else { P.r2 = Math.max(p.r, P.r1); P.s2 = p.s; }
+    syncKnots(); render2();
+  });
+  const end = () => { P.drag = -1; };
+  c.addEventListener('pointerup', end);
+  c.addEventListener('pointercancel', end);
+})();
+
+const tries2 = IP.tries('t2', [
+  { text: '<i>Night street</i>: find a γ that lifts the mean above 90 while clipping less than 1% of pixels.',
+    test: () => IP.key === 'night' && P.op === 'gamma' && P.sB.mean > 90 && (P.hB[255] / P.sB.n) < 0.01 },
+  { text: '<i>Foggy hills</i>: use contrast stretching until the result spans the full range (min ≤ 5, max ≥ 250).',
+    test: () => IP.key === 'fog' && P.op === 'stretch' && P.sB.min <= 5 && P.sB.max >= 250 },
+  { text: 'Turn the contrast stretch into a threshold: <i>r</i><sub>1</sub> = <i>r</i><sub>2</sub>, <i>s</i><sub>1</sub> = 0, <i>s</i><sub>2</sub> = 255.',
+    test: () => P.op === 'stretch' && P.r1 === P.r2 && P.s1 === 0 && P.s2 === 255 },
+  { text: 'Find a curve that loses at least 30 grey levels. Then try to get them back with a second curve.',
+    test: () => P.sA && P.sB.levels <= P.sA.levels - 30 }
+]);
+
+/* ═════ 03 — equalization ═════ */
+
+function renderTable() {
+  const n = gCounts(G.px), L1 = GL - 1;
+  let acc = 0;
+  const rows = n.map((c, k) => {
+    acc += c / 64;
+    return { k, c, p: c / 64, cum: acc, raw: L1 * acc, s: Math.round(L1 * acc + 1e-9) };
+  });
+  const after = new Array(GL).fill(0);
+  rows.forEach(r => { after[r.s] += r.c; });
+  $('eqt').innerHTML =
+    '<thead><tr><th><i>r<sub>k</sub></i></th><th><i>n<sub>k</sub></i></th><th><i>p</i>(<i>r<sub>k</sub></i>)</th>' +
+    '<th>Σ <i>p</i></th><th>7 · Σ <i>p</i></th><th><i>s<sub>k</sub></i></th><th>after: <i>n</i></th></tr></thead><tbody>' +
+    rows.map(r => '<tr class="' + (r.c ? '' : 'zero') + '"><td>' + r.k + '</td><td>' + r.c + '</td><td>' + r.p.toFixed(3) +
+      '</td><td>' + r.cum.toFixed(3) + '</td><td>' + r.raw.toFixed(2) + '</td><td class="s">' + r.s + '</td><td>' + after[r.k] + '</td></tr>').join('') +
+    '</tbody>';
+  const map = rows.map(r => r.s);
+  const fill = (id, vals) => {
+    const el = $(id);
+    el.innerHTML = '';
+    vals.forEach(v => {
+      const d = document.createElement('div'), s = shade(v);
+      d.textContent = v; d.style.background = 'rgb(' + s + ',' + s + ',' + s + ')'; d.style.color = v < 4 ? '#f4ede0' : '#1a1a1a';
+      el.appendChild(d);
+    });
+  };
+  fill('mini-a', Array.from(G.px));
+  fill('mini-b', Array.from(G.px).map(v => map[v]));
+  E.tableFixed = rows.every(r => !r.c || r.s === r.k);
+  if (typeof tries3 !== 'undefined') tries3.check();
+}
+
+/** CLAHE: an equalization curve per tile, clipped, then bilinearly blended between tile centres. */
+function clahe(img, tiles, clipMul) {
+  const { w, h, data } = img, tw = w / tiles, th = h / tiles;
+  const maps = [];
+  for (let ty = 0; ty < tiles; ty++)
+    for (let tx = 0; tx < tiles; tx++) {
+      const x0 = Math.floor(tx * tw), x1 = Math.floor((tx + 1) * tw), y0 = Math.floor(ty * th), y1 = Math.floor((ty + 1) * th);
+      const hist = new Float64Array(256);
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) hist[data[y * w + x]]++;
+      const n = (x1 - x0) * (y1 - y0), limit = Math.max(1, clipMul * n / 256);
+      let excess = 0;
+      for (let k = 0; k < 256; k++) if (hist[k] > limit) { excess += hist[k] - limit; hist[k] = limit; }
+      const add = excess / 256, m = new Uint8ClampedArray(256);
+      let acc = 0;
+      for (let k = 0; k < 256; k++) { acc += hist[k] + add; m[k] = Math.round(255 * acc / n); }
+      maps.push(m);
+    }
+  const out = IP.make(w, h), o = out.data;
+  for (let y = 0; y < h; y++) {
+    let gy = (y + 0.5) / th - 0.5, iy = Math.floor(gy), fy = gy - iy;
+    if (gy < 0) { iy = 0; fy = 0; } else if (iy >= tiles - 1) { iy = tiles - 1; fy = 0; }
+    const iy2 = Math.min(iy + 1, tiles - 1);
+    for (let x = 0; x < w; x++) {
+      let gx = (x + 0.5) / tw - 0.5, ix = Math.floor(gx), fx = gx - ix;
+      if (gx < 0) { ix = 0; fx = 0; } else if (ix >= tiles - 1) { ix = tiles - 1; fx = 0; }
+      const ix2 = Math.min(ix + 1, tiles - 1), r = data[y * w + x];
+      const a = maps[iy * tiles + ix][r], b = maps[iy * tiles + ix2][r];
+      const c = maps[iy2 * tiles + ix][r], d = maps[iy2 * tiles + ix2][r];
+      o[y * w + x] = Math.round((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy);
+    }
+  }
+  return out;
+}
+
+const E = { mode: 'global', tiles: 4, clip: 3, out: null, seen: new Map(), found: false, tableFixed: false };
+const st3 = IP.stage('st3', {
+  explain: (r, s) => {
+    if (E.mode === 'global')
+      return '<i>s</i> = round(255 × Σ <i>p</i>) = round(255 × ' + E.cdf[r].toFixed(3) + ') = <b>' + s + '</b>. Every pixel with <i>r</i> = ' + r + ' gets this same value.';
+    return '<i>r</i> = <b>' + r + '</b> → <i>s</i> = <b>' + s + '</b>. This value is a blend of the four nearest tile curves, so the same <i>r</i> can give a different <i>s</i> elsewhere in the image. CLAHE is no longer a point operation.';
+  }
+});
+st3.onProbe = (r, s) => {
+  drawCharts3(r, s);
+  if (E.mode !== 'clahe') return;
+  const prev = E.seen.get(r);
+  if (prev == null) E.seen.set(r, s);
+  else if (Math.abs(prev - s) >= 10) { E.found = true; tries3.check(); }
+};
+function buildE() {
+  seg('he-mode', ['global', 'clahe'], E.mode, v => { E.mode = v; E.seen.clear(); buildE(); render3(); }, ['Global', 'CLAHE']);
+  seg('he-tiles', [2, 4, 8], E.tiles, v => { E.tiles = v; E.seen.clear(); buildE(); render3(); }, ['2 × 2', '4 × 4', '8 × 8'], E.mode !== 'clahe');
+  $('he-clip').disabled = E.mode !== 'clahe';
+  $('he-clip-v').textContent = '×' + E.clip.toFixed(1);
+}
+$('he-clip').addEventListener('input', e => { E.clip = +e.target.value; E.seen.clear(); buildE(); render3(); });
+
+function render3() {
+  E.hA = IP.histogram(IMG);
+  E.cdf = IP.cdf(E.hA);
+  if (E.mode === 'global') {
+    const lut = new Uint8ClampedArray(256);
+    for (let r = 0; r < 256; r++) lut[r] = Math.round(255 * E.cdf[r]);
+    E.out = IP.applyLUT(IMG, lut);
+  } else E.out = clahe(IMG, E.tiles, E.clip);
+  E.hB = IP.histogram(E.out);
+  st3.set(IMG, E.out);
+  drawCharts3();
+  tries3.check();
+}
+function drawCharts3(r, s) {
+  if (!E.hA) return;
+  IP.drawHist($('h3a'), E.hA, { height: 130, cdf: E.cdf, markers: r != null ? [{ v: r, label: 'r = ' + r }] : [] });
+  IP.drawHist($('h3b'), E.hB, { height: 130, cdf: IP.cdf(E.hB), markers: s != null ? [{ v: s, label: 's = ' + s }] : [] });
+}
+
+const tries3 = IP.tries('t3', [
+  { text: 'In the table, find a grid that equalization leaves exactly as it was. (What must its histogram look like?)', test: () => E.tableFixed },
+  { text: '<i>Night street</i>: equalize globally and look at the sky. Then switch to CLAHE and compare.', test: () => IP.key === 'night' && E.mode === 'clahe' },
+  { text: 'In CLAHE mode, find two pixels with the same <i>r</i> whose <i>s</i> values differ by 10 or more.', test: () => E.found },
+  { text: '<i>Uneven page</i>: make the text in the dark lower-right corner readable.', test: () => IP.key === 'page' && E.mode === 'clahe' && E.tiles >= 4 }
+]);
+
+/* ═════ 04 — Otsu ═════ */
+
+const O = { T: 128, pre: false, snapped: false, moved: false, preOf: null, preImg: null };
+function otsuOf(img) {
+  const h = IP.histogram(img), n = img.data.length, p = new Float64Array(256);
+  let mG = 0;
+  for (let k = 0; k < 256; k++) { p[k] = h[k] / n; mG += k * p[k]; }
+  let varG = 0;
+  for (let k = 0; k < 256; k++) varG += (k - mG) * (k - mG) * p[k];
+  const sB = new Float64Array(256), P1 = new Float64Array(256), M = new Float64Array(256);
+  let a = 0, m = 0, best = -1;
+  for (let k = 0; k < 256; k++) {
+    a += p[k]; m += k * p[k]; P1[k] = a; M[k] = m;
+    sB[k] = a > 1e-12 && a < 1 - 1e-12 ? (mG * a - m) ** 2 / (a * (1 - a)) : 0;
+    if (sB[k] > best) best = sB[k];
+  }
+  // if several k share the maximum, G&W take their average
+  let sum = 0, cnt = 0;
+  for (let k = 0; k < 256; k++) if (sB[k] >= best - 1e-9 * Math.max(1, best)) { sum += k; cnt++; }
+  return { h, sB, P1, M, mG, varG, star: Math.round(sum / cnt) };
+}
+function src4() {
+  if (!O.pre) return IMG;
+  if (O.preOf !== IMG) { O.preOf = IMG; O.preImg = clahe(IMG, 4, 2.5); }
+  return O.preImg;
+}
+const st4 = IP.stage('st4', {
+  beforeLabel: 'Input', afterLabel: 'Binary',
+  explain: (r, s) => '<i>r</i> = <b>' + r + '</b> ' + (r > O.T ? '>' : '≤') + ' <i>T</i> = ' + O.T + ' → <b>' + s + '</b> (' + (s ? 'foreground' : 'background') + ')'
+});
+st4.onProbe = r => drawCharts4(r);
+
+function render4() {
+  const src = src4();
+  O.stats = otsuOf(src);
+  const lut = new Uint8ClampedArray(256);
+  for (let r = 0; r < 256; r++) lut[r] = r > O.T ? 255 : 0;
+  st4.set(src, IP.applyLUT(src, lut));
+  $('th').value = O.T; $('th-v').textContent = O.T;
+  const S = O.stats, k = O.T, eta = S.varG ? S.sB[k] / S.varG : 0, etaStar = S.varG ? S.sB[S.star] / S.varG : 0;
+  O.etaStar = etaStar;
+  $('eq4').innerHTML =
+    '<span>at <i>k</i> = <b>' + k + '</b>:</span>' +
+    '<span><i>P</i><sub>1</sub> = ' + S.P1[k].toFixed(3) + '</span>' +
+    '<span><i>m</i>(<i>k</i>) = ' + S.M[k].toFixed(2) + '</span>' +
+    '<span><i>m</i><sub>G</sub> = ' + S.mG.toFixed(2) + '</span>' +
+    '<span><i>σ</i><sub>B</sub><sup>2</sup> = <b>' + S.sB[k].toFixed(1) + '</b></span>' +
+    '<span><i>η</i> = ' + S.sB[k].toFixed(1) + ' / ' + S.varG.toFixed(1) + ' = <b>' + eta.toFixed(3) + '</b></span>';
+  $('sb4').innerHTML =
+    score('Your T', k, 'η = ' + eta.toFixed(3)) +
+    score('Otsu T*', S.star, 'η = ' + etaStar.toFixed(3), true) +
+    score('Gap', Math.abs(k - S.star), 'grey levels') +
+    score('Foreground', ((1 - S.P1[k]) * 100).toFixed(1) + '%', 'pixels above T');
+  drawCharts4();
+  tries4.check();
+}
+function drawCharts4(probe) {
+  if (!O.stats) return;
+  const S = O.stats, mk = [
+    { v: O.T, color: IP.col('ink'), label: 'T = ' + O.T },
+    { v: S.star, dash: [4, 3], label: 'Otsu ' + S.star }
+  ];
+  if (probe != null) mk.push({ v: probe, color: IP.col('sage') });
+  IP.drawHist($('h4'), S.h, { height: 140, split: O.T, markers: mk });
+  IP.drawSeries($('s4'), S.sB, { height: 140, markers: mk.slice(0, 2) });
+}
+$('th').addEventListener('input', e => { O.T = +e.target.value; O.snapped = false; O.moved = true; render4(); });
+$('th-snap').addEventListener('click', () => { O.T = Math.min(254, O.stats.star); O.snapped = true; O.moved = false; O.didSnap = true; render4(); });
+$('th-pre').addEventListener('click', () => {
+  O.pre = !O.pre; $('th-pre').setAttribute('aria-pressed', String(O.pre));
+  if (O.snapped) { O.stats = otsuOf(src4()); O.T = Math.min(254, O.stats.star); }
+  render4();
+});
+
+const tries4 = IP.tries('t4', [
+  { text: '<i>Coins</i>: set the threshold by eye, then check it. Aim to land within 8 levels of Otsu without pressing Snap.',
+    test: () => IP.key === 'coins' && O.moved && !O.snapped && Math.abs(O.T - O.stats.star) <= 8 },
+  { text: '<i>Uneven page</i>: snap to Otsu and look at what happens to the text in the shadow.',
+    test: () => IP.key === 'page' && O.snapped && !O.pre },
+  { text: 'Now turn on CLAHE first and snap again. The result is better, but look closely at the corners.',
+    test: () => IP.key === 'page' && O.snapped && O.pre },
+  { text: 'Find an image where <i>η</i> at Otsu\'s threshold is above 0.9, meaning it splits cleanly in two. Does a clean split always look like a good segmentation?',
+    test: () => O.etaStar > 0.9 }
+]);
+
+/* ═════ wiring ═════ */
+
+['pick1', 'pick2', 'pick3', 'pick4'].forEach(id => IP.picker(id));
+IP.onImage(img => {
+  IMG = img;
+  P.probe = null;
+  E.seen.clear();
+  if (O.snapped) O.T = Math.min(254, otsuOf(O.pre ? clahe(img, 4, 2.5) : img).star);
+  render1(); render2(); render3(); render4();
+});
+IP.onResize(() => { drawH1(); drawCharts2(); drawCharts3(); drawCharts4(); });
+
+loadPreset('low');
+buildGrid(); buildPresets(); renderGrid(); renderTable();
+buildOps(); buildE();
+IP.useSample('fog');
+</script>
+</body>
+</html>

@@ -46,6 +46,11 @@
 
   .lab-row.planned{opacity:.58;cursor:default}
 
+  .series-ref{font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink-soft);max-width:70ch;margin:-.4rem 0 1.4rem;line-height:1.7}
+  .series-ref b{font-weight:500}
+  .series-ref i{font-family:'Cormorant Garamond',serif;font-size:1.02rem}
+  section{scroll-margin-top:64px}
+
   .path-note{border-left:2px solid var(--sage);padding:.4rem 0 .4rem 1.2rem;margin:3rem 0 0;
     color:var(--ink-soft);max-width:64ch}
 
@@ -62,9 +67,8 @@
   <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
   <nav class="nav-links">
     <a href="labs.html" class="here">The Series</a>
-    <a href="convolution-lab.html">Convolution</a>
-    <a href="segmentation-lab.html">Segmentation</a>
-    <a href="encoder-decoder-lab.html">Encoder&ndash;Decoder</a>
+    <a href="#ip">Image Processing</a>
+    <a href="#cv">Computer Vision</a>
     <a href="../index.html#teaching">Teaching</a>
     <a href="../index.html">Back</a>
   </nav>
@@ -77,18 +81,117 @@
     <h1>The Lab <em>Series</em></h1>
     <div class="hero-divider"></div>
     <p>
-      Five labs that build a convolutional network from the sliding window up to the problem
-      I actually work on — finding animals that do not want to be found. Each one is a single
-      page you open and play with. No install, no notebook, no account.
+      Two series of labs. <em>Image Processing</em> covers the classical toolkit, following the
+      textbooks most courses use: histograms, filters, the frequency domain, morphology.
+      <em>Computer Vision</em> builds a convolutional network from the sliding window up to the
+      problem I actually work on: finding animals that do not want to be found. Each lab is a
+      single page you open and play with. No install, no notebook, no account.
     </p>
   </section>
 
-  <section>
+  <section id="ip">
     <div class="section-heading reveal">
-      <div class="section-heading-kanji">順 · 路</div>
-      <h2 class="section-heading-text">The path</h2>
+      <span class="section-num">Series A</span>
+      <div class="section-heading-kanji">画 · 像 · 処 · 理</div>
+      <h2 class="section-heading-text">Image Processing</h2>
       <div class="section-heading-rule"></div>
     </div>
+    <p class="series-ref reveal d1">Follows <b>Gonzalez &amp; Woods</b>, <i>Digital Image Processing</i>, with <b>Burger &amp; Burge</b>, <i>Digital Image Processing: An Algorithmic Introduction</i>, alongside. Every lab takes your own image: drop one in and turn the dials.</p>
+
+    <div class="series">
+      <div class="lab-row planned reveal">
+        <div class="lab-num">01<small>画 素</small></div>
+        <div>
+          <h3 class="lab-row-title">Pixels &amp; Colour</h3>
+          <p class="lab-row-desc">
+            How a continuous scene becomes a grid of integers. Drag the bit depth down until false contours appear, undersample until stripes alias into new patterns, and split a photograph into RGB, HSV and Lab channels.
+          </p>
+          <div class="topics"><span class="topic">Sampling &amp; quantization</span><span class="topic">Bit depth</span><span class="topic">Aliasing</span><span class="topic">Colour spaces</span></div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+      <a href="histogram-lab.html" class="lab-row live reveal d1">
+        <div class="lab-num">02<small>階 調</small></div>
+        <div>
+          <h3 class="lab-row-title">Intensity &amp; <em>Histograms</em></h3>
+          <p class="lab-row-desc">
+            Operations that look at one pixel at a time. Count a histogram by hand, bend a transfer curve and watch every pixel follow it, build histogram equalization from the cumulative sum, then let Otsu choose a threshold.
+          </p>
+          <div class="topics"><span class="topic">Histograms</span><span class="topic">Negative, log &amp; gamma</span><span class="topic">Contrast stretching</span><span class="topic">Histogram equalization</span><span class="topic">CLAHE</span><span class="topic">Otsu&rsquo;s threshold</span></div>
+        </div>
+        <span class="go">Open<span>&rarr;</span></span>
+      </a>
+      <div class="lab-row planned reveal d2">
+        <div class="lab-num">03<small>空 間</small></div>
+        <div>
+          <h3 class="lab-row-title">Spatial Filtering</h3>
+          <p class="lab-row-desc">
+            Operations that look at a neighbourhood. Add salt-and-pepper noise and see why the median beats the mean, sharpen with an unsharp mask, and find edges with Sobel and the Laplacian.
+          </p>
+          <div class="topics"><span class="topic">Noise models</span><span class="topic">Mean vs median</span><span class="topic">Gaussian smoothing</span><span class="topic">Unsharp masking</span><span class="topic">Sobel &amp; Laplacian</span></div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+      <div class="lab-row planned reveal d3">
+        <div class="lab-num">04<small>周 波 数</small></div>
+        <div>
+          <h3 class="lab-row-title">Frequency Domain</h3>
+          <p class="lab-row-desc">
+            Every image is a sum of waves. Look at a photograph&rsquo;s spectrum, paint a mask on it, and compare ideal, Butterworth and Gaussian filters to see where ringing comes from.
+          </p>
+          <div class="topics"><span class="topic">2-D DFT</span><span class="topic">Magnitude spectrum</span><span class="topic">Low- &amp; high-pass</span><span class="topic">Ringing</span><span class="topic">Notch filters</span></div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+      <div class="lab-row planned reveal d4">
+        <div class="lab-num">05<small>復 元</small></div>
+        <div>
+          <h3 class="lab-row-title">Restoration</h3>
+          <p class="lab-row-desc">
+            Blur an image with a known motion or defocus, then try to undo it. Inverse filtering blows up the moment there is noise, and Wiener filtering shows why.
+          </p>
+          <div class="topics"><span class="topic">Degradation model</span><span class="topic">Motion blur</span><span class="topic">Inverse filtering</span><span class="topic">Wiener filtering</span></div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+      <div class="lab-row planned reveal d4">
+        <div class="lab-num">06<small>形 態</small></div>
+        <div>
+          <h3 class="lab-row-title">Morphology</h3>
+          <p class="lab-row-desc">
+            Draw your own structuring element and push it across a binary image: erosion, dilation, opening and closing, and what each one is used for.
+          </p>
+          <div class="topics"><span class="topic">Structuring elements</span><span class="topic">Erosion &amp; dilation</span><span class="topic">Opening &amp; closing</span><span class="topic">Boundary extraction</span></div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+      <div class="lab-row planned reveal d4">
+        <div class="lab-num">07<small>分 割</small></div>
+        <div>
+          <h3 class="lab-row-title">Edges &amp; Classical Segmentation</h3>
+          <p class="lab-row-desc">
+            Canny one stage at a time, Hough lines, and the thresholds that change across the image, bridging to the Segmentation lab in the Computer Vision series.
+          </p>
+          <div class="topics"><span class="topic">Canny</span><span class="topic">Hough transform</span><span class="topic">Local thresholding</span><span class="topic">Region growing</span><span class="topic">Watershed</span></div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+    </div>
+
+    <p class="path-note reveal">
+      Start here if the course is image processing. Lab 03&rsquo;s hand-made filters are exactly
+      what the Convolution Lab in the next series turns into learned weights.
+    </p>
+  </section>
+
+  <section id="cv">
+    <div class="section-heading reveal">
+      <span class="section-num">Series B</span>
+      <div class="section-heading-kanji">視 · 覚</div>
+      <h2 class="section-heading-text">Computer Vision</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+    <p class="series-ref reveal d1">From the sliding window up to camouflaged object detection, the problem I work on in research.</p>
 
     <div class="series">
 
@@ -188,8 +291,8 @@
     </div>
 
     <p class="path-note reveal">
-      The labs are meant to be walked in order — each one assumes the last. If you only have an
-      hour, lab 01 on its own is still the thing most people are missing.
+      These labs are meant to be walked in order, since each one assumes the last.
+      If you only have an hour, the Convolution Lab on its own is still the thing most people are missing.
     </p>
   </section>
 
