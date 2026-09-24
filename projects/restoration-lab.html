@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Image Restoration Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive image processing lab following Gonzalez & Woods chapter 5: noise models and estimating them from a flat patch, mean and adaptive filters, motion and turbulence blur, inverse filtering, Wiener and constrained least squares restoration — on sample images or your own photograph." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+section{scroll-margin-top:64px}
+.fd-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.4rem 1.6rem;margin-top:1.2rem;align-items:start}
+.fd-cell{min-width:0}
+.fd-cell canvas.sq{display:block;width:100%;aspect-ratio:1/1;border:1px solid var(--line);background:var(--paper-dark)}
+.fd-cell canvas.px{image-rendering:pixelated}
+.fd-cell .cap{font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-light);display:block;margin-bottom:.4rem}
+.fd-cell .cap em{font-style:normal;color:var(--vermillion);text-transform:none;letter-spacing:.04em}
+.fd-cell .cap b{font-weight:500;color:var(--ink);text-transform:none;letter-spacing:.04em}
+.patch-wrap{position:relative;touch-action:none;cursor:crosshair}
+.patch-wrap canvas{display:block;width:100%;aspect-ratio:1/1;border:1px solid var(--line)}
+.patch{position:absolute;border:2px solid var(--vermillion);background:rgba(184,65,46,.08);pointer-events:none}
+.est{font-family:'Inter',sans-serif;font-size:.78rem;border-collapse:collapse;margin-top:.8rem;width:100%}
+.est th,.est td{padding:.35rem .5rem;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+.est th{font-weight:400;color:var(--ink-light);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase}
+.est td:first-child,.est th:first-child{text-align:left}
+.est td.hl{color:var(--vermillion);font-weight:500}
+.params{display:contents}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#noise">Noise</a><a href="#means">Mean filters</a><a href="#degrade">Degradation</a>
+    <a href="#inverse">Inverse</a><a href="#wiener">Wiener &amp; CLS</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">画 · 像 · 復 · 元</div>
+  <h1>Image <em>Restoration</em> Lab</h1>
+  <div class="hero-divider"></div>
+  <p>Labs 02–04 were about <em>enhancement</em>: making an image look better, judged by eye. Restoration has a stricter goal. It assumes the image was damaged in a known way and tries to undo that damage, and the result can be measured against the original. This lab follows Chapter 5 of Gonzalez &amp; Woods: first model the noise, then remove it, then model the blur, and finally undo the blur and the noise together.</p>
+</div>
+
+<div class="eqbox reveal">
+  <div class="eqmath"><i>g</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;(<i>h</i>&nbsp;★&nbsp;<i>f</i>)(<i>x</i>, <i>y</i>)&nbsp;+&nbsp;<i>η</i>(<i>x</i>, <i>y</i>)&nbsp;&nbsp;&nbsp;⇔&nbsp;&nbsp;&nbsp;<i>G</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;<i>H</i>(<i>u</i>, <i>v</i>)<i>F</i>(<i>u</i>, <i>v</i>)&nbsp;+&nbsp;<i>N</i>(<i>u</i>, <i>v</i>)</div>
+  <p class="eqgloss">The whole chapter rests on this one model (the book's eqs. 5-1 and 5-2). The true image <i>f</i> is blurred by a degradation function <i>h</i>, and then noise <i>η</i> is added. Sections 01–02 deal with noise only, where <i>h</i> does nothing. Sections 03–05 add the blur back in. Images are cropped and resized to 256 × 256 here, because the later sections work in the frequency domain, as in lab 04.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="noise">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">雑 · 音 · 模 · 型</div>
+    <h2 class="section-heading-text">Noise models, and measuring them</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §5.2: Some Important Noise Probability Density Functions (p. 319), Estimating Noise Parameters (p. 325), eqs. 5-3 to 5-20</p>
+  <p class="lede reveal d1">Every noise model is a probability density function (PDF) describing the values <i>η</i> can take. In practice you are not told which PDF applies. You find a region of the image that should be perfectly flat, such as a wall, the sky or a uniform background, and look at its histogram. Any spread in that histogram must be noise. Drag a box over the image to choose the region. The curve drawn over the histogram is the true PDF, so you can check the estimate against it.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="n1-eq"></div>
+    <div class="eqkey" id="n1-key"></div>
+    <p class="eqgloss">The estimates come from the patch alone. They are the mean and variance of its histogram (eqs. 5-19 and 5-20). If the patch really is flat, its mean is the true brightness plus the noise mean, and its variance is the noise variance. If you drag the box across an edge, the edge's own variation gets counted as noise too.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Noise PDF</span><div class="chiprow" id="n1-type"></div></div>
+    <div class="params" id="n1-params"></div>
+    <div><span class="label">Sample</span><button type="button" class="chip" id="n1-seed">New noise</button></div>
+  </div>
+  <div id="pick1"></div>
+  <div class="fd-row">
+    <div class="fd-cell"><span class="cap">Noisy image · <em>drag a box over a flat region</em></span>
+      <div class="patch-wrap" id="n1-wrap"><canvas id="n1-img" width="256" height="256" aria-label="Noisy image. Drag to choose a flat patch."></canvas><div class="patch" id="n1-box"></div></div></div>
+    <div class="fd-cell" style="grid-column:span 2;min-width:0">
+      <span class="cap">Histogram of the patch <em>· line = true PDF, shifted to the patch's clean brightness</em></span>
+      <canvas id="n1-hist" style="display:block;width:100%"></canvas>
+      <table class="est" id="n1-est"></table>
+    </div>
+  </div>
+  <div id="t1"></div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="means">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">平 · 均 · 化 · 濾 · 波</div>
+    <h2 class="section-heading-text">Mean filters, and one that adapts</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §5.3: Mean Filters (p. 328), Order-Statistic Filters (p. 330), Adaptive Filters (p. 333), eqs. 5-23 to 5-32</p>
+  <p class="lede reveal d1">Lab 03 compared the ordinary average with the median. Chapter 5 adds several other means, and each one handles impulses differently. The contraharmonic mean is the one to try first. With <i>Q</i> &gt; 0 it removes pepper (black dots), and with <i>Q</i> &lt; 0 it removes salt (white dots). Choose the wrong sign and it makes the image much worse. The adaptive filter goes further: it uses local statistics to decide, pixel by pixel, how much smoothing to apply.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="m-eq"></div>
+    <div class="eqkey" id="m-key"><span>Point at the image to see the numbers in the window.</span></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:span 2"><span class="label">Noise</span><div class="seg" id="m-noise"></div></div>
+    <div><span class="label" id="m-amt-l"></span><input type="range" id="m-amt" min="1" max="40" value="10" aria-label="Noise amount"></div>
+    <div><span class="label">Window</span><div class="seg" id="m-size"></div></div>
+    <div style="grid-column:1/-1"><span class="label">Filter</span><div class="chiprow" id="m-filter"></div></div>
+    <div id="m-q-w"><span class="label">Order Q <span class="mono" id="m-q-v"></span></span><input type="range" id="m-q" min="-3" max="3" step="0.25" value="1.5" aria-label="Contraharmonic order"></div>
+    <div id="m-d-w"><span class="label">Trim d <span class="mono" id="m-d-v"></span></span><input type="range" id="m-d" min="0" max="8" step="2" value="4" aria-label="Alpha-trimmed d"></div>
+    <div id="m-s-w"><span class="label">Assumed noise variance σ²<sub>η</sub> <span class="mono" id="m-s-v"></span></span><input type="range" id="m-s" min="0" max="2000" step="10" value="100" aria-label="Assumed noise variance"></div>
+  </div>
+  <div id="pick2"></div>
+  <div id="st2"></div>
+  <div class="ip-charts">
+    <div class="ip-chart"><span class="cap">PSNR against the clean image <em>· same window, every filter</em></span><div class="bars" id="m-bars" style="margin-top:.4rem"></div></div>
+  </div>
+  <div id="t2"></div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="degrade">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">劣 · 化 · 関 · 数</div>
+    <h2 class="section-heading-text">Modelling the blur: H(u, v)</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §5.5 Linear, Position-Invariant Degradations (p. 348); §5.6: Estimation by Modeling (p. 353), eqs. 5-68 and 5-77</p>
+  <p class="lede reveal d1">To undo a blur you first need <i>H</i>. The book gives two physical models. One is atmospheric turbulence, which blurs everything smoothly. The other is uniform linear motion, where the camera moves a distance (<i>a</i>, <i>b</i>) while the shutter is open. Motion blur has a telltale sign: <i>H</i> falls exactly to zero along evenly spaced lines. At those frequencies the blur has erased the image information completely, and that will matter in section 04.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="d-eq"></div>
+    <div class="eqkey" id="d-key"></div>
+    <p class="eqgloss">The book writes the motion model with <i>a</i> and <i>b</i> as fractions of the image size. Here they are measured in pixels, so <i>ua</i> becomes <i>ua</i>/256. After blurring, noise with standard deviation <i>σ</i> is added and the result is rounded to 8 bits, as a real camera would do. That means even <i>σ</i> = 0 leaves some noise, from rounding.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Model</span><div class="seg" id="d-model"></div></div>
+    <div class="params" id="d-params"></div>
+    <div><span class="label">Noise σ <span class="mono" id="d-sig-v"></span></span><input type="range" id="d-sig" min="0" max="20" step="0.5" value="0" aria-label="Noise standard deviation"></div>
+  </div>
+  <div id="pick3"></div>
+  <div class="fd-row">
+    <div class="fd-cell"><span class="cap">|H(u, v)| <em>centred · black = zero</em></span><canvas id="d-h" class="sq px" width="256" height="256"></canvas></div>
+    <div class="fd-cell" style="grid-column:span 2;min-width:0"><span class="cap">Cross-section |H(u, 0)| <em>· log scale</em></span><canvas id="d-hp"></canvas></div>
+  </div>
+  <div id="st3" style="margin-top:1.4rem"></div>
+  <div class="scoreboard" id="sb3"></div>
+  <div id="t3"></div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="inverse">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">逆 · 濾 · 波</div>
+    <h2 class="section-heading-text">Inverse filtering, and why it explodes</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §5.7 Inverse Filtering (p. 356), eqs. 5-78 and 5-79</p>
+  <p class="lede reveal d1">If the damage was multiplication by <i>H</i>, the obvious fix is to divide by it. That is exactly right for the blur, but it also divides the noise by <i>H</i>. Wherever <i>H</i> is tiny, even a small amount of noise gets multiplied into a huge error. The book's workaround is to divide only near the centre of the spectrum, inside a radius <i>D</i><sub>0</sub>, where <i>H</i> is still large.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>F̂</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;<i>G</i>(<i>u</i>, <i>v</i>) / <i>H</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;<i>F</i>(<i>u</i>, <i>v</i>)&nbsp;+&nbsp;<i>N</i>(<i>u</i>, <i>v</i>) / <i>H</i>(<i>u</i>, <i>v</i>)</div>
+    <div class="eqkey" id="i-key"></div>
+    <p class="eqgloss">The second form is the book's eq. 5-79, and it explains the whole problem: even with <i>H</i> known exactly, you get back <i>F</i> plus a term you can never know, the noise divided by <i>H</i>. The cutoff here multiplies the inverse by a Butterworth lowpass of order 10, which is how the book's own example limits the division to a radius.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:span 2"><span class="label">Cutoff radius D₀ <span class="mono" id="i-d0-v"></span></span><input type="range" id="i-d0" min="5" max="182" value="182" aria-label="Inverse filter cutoff radius"></div>
+  </div>
+  <div id="pick4"></div>
+  <div class="fd-row">
+    <div class="fd-cell" style="grid-column:1/-1;min-width:0"><span class="cap">Gain of the restoration filter along u <em>· log scale · dashed = |H|</em></span><canvas id="i-gp"></canvas></div>
+  </div>
+  <div id="st4" style="margin-top:1.4rem"></div>
+  <div class="scoreboard" id="sb4"></div>
+  <div id="t4"></div>
+</section>
+
+<!-- ══════ 05 ══════ -->
+<section id="wiener">
+  <div class="section-heading reveal">
+    <span class="section-num">— 05 —</span>
+    <div class="section-heading-kanji">最 · 適 · 復 · 元</div>
+    <h2 class="section-heading-text">Wiener and constrained least squares</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §5.8 Minimum Mean Square Error (Wiener) Filtering (p. 358), eqs. 5-83, 5-85; §5.9 Constrained Least Squares Filtering (p. 363), eqs. 5-89 to 5-98</p>
+  <p class="lede reveal d1">Both filters fix the inverse filter by adding one term to the denominator, which keeps it away from zero. Wiener adds a constant <i>K</i>, which stands in for the noise-to-signal power ratio. Constrained least squares adds <i>γ</i>|<i>P</i>|², where <i>P</i> is the Laplacian, so it holds back exactly the frequencies that would make the result rough. The difference is in how the parameter is chosen. The book offers no rule for <i>K</i>, so you tune it by eye. For <i>γ</i> it gives an iteration that needs only the noise variance, which you can measure as in section 01.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="w-eq"></div>
+    <div class="eqkey" id="w-key"></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Method</span><div class="seg" id="w-method"></div></div>
+    <div id="w-k-w" style="grid-column:span 2"><span class="label">K <span class="mono" id="w-k-v"></span></span><input type="range" id="w-k" min="-7" max="0" step="0.05" value="-3" aria-label="Wiener K, log scale"></div>
+    <div id="w-g-w" style="grid-column:span 2"><span class="label">γ <span class="mono" id="w-g-v"></span></span><input type="range" id="w-g" min="-8" max="2" step="0.05" value="-3" aria-label="CLS gamma, log scale"></div>
+    <div><span class="label">Choose the parameter</span><div class="chiprow"><button type="button" class="chip" id="w-bestk">Best K (peeks at the original)</button><button type="button" class="chip" id="w-findg">Find γ from the noise (book&rsquo;s iteration)</button></div></div>
+  </div>
+  <div id="pick5"></div>
+  <div class="fd-row" id="w-three">
+    <div class="fd-cell"><span class="cap">Degraded <b id="w-p0"></b></span><canvas id="w-c0" class="sq" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">Inverse (section 04) <b id="w-p1"></b></span><canvas id="w-c1" class="sq" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">Wiener <b id="w-p2"></b></span><canvas id="w-c2" class="sq" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">Constrained least squares <b id="w-p3"></b></span><canvas id="w-c3" class="sq" width="256" height="256"></canvas></div>
+  </div>
+  <div class="fd-row">
+    <div class="fd-cell" style="grid-column:1/-1;min-width:0"><span class="cap">Gain of each restoration filter along u <em>· log scale</em></span><canvas id="w-gp"></canvas></div>
+  </div>
+  <div id="st5" style="margin-top:1.4rem"></div>
+  <div class="scoreboard" id="sb5"></div>
+  <div class="note">Neither filter can bring back what <i>H</i> destroyed. Wherever <i>H</i> = 0, the degraded image holds no trace of the original at that frequency, and every method has to fill those gaps with something smooth. Restoration recovers what the blur only weakened. What the blur erased is gone.</div>
+  <div id="t5"></div>
+</section>
+
+<nav class="lab-pager">
+  <a href="frequency-domain-lab.html" class="prev">
+    <span class="pager-dir">← Previous</span>
+    <span class="pager-title">04 · Frequency Domain</span>
+  </a>
+  <a href="labs.html" class="next">
+    <span class="pager-dir">The series →</span>
+    <span class="pager-title">All labs</span>
+  </a>
+</nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+    <p style="margin-top:.6rem">Your images never leave the browser. Everything runs on your own machine.</p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script src="../assets/imgproc.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Image Restoration Lab — Gonzalez & Woods, 4th ed., chapter 5
+   ═══════════════════════════════════════════════════════════════════ */
+
+const N = 256, NN = N * N, H2 = N / 2;
+let IMG = null, SQ = null, FQ = null;
+const $ = id => document.getElementById(id);
+const f1 = v => v.toFixed(1).replace('-', '−');
+const db = v => isFinite(v) ? v.toFixed(1) + ' dB' : '∞ dB';
+const expo = v => { const e = Math.floor(Math.log10(v)); const m = v / Math.pow(10, e); return (Math.abs(m - 1) < 0.05 ? '' : m.toFixed(1) + '×') + '10<sup>' + e + '</sup>'; };
+
+/* ═════ 01 — noise PDFs ═════ */
+
+// each model: parameter sliders, a sampler, the PDF, and the book's mean / variance formulas
+const PDFS = {
+  gauss: {
+    label: 'Gaussian', ref: '5-3',
+    params: [['m', 'Mean z̄', -40, 40, 1, 0], ['s', 'σ', 1, 50, 1, 15]],
+    sample: (p, r) => { const u = Math.max(r(), 1e-12), v = r(); return p.m + p.s * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); },
+    pdf: (z, p) => Math.exp(-((z - p.m) ** 2) / (2 * p.s * p.s)) / (Math.sqrt(2 * Math.PI) * p.s),
+    mean: p => p.m, vari: p => p.s * p.s,
+    eq: p => '<i>p</i>(<i>z</i>)&nbsp;=&nbsp;<span>1 / (√(2π)&nbsp;<i>σ</i>)</span>&nbsp;<i>e</i><sup>&nbsp;−(<i>z</i> − <i>z̄</i>)² / 2<i>σ</i>²</sup>',
+    key: p => '<span><i>z̄</i> = ' + p.m + '</span><span><i>σ</i>² = ' + p.s * p.s + '</span>'
+  },
+  rayleigh: {
+    label: 'Rayleigh', ref: '5-4 to 5-6',
+    params: [['a', 'a', 0, 30, 1, 0], ['b', 'b', 50, 3000, 50, 600]],
+    sample: (p, r) => p.a + Math.sqrt(-p.b * Math.log(1 - r())),
+    pdf: (z, p) => z < p.a ? 0 : (2 / p.b) * (z - p.a) * Math.exp(-((z - p.a) ** 2) / p.b),
+    mean: p => p.a + Math.sqrt(Math.PI * p.b / 4), vari: p => p.b * (4 - Math.PI) / 4,
+    eq: p => '<i>p</i>(<i>z</i>)&nbsp;=&nbsp;(2/<i>b</i>)(<i>z</i> − <i>a</i>)&nbsp;<i>e</i><sup>&nbsp;−(<i>z</i> − <i>a</i>)² / <i>b</i></sup>&nbsp;&nbsp;for <i>z</i> ≥ <i>a</i>',
+    key: p => '<span><i>z̄</i> = <i>a</i> + √(π<i>b</i>/4) = ' + f2(PDFS.rayleigh.mean(p)) + '</span><span><i>σ</i>² = <i>b</i>(4 − π)/4 = ' + f1(PDFS.rayleigh.vari(p)) + '</span>'
+  },
+  erlang: {
+    label: 'Erlang', ref: '5-7 to 5-9',
+    params: [['a', 'a', 0.05, 1, 0.01, 0.2], ['b', 'b', 1, 10, 1, 3]],
+    sample: (p, r) => { let s = 0; for (let i = 0; i < p.b; i++) s += -Math.log(Math.max(r(), 1e-12)) / p.a; return s; },
+    pdf: (z, p) => { if (z < 0) return 0; let fact = 1; for (let i = 2; i < p.b; i++) fact *= i; return Math.pow(p.a, p.b) * Math.pow(z, p.b - 1) * Math.exp(-p.a * z) / fact; },
+    mean: p => p.b / p.a, vari: p => p.b / (p.a * p.a),
+    eq: p => '<i>p</i>(<i>z</i>)&nbsp;=&nbsp;<i>a</i><sup><i>b</i></sup><i>z</i><sup><i>b</i>−1</sup> / (<i>b</i> − 1)!&nbsp;·&nbsp;<i>e</i><sup>&nbsp;−<i>az</i></sup>&nbsp;&nbsp;for <i>z</i> ≥ 0',
+    key: p => '<span><i>z̄</i> = <i>b</i>/<i>a</i> = ' + f2(PDFS.erlang.mean(p)) + '</span><span><i>σ</i>² = <i>b</i>/<i>a</i>² = ' + f1(PDFS.erlang.vari(p)) + '</span>'
+  },
+  expo: {
+    label: 'Exponential', ref: '5-10 to 5-12',
+    params: [['a', 'a', 0.02, 0.5, 0.01, 0.06]],
+    sample: (p, r) => -Math.log(Math.max(r(), 1e-12)) / p.a,
+    pdf: (z, p) => z < 0 ? 0 : p.a * Math.exp(-p.a * z),
+    mean: p => 1 / p.a, vari: p => 1 / (p.a * p.a),
+    eq: p => '<i>p</i>(<i>z</i>)&nbsp;=&nbsp;<i>a</i>&nbsp;<i>e</i><sup>&nbsp;−<i>az</i></sup>&nbsp;&nbsp;for <i>z</i> ≥ 0',
+    key: p => '<span><i>z̄</i> = 1/<i>a</i> = ' + f2(1 / p.a) + '</span><span><i>σ</i>² = 1/<i>a</i>² = ' + f1(1 / (p.a * p.a)) + '</span>'
+  },
+  uniform: {
+    label: 'Uniform', ref: '5-13 to 5-15',
+    params: [['a', 'a', -60, 0, 1, -30], ['b', 'b', 0, 60, 1, 30]],
+    sample: (p, r) => p.a + (p.b - p.a) * r(),
+    pdf: (z, p) => z >= p.a && z <= p.b ? 1 / (p.b - p.a) : 0,
+    mean: p => (p.a + p.b) / 2, vari: p => (p.b - p.a) ** 2 / 12,
+    eq: p => '<i>p</i>(<i>z</i>)&nbsp;=&nbsp;1 / (<i>b</i> − <i>a</i>)&nbsp;&nbsp;for <i>a</i> ≤ <i>z</i> ≤ <i>b</i>',
+    key: p => '<span><i>z̄</i> = (<i>a</i> + <i>b</i>)/2 = ' + f1(PDFS.uniform.mean(p)) + '</span><span><i>σ</i>² = (<i>b</i> − <i>a</i>)²/12 = ' + f1(PDFS.uniform.vari(p)) + '</span>'
+  },
+  sp: {
+    label: 'Salt & pepper', ref: '5-16 to 5-18',
+    params: [['ps', 'Salt P<sub>s</sub>', 0, 0.25, 0.01, 0.05], ['pp', 'Pepper P<sub>p</sub>', 0, 0.25, 0.01, 0.05]],
+    impulse: true,
+    eq: p => '<i>p</i>(<i>z</i>)&nbsp;=&nbsp;<i>P<sub>s</sub></i> at <i>z</i> = 255,&nbsp;&nbsp;<i>P<sub>p</sub></i> at <i>z</i> = 0,&nbsp;&nbsp;1 − (<i>P<sub>s</sub></i> + <i>P<sub>p</sub></i>) at <i>z</i> = <i>f</i>',
+    key: p => '<span><i>P<sub>s</sub></i> = ' + p.ps.toFixed(2) + '</span><span><i>P<sub>p</sub></i> = ' + p.pp.toFixed(2) + '</span><span>noise density ' + (p.ps + p.pp).toFixed(2) + '</span>'
+  }
+};
+const N1 = { type: 'gauss', p: {}, seed: 1, box: null, seen: new Set(), edge: false };
+Object.keys(PDFS).forEach(k => { N1.p[k] = {}; PDFS[k].params.forEach(([id, , , , , def]) => { N1.p[k][id] = def; }); });
+
+function buildN1() {
+  chips('n1-type', Object.keys(PDFS).map(k => [k, PDFS[k].label]), N1.type, k => { N1.type = k; buildN1(); render1(); });
+  const el = $('n1-params'), m = PDFS[N1.type], p = N1.p[N1.type];
+  el.innerHTML = m.params.map(([id, lab, lo, hi, st]) =>
+    '<div><span class="label">' + lab + ' <span class="mono" id="n1-' + id + '-v">' + p[id] + '</span></span>' +
+    '<input type="range" id="n1-' + id + '" min="' + lo + '" max="' + hi + '" step="' + st + '" value="' + p[id] + '" aria-label="' + lab.replace(/<[^>]+>/g, '') + '"></div>').join('');
+  m.params.forEach(([id]) => $('n1-' + id).addEventListener('input', e => {
+    let v = +e.target.value;
+    if (N1.type === 'uniform' && id === 'a' && v >= p.b) v = p.b - 1;
+    p[id] = v; $('n1-' + id + '-v').textContent = v; render1();
+  }));
+}
+$('n1-seed').addEventListener('click', () => { N1.seed++; render1(); });
+
+/** Clean image + noise drawn from the chosen PDF, rounded to 8 bits. */
+function noisy1() {
+  const m = PDFS[N1.type], p = N1.p[N1.type], r = IP.rng(N1.seed * 7919), out = IP.make(N, N);
+  for (let i = 0; i < NN; i++) {
+    if (m.impulse) { const u = r(); out.data[i] = u < p.pp ? 0 : u < p.pp + p.ps ? 255 : SQ.data[i]; }
+    else out.data[i] = SQ.data[i] + m.sample(p, r);
+  }
+  return out;
+}
+/** The flattest 32×32 block — a sensible first patch on any image. */
+function flattestBox() {
+  let best = null, bv = Infinity;
+  for (let y = 8; y + 32 <= N - 8; y += 8) for (let x = 8; x + 32 <= N - 8; x += 8) {
+    let s = 0, q = 0;
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) { const v = SQ.data[(y + j) * N + x + i]; s += v; q += v * v; }
+    const m = s / 1024, va = q / 1024 - m * m + (Math.abs(m - 128) > 100 ? 400 : 0);   // avoid patches pinned at 0 or 255
+    if (va < bv) { bv = va; best = { x0: x, y0: y, x1: x + 32, y1: y + 32 }; }
+  }
+  return best;
+}
+function patchStats(img, b) {
+  const h = new Float64Array(256);
+  let n = 0, s = 0, q = 0;
+  for (let y = b.y0; y < b.y1; y++) for (let x = b.x0; x < b.x1; x++) { const v = img.data[y * N + x]; h[v]++; n++; s += v; q += v * v; }
+  const m = s / n;
+  return { h, n, mean: m, vari: q / n - m * m };
+}
+function render1() {
+  const m = PDFS[N1.type], p = N1.p[N1.type], g = noisy1();
+  IP.drawGray($('n1-img'), g);
+  if (!N1.box) N1.box = flattestBox();
+  const b = N1.box, box = $('n1-box');
+  box.style.left = (b.x0 / N * 100) + '%'; box.style.top = (b.y0 / N * 100) + '%';
+  box.style.width = ((b.x1 - b.x0) / N * 100) + '%'; box.style.height = ((b.y1 - b.y0) / N * 100) + '%';
+  const P = patchStats(g, b), C = patchStats(SQ, b);
+  drawPatchHist($('n1-hist'), P, C.mean);
+  $('n1-eq').innerHTML = m.eq(p) + '&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(eq. ' + m.ref + ')</span>';
+  $('n1-key').innerHTML = m.key(p);
+  let expMean, expVar;
+  if (m.impulse) {
+    const pc = 1 - p.ps - p.pp;
+    expMean = pc * C.mean + p.ps * 255;
+    expVar = pc * C.mean * C.mean + p.ps * 255 * 255 - expMean * expMean + pc * C.vari;
+  } else { expMean = C.mean + m.mean(p); expVar = m.vari(p) + C.vari; }
+  N1.est = { m: P.mean, v: P.vari, em: expMean, ev: expVar, cstd: Math.sqrt(C.vari) };
+  $('n1-est').innerHTML =
+    '<tr><th></th><th>Mean</th><th>Variance</th><th>σ</th></tr>' +
+    '<tr><td>Estimated from the patch (5-19, 5-20)</td><td class="hl">' + f2(P.mean) + '</td><td class="hl">' + f1(P.vari) + '</td><td class="hl">' + f2(Math.sqrt(P.vari)) + '</td></tr>' +
+    '<tr><td>Expected: clean patch + noise PDF</td><td>' + f2(expMean) + '</td><td>' + f1(expVar) + '</td><td>' + f2(Math.sqrt(Math.max(0, expVar))) + '</td></tr>' +
+    '<tr><td>Clean patch alone <span style="color:var(--ink-light)">(ideally flat)</span></td><td>' + f2(C.mean) + '</td><td>' + f1(C.vari) + '</td><td>' + f2(Math.sqrt(C.vari)) + '</td></tr>' +
+    '<tr><td>Pixels in the patch</td><td colspan="3">' + P.n + ' (' + (b.x1 - b.x0) + ' × ' + (b.y1 - b.y0) + ')</td></tr>';
+  N1.seen.add(N1.type);
+  if (Math.sqrt(C.vari) > 15) N1.edge = true;
+  tries1.check();
+}
+function drawPatchHist(canvas, P, base) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 400, h = 170;
+  canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const m = PDFS[N1.type], p = N1.p[N1.type];
+  const L = 6, R = 6, T = 12, B = h - 18, pw = w - L - R, bw = pw / 256, X = z => L + z * bw;
+  const hist = Array.from(P.h, c => c / P.n);
+  const curve = [];
+  if (!m.impulse) for (let z = 0; z < 256; z++) curve.push(m.pdf(z - base, p));
+  const top = Math.max(...hist.slice(1, 255), ...(curve.length ? curve : [0]), 1e-4) * 1.15;
+  ctx.fillStyle = IP.col('ink');
+  hist.forEach((v, z) => { if (!v) return; const bh = Math.min(v, top) / top * (B - T); ctx.fillRect(X(z), B - bh, Math.max(bw - 0.25, 0.9), bh); if (v > top) { ctx.fillStyle = IP.col('vermillion'); ctx.fillRect(X(z) - 1, T - 6, 4, 3); ctx.fillStyle = IP.col('ink'); } });
+  if (curve.length) {
+    ctx.strokeStyle = IP.col('vermillion'); ctx.lineWidth = 1.8; ctx.beginPath();
+    curve.forEach((v, z) => { const x = X(z + 0.5), y = B - Math.min(v, top) / top * (B - T); z ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = IP.col('vermillion'); ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText('P_p = ' + p.pp.toFixed(2), X(2), T + 4);
+    ctx.textAlign = 'right'; ctx.fillText('P_s = ' + p.ps.toFixed(2), X(254), T + 4);
+    ctx.textAlign = 'center'; ctx.fillText('spikes clipped · bar height ' + hist[0].toFixed(2) + ' and ' + hist[255].toFixed(2), w / 2, T + 4);
+  }
+  ctx.strokeStyle = 'rgba(26,26,26,.2)'; ctx.beginPath(); ctx.moveTo(L, B + .5); ctx.lineTo(L + pw, B + .5); ctx.stroke();
+  ctx.fillStyle = IP.col('ink-light'); ctx.font = '10px Inter, sans-serif';
+  [0, 64, 128, 192, 255].forEach((z, i) => { ctx.textAlign = i === 0 ? 'left' : i === 4 ? 'right' : 'center'; ctx.fillText(z, X(z + (i === 4 ? 1 : .5)), h - 4); });
+}
+(function () {
+  const wrap = $('n1-wrap'), c = $('n1-img');
+  let start = null;
+  const at = e => {
+    const r = c.getBoundingClientRect();
+    return { x: clamp(Math.round((e.clientX - r.left - c.clientLeft) / c.clientWidth * N), 0, N), y: clamp(Math.round((e.clientY - r.top - c.clientTop) / c.clientHeight * N), 0, N) };
+  };
+  const set = (a, b) => {
+    let x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+    if (x1 - x0 < 6) x1 = Math.min(N, x0 + 6); if (y1 - y0 < 6) y1 = Math.min(N, y0 + 6);
+    N1.box = { x0, y0, x1, y1 }; render1();
+  };
+  wrap.addEventListener('pointerdown', e => { start = at(e); wrap.setPointerCapture(e.pointerId); });
+  wrap.addEventListener('pointermove', e => { if (start) set(start, at(e)); });
+  const end = () => { start = null; };
+  wrap.addEventListener('pointerup', end); wrap.addEventListener('pointercancel', end);
+})();
+const tries1 = IP.tries('t1', [
+  { text: 'Choose <i>Rayleigh</i>, then find a flat patch where the estimated mean and σ each land within 2 of the expected values.',
+    test: () => N1.type === 'rayleigh' && N1.est.cstd < 3 && Math.abs(N1.est.m - N1.est.em) < 2 && Math.abs(Math.sqrt(N1.est.v) - Math.sqrt(N1.est.ev)) < 2 },
+  { text: 'Drag the patch across a strong edge and watch the variance estimate. What would you conclude about the noise if you trusted it?',
+    test: () => N1.edge },
+  { text: 'Look at all six PDFs. Which ones could you tell apart just from a patch histogram, and which look alike?',
+    test: () => N1.seen.size >= 6 }
+]);
+
+/* ═════ 02 — mean filters (§5.3) ═════ */
+
+const MN = [['arith', 'Arithmetic'], ['geo', 'Geometric'], ['harm', 'Harmonic'], ['contra', 'Contraharmonic'], ['mid', 'Midpoint'], ['alpha', 'Alpha-trimmed'], ['median', 'Median'], ['adapt', 'Adaptive']];
+const M = { noise: 'pepper', amt: 10, size: 3, filter: 'contra', Q: 1.5, d: 4, s2: 100, cache: {}, noisy: null, key: '', flip: false };
+const EPS = 0.5;   // stands in for a zero pixel in products, reciprocals and negative powers
+
+function noisy2() {
+  const r = IP.rng(4242), out = IP.make(N, N), a = M.amt / 100;
+  for (let i = 0; i < NN; i++) {
+    const v = SQ.data[i];
+    if (M.noise === 'gauss') { const u = Math.max(r(), 1e-12), w = r(); out.data[i] = v + M.amt * 1.5 * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * w); }
+    else { const u = r(); out.data[i] = M.noise === 'pepper' ? (u < a ? 0 : v) : M.noise === 'salt' ? (u < a ? 255 : v) : (u < a / 2 ? 0 : u < a ? 255 : v); }
+  }
+  return out;
+}
+/** One local filter over the whole image. fn(window values, centre value) → output. */
+function local(img, size, fn) {
+  const r = size >> 1, n = size * size, buf = new Float64Array(n), out = IP.make(N, N), d = img.data;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let k = 0;
+    for (let t = -r; t <= r; t++) { const yy = clamp(y + t, 0, N - 1) * N; for (let s = -r; s <= r; s++) buf[k++] = d[yy + clamp(x + s, 0, N - 1)]; }
+    out.data[y * N + x] = fn(buf, d[y * N + x]);
+  }
+  return out;
+}
+const FN = {
+  arith: b => { let s = 0; for (const v of b) s += v; return s / b.length; },
+  geo: b => { let s = 0; for (const v of b) s += Math.log(Math.max(v, EPS)); return Math.exp(s / b.length); },
+  harm: b => { let s = 0; for (const v of b) s += 1 / Math.max(v, EPS); return b.length / s; },
+  contra: b => { let a = 0, c = 0; for (const v0 of b) { const v = Math.max(v0, EPS); a += Math.pow(v, M.Q + 1); c += Math.pow(v, M.Q); } return a / c; },
+  mid: b => { let lo = 255, hi = 0; for (const v of b) { if (v < lo) lo = v; if (v > hi) hi = v; } return (lo + hi) / 2; },
+  alpha: b => { const s = Array.from(b).sort((p, q) => p - q), h = M.d / 2; let t = 0; for (let i = h; i < s.length - h; i++) t += s[i]; return t / (s.length - M.d); },
+  median: b => Array.from(b).sort((p, q) => p - q)[b.length >> 1],
+  adapt: (b, g) => {
+    let s = 0, q = 0; for (const v of b) { s += v; q += v * v; }
+    const m = s / b.length, vl = q / b.length - m * m, ratio = vl > 0 ? Math.min(1, M.s2 / vl) : 1;
+    return g - ratio * (g - m);
+  }
+};
+const paramKey = f => f === 'contra' ? 'Q' + M.Q : f === 'alpha' ? 'd' + M.d : f === 'adapt' ? 's' + M.s2 : '';
+function filtered(f) {
+  const k = f + '|' + M.size + '|' + paramKey(f);
+  if (!M.cache[k]) M.cache[k] = local(M.noisy, M.size, FN[f]);
+  return M.cache[k];
+}
+function buildM() {
+  seg('m-noise', ['gauss', 'pepper', 'salt', 'sp'], M.noise, v => { M.noise = v; buildM(); render2(); }, ['Gaussian', 'Pepper', 'Salt', 'Salt & pepper']);
+  seg('m-size', [3, 5, 7], M.size, v => { M.size = v; buildM(); render2(); }, ['3 × 3', '5 × 5', '7 × 7']);
+  chips('m-filter', MN, M.filter, v => { M.filter = v; buildM(); render2(); });
+  $('m-q-w').style.display = M.filter === 'contra' ? '' : 'none';
+  $('m-d-w').style.display = M.filter === 'alpha' ? '' : 'none';
+  $('m-s-w').style.display = M.filter === 'adapt' ? '' : 'none';
+  $('m-d').max = M.size * M.size - 1 - ((M.size * M.size - 1) % 2);
+  if (M.d > +$('m-d').max) { M.d = +$('m-d').max; $('m-d').value = M.d; }
+  $('m-amt-l').innerHTML = M.noise === 'gauss' ? 'Noise σ <span class="mono">' + (M.amt * 1.5).toFixed(0) + '</span>' : 'Density <span class="mono">' + M.amt + '%</span>';
+}
+$('m-amt').addEventListener('input', e => { M.amt = +e.target.value; buildM(); render2(); });
+$('m-q').addEventListener('input', e => { M.Q = +e.target.value; render2(); });
+$('m-d').addEventListener('input', e => { M.d = +e.target.value; render2(); });
+$('m-s').addEventListener('input', e => { M.s2 = +e.target.value; render2(); });
+
+const MEQ = {
+  arith: '<i>f̂</i>&nbsp;=&nbsp;(1/<i>mn</i>)&nbsp;Σ&nbsp;<i>g</i>(<i>r</i>, <i>c</i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-23)</span>',
+  geo: '<i>f̂</i>&nbsp;=&nbsp;[&nbsp;Π&nbsp;<i>g</i>(<i>r</i>, <i>c</i>)&nbsp;]<sup>1/<i>mn</i></sup>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-24)</span>',
+  harm: '<i>f̂</i>&nbsp;=&nbsp;<i>mn</i>&nbsp;/&nbsp;Σ&nbsp;1/<i>g</i>(<i>r</i>, <i>c</i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-25)</span>',
+  contra: '<i>f̂</i>&nbsp;=&nbsp;Σ&nbsp;<i>g</i><sup><i>Q</i>+1</sup>&nbsp;/&nbsp;Σ&nbsp;<i>g</i><sup><i>Q</i></sup>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-26)</span>',
+  mid: '<i>f̂</i>&nbsp;=&nbsp;½&nbsp;[&nbsp;max&nbsp;<i>g</i>&nbsp;+&nbsp;min&nbsp;<i>g</i>&nbsp;]&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-30)</span>',
+  alpha: '<i>f̂</i>&nbsp;=&nbsp;1/(<i>mn</i> − <i>d</i>)&nbsp;Σ&nbsp;<i>g<sub>R</sub></i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-31) · the d/2 lowest and d/2 highest removed</span>',
+  median: '<i>f̂</i>&nbsp;=&nbsp;median&nbsp;{&nbsp;<i>g</i>(<i>r</i>, <i>c</i>)&nbsp;}&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-27)</span>',
+  adapt: '<i>f̂</i>&nbsp;=&nbsp;<i>g</i>&nbsp;−&nbsp;(<i>σ</i>²<sub><i>η</i></sub> / <i>σ</i>²<sub><i>S</i></sub>)&nbsp;[&nbsp;<i>g</i> − <i>z̄<sub>S</sub></i>&nbsp;]&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-32) · ratio capped at 1</span>'
+};
+const st2 = IP.stage('st2', {
+  beforeLabel: 'Noisy', afterLabel: 'Filtered',
+  explain: (r, s, x, y) => {
+    const n = M.size, rr = n >> 1, b = [];
+    for (let t = -rr; t <= rr; t++) for (let u = -rr; u <= rr; u++) b.push(M.noisy.data[clamp(y + t, 0, N - 1) * N + clamp(x + u, 0, N - 1)]);
+    const f = M.filter;
+    if (f === 'contra') {
+      let a = 0, c = 0; for (const v0 of b) { const v = Math.max(v0, EPS); a += Math.pow(v, M.Q + 1); c += Math.pow(v, M.Q); }
+      return 'Σ<i>g</i><sup>' + f2(M.Q + 1) + '</sup> = ' + expo(a) + ',&nbsp; Σ<i>g</i><sup>' + f2(M.Q) + '</sup> = ' + expo(c) + '<br>ratio = <b>' + f1(a / c) + '</b>' +
+        (b.some(v => v === 0) ? '. Pepper in the window: ' + (M.Q > 0 ? 'raising to a positive power shrinks it to almost nothing.' : 'a negative power makes it enormous and it takes over.') : '') +
+        (b.some(v => v === 255) ? ' Salt in the window: ' + (M.Q < 0 ? 'a negative power shrinks it.' : 'a positive power lets it dominate.') : '');
+    }
+    if (f === 'adapt') {
+      const m = b.reduce((p, q) => p + q, 0) / b.length, vl = b.reduce((p, q) => p + (q - m) ** 2, 0) / b.length, ratio = vl > 0 ? Math.min(1, M.s2 / vl) : 1;
+      return '<i>z̄<sub>S</sub></i> = ' + f1(m) + ',&nbsp; <i>σ</i>²<sub><i>S</i></sub> = ' + f1(vl) + ',&nbsp; ratio = ' + f2(ratio) + '<br><i>f̂</i> = ' + r + ' − ' + f2(ratio) + ' × (' + r + ' − ' + f1(m) + ') = <b>' + s + '</b><br>' +
+        (ratio > 0.9 ? 'Local variance is no bigger than the noise, so the filter averages fully.' : ratio < 0.3 ? 'Local variance is far above the noise, probably an edge, so the pixel is mostly left alone.' : 'Something in between: partial smoothing.');
+    }
+    return 'Window: ' + b.join(', ') + '<br>→ <b>' + s + '</b>';
+  }
+});
+function render2() {
+  const key = [IP.key, M.noise, M.amt].join('|');
+  if (key !== M.key || M.noisyOf !== SQ) { M.noisy = noisy2(); M.cache = {}; M.key = key; M.noisyOf = SQ; }
+  const out = filtered(M.filter);
+  st2.set(M.noisy, out);
+  $('m-eq').innerHTML = MEQ[M.filter];
+  $('m-q-v').textContent = '= ' + M.Q.toFixed(2) + (M.Q > 0 ? ' (removes pepper)' : M.Q < 0 ? ' (removes salt)' : ' (arithmetic mean)');
+  $('m-d-v').textContent = '= ' + M.d + ' of ' + M.size * M.size;
+  $('m-s-v').textContent = '= ' + M.s2 + (M.noise === 'gauss' ? ' (true ' + Math.round((M.amt * 1.5) ** 2) + ')' : '');
+  const pN = IP.psnr(SQ, M.noisy), rows = MN.map(([f, lab]) => [lab, IP.psnr(SQ, filtered(f)), f]);
+  const top = Math.max(pN, ...rows.map(r => isFinite(r[1]) ? r[1] : 60), 1), best = rows.reduce((a, b) => b[1] > a[1] ? b : a);
+  $('m-bars').innerHTML = bar('No filter', pN.toFixed(1), top, 'sage') +
+    rows.map(([lab, v, f]) => bar(lab + (f === best[2] ? ' ★' : '') + (f === M.filter ? ' ◂' : ''), v.toFixed(1), top)).join('');
+  M.ps = Object.fromEntries(rows.map(r => [r[2], r[1]]));
+  if (M.noise === 'pepper' && M.filter === 'contra' && M.Q < 0) M.flip = true;
+  tries2.check();
+}
+const tries2 = IP.tries('t2', [
+  { text: '<i>Coins</i> with pepper noise: use the contraharmonic with <i>Q</i> &gt; 0 and beat the arithmetic mean by at least 5 dB. Then try <i>Night street</i>. Why does the same filter lose there?',
+    test: () => IP.key === 'coins' && M.noise === 'pepper' && M.filter === 'contra' && M.Q > 0 && M.ps.contra - M.ps.arith >= 5 },
+  { text: 'Keep the pepper noise and flip <i>Q</i> to a negative value. Point at a black dot to see why the result falls apart.',
+    test: () => M.flip },
+  { text: '<i>Test chart</i> with Gaussian noise: set the adaptive filter\'s σ²<sub>η</sub> to the true noise variance and beat the arithmetic mean. On <i>Foggy hills</i> it loses. Why do edges decide the winner?',
+    test: () => IP.key === 'chart' && M.noise === 'gauss' && M.filter === 'adapt' && M.ps.adapt > M.ps.arith },
+  { text: '<i>Salt &amp; pepper</i>: the contraharmonic can only remove one kind. Which filter here handles both?',
+    test: () => M.noise === 'sp' && (M.filter === 'median' || M.filter === 'alpha') }
+]);
+
+/* ═════ 03 — the degradation function ═════ */
+
+const DG = { model: 'motion', a: 12, b: 4, k: 0.001, sigma: 0, seed: 3, Hre: null, Him: null, g: null, G: null };
+const TURB = [[0.0025, 'severe'], [0.001, 'mild'], [0.00025, 'low']];
+function buildD() {
+  seg('d-model', ['motion', 'turb'], DG.model, v => { DG.model = v; buildD(); degrade(); }, ['Motion', 'Turbulence']);
+  const el = $('d-params');
+  if (DG.model === 'motion') {
+    el.innerHTML =
+      '<div><span class="label">Distance a (along x) <span class="mono" id="d-a-v">' + DG.a + ' px</span></span><input type="range" id="d-a" min="-24" max="24" value="' + DG.a + '" aria-label="Motion distance a"></div>' +
+      '<div><span class="label">Distance b (along y) <span class="mono" id="d-b-v">' + DG.b + ' px</span></span><input type="range" id="d-b" min="-24" max="24" value="' + DG.b + '" aria-label="Motion distance b"></div>';
+    $('d-a').addEventListener('input', e => { DG.a = +e.target.value; $('d-a-v').textContent = DG.a + ' px'; degrade(); });
+    $('d-b').addEventListener('input', e => { DG.b = +e.target.value; $('d-b-v').textContent = DG.b + ' px'; degrade(); });
+  } else {
+    el.innerHTML = '<div style="grid-column:span 2"><span class="label">k <span class="mono" id="d-k-v"></span></span>' +
+      '<input type="range" id="d-k" min="-4.3" max="-2.3" step="0.05" value="' + Math.log10(DG.k) + '" aria-label="Turbulence k, log scale">' +
+      '<div class="chiprow" id="d-kq" style="margin-top:.5rem"></div></div>';
+    $('d-k').addEventListener('input', e => { DG.k = Math.pow(10, +e.target.value); degrade(); });
+    chips('d-kq', TURB.map(([k, l]) => [k, 'Book\'s ' + l + ' (' + k + ')']), DG.k, k => { DG.k = k; $('d-k').value = Math.log10(k); buildD(); degrade(); });
+  }
+}
+$('d-sig').addEventListener('input', e => { DG.sigma = +e.target.value; degrade(); });
+
+function buildH() {
+  const re = new Float64Array(NN), im = new Float64Array(NN);
+  for (let k = 0; k < NN; k++) {
+    const { u, v } = IP.freqOf(k, N);
+    if (DG.model === 'motion') {
+      const th = Math.PI * (u * DG.a + v * DG.b) / N;
+      const s = Math.abs(th) < 1e-12 ? 1 : Math.sin(th) / th;
+      re[k] = s * Math.cos(th); im[k] = -s * Math.sin(th);
+    } else { re[k] = Math.exp(-DG.k * Math.pow(u * u + v * v, 5 / 6)); im[k] = 0; }
+  }
+  DG.Hre = re; DG.Him = im;
+}
+/** g = IDFT(H·F) + η, rounded to 8 bits; G is its transform. */
+function degrade() {
+  buildH();
+  const G0 = { n: N, re: new Float64Array(NN), im: new Float64Array(NN) };
+  for (let k = 0; k < NN; k++) {
+    G0.re[k] = DG.Hre[k] * FQ.re[k] - DG.Him[k] * FQ.im[k];
+    G0.im[k] = DG.Hre[k] * FQ.im[k] + DG.Him[k] * FQ.re[k];
+  }
+  const blur = IP.idft(G0), r = IP.rng(DG.seed * 131), g = IP.make(N, N);
+  for (let i = 0; i < NN; i++) {
+    let n = 0;
+    if (DG.sigma) { const u = Math.max(r(), 1e-12), w = r(); n = DG.sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * w); }
+    g.data[i] = blur.data[i] + n;
+  }
+  DG.g = g; DG.G = IP.dft(g);
+  // actual noise, including rounding, for the CLS iteration (eq. 5-98 needs its variance and mean)
+  let s = 0, q = 0; for (let i = 0; i < NN; i++) { const e = g.data[i] - blur.data[i]; s += e; q += e * e; }
+  DG.noiseMean = s / NN; DG.noiseVar = q / NN - DG.noiseMean * DG.noiseMean;
+  render3(); render4(); render5();
+}
+function render3() {
+  const himg = IP.make(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const k = IP.shiftIndex(x, y, N, true); himg.data[y * N + x] = Math.hypot(DG.Hre[k], DG.Him[k]) * 255; }
+  IP.drawGray($('d-h'), himg);
+  const mag = []; for (let u = -H2; u < H2; u++) { const k = ((u + N) % N); mag.push(Math.hypot(DG.Hre[k], DG.Him[k])); }
+  drawLog($('d-hp'), [{ data: mag, color: IP.col('ink'), label: '|H(u, 0)|' }], { lo: 1e-4, hi: 2 });
+  st3.set(SQ, DG.g);
+  if (DG.model === 'motion') {
+    $('d-eq').innerHTML = '<i>H</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;<span><i>T</i> / π(<i>ua</i> + <i>vb</i>)</span>&nbsp;sin[π(<i>ua</i> + <i>vb</i>)]&nbsp;<i>e</i><sup>&nbsp;−<i>j</i>π(<i>ua</i> + <i>vb</i>)</sup>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-77)</span>';
+    const z = DG.a ? f1(N / Math.abs(DG.a)) : '—';
+    $('d-key').innerHTML = '<span><i>T</i> = 1</span><span><i>a</i> = ' + DG.a + ' px, <i>b</i> = ' + DG.b + ' px</span><span>zeros along <i>u</i> every ' + z + ' cycles</span>';
+  } else {
+    $('d-eq').innerHTML = '<i>H</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;<i>e</i><sup>&nbsp;−<i>k</i>(<i>u</i>² + <i>v</i>²)<sup>5/6</sup></sup>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-68)</span>';
+    $('d-key').innerHTML = '<span><i>k</i> = ' + DG.k.toPrecision(2) + '</span><span><i>H</i> never reaches zero, but at the edge of the spectrum it is ' + expo(Math.exp(-DG.k * Math.pow(2 * H2 * H2, 5 / 6))) + '</span>';
+    if ($('d-k-v')) $('d-k-v').textContent = '= ' + DG.k.toPrecision(2);
+  }
+  $('d-sig-v').textContent = '= ' + DG.sigma;
+  let minH = Infinity; for (let k = 0; k < NN; k++) minH = Math.min(minH, Math.hypot(DG.Hre[k], DG.Him[k]));
+  DG.pDeg = IP.psnr(SQ, DG.g);
+  $('sb3').innerHTML =
+    score('Degraded', db(DG.pDeg), 'PSNR against the original', true) +
+    score('Smallest |H|', minH < 1e-6 ? '≈ 0' : expo(minH), minH < 1e-6 ? 'information erased there' : 'weak but not gone') +
+    score('Noise σ', DG.sigma ? String(DG.sigma) : '0', 'plus rounding to 8 bits (σ ≈ 0.29)');
+  tries3.check();
+}
+const st3 = IP.stage('st3', { beforeLabel: 'Original', afterLabel: 'Degraded',
+  explain: (r, s) => 'Original <b>' + r + '</b> → degraded <b>' + s + '</b>. Every degraded pixel is a mix of original pixels along the blur path.' });
+const tries3 = IP.tries('t3', [
+  { text: 'Motion blur: set <i>a</i> to 16 and count the dark lines across |<i>H</i>|. How far apart are they, and how does that relate to <i>a</i>?',
+    test: () => DG.model === 'motion' && Math.abs(DG.a) === 16 },
+  { text: 'Turbulence: try the book\'s <i>severe</i> value, <i>k</i> = 0.0025. How small does |<i>H</i>| get at the edge of the spectrum?',
+    test: () => DG.model === 'turb' && Math.abs(DG.k - 0.0025) < 1e-6 }
+]);
+
+/** Log-scale line plot over u = −128 … 127. */
+function drawLog(canvas, series, o) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 500, h = 150;
+  canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const lo = Math.log10(o.lo), hi = Math.log10(o.hi), L = 34, R = 6, T = 14, B = h - 16;
+  const X = i => L + i / (series[0].data.length - 1) * (w - L - R), Y = v => B - (Math.log10(clamp(v, o.lo, o.hi)) - lo) / (hi - lo) * (B - T);
+  ctx.font = '10px Inter, sans-serif'; ctx.fillStyle = IP.col('ink-light'); ctx.textAlign = 'right';
+  for (let e = Math.ceil(lo); e <= Math.floor(hi); e++) {
+    ctx.strokeStyle = e === 0 ? 'rgba(26,26,26,.3)' : 'rgba(26,26,26,.08)';
+    ctx.beginPath(); ctx.moveTo(L, Y(Math.pow(10, e))); ctx.lineTo(w - R, Y(Math.pow(10, e))); ctx.stroke();
+    ctx.fillText(e === 0 ? '1' : '10' + (e < 0 ? '⁻' : '') + String(Math.abs(e)).split('').map(c => '⁰¹²³⁴⁵⁶⁷⁸⁹'[c]).join(''), L - 4, Y(Math.pow(10, e)) + 3);
+  }
+  let lx = L + 4;
+  series.forEach(s => {
+    ctx.save(); ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.4; if (s.dash) ctx.setLineDash(s.dash);
+    ctx.beginPath(); s.data.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))); ctx.stroke(); ctx.restore();
+    if (s.label) { ctx.fillStyle = s.color; ctx.textAlign = 'left'; ctx.fillRect(lx, 4, 10, 2); ctx.fillText(s.label, lx + 14, 9); lx += ctx.measureText(s.label).width + 30; }
+  });
+  ctx.fillStyle = IP.col('ink-light'); ctx.textAlign = 'left'; ctx.fillText('u = −128', L, h - 3);
+  ctx.textAlign = 'center'; ctx.fillText('0', (L + w - R) / 2, h - 3); ctx.textAlign = 'right'; ctx.fillText('127', w - R, h - 3);
+}
+
+/* ═════ 04 — inverse filtering ═════ */
+
+const IV = { D0: 182, seen0: false };
+$('i-d0').addEventListener('input', e => { IV.D0 = +e.target.value; render4(); render5(); });
+const noCut = () => IV.D0 >= 182;
+function restore(gainFn) {
+  const F = { n: N, re: new Float64Array(NN), im: new Float64Array(NN) };
+  for (let k = 0; k < NN; k++) {
+    const hr = DG.Hre[k], hi = DG.Him[k], h2 = hr * hr + hi * hi, { u, v } = IP.freqOf(k, N);
+    const w = gainFn(h2, u, v);                     // F̂ = w · H* · G
+    const gr = DG.G.re[k], gi = DG.G.im[k];
+    F.re[k] = w * (hr * gr + hi * gi); F.im[k] = w * (hr * gi - hi * gr);
+  }
+  return F;
+}
+const invGain = (h2, u, v) => { const D = Math.hypot(u, v); const B = noCut() ? 1 : 1 / (1 + Math.pow(D / IV.D0, 20)); return B / Math.max(h2, 1e-20); };
+const st4 = IP.stage('st4', { beforeLabel: 'Degraded', afterLabel: 'Inverse filtered',
+  explain: (r, s) => 'Degraded <b>' + r + '</b> → restored <b>' + s + '</b>' + (s === 0 || s === 255 ? ' (clipped: the true value is far outside 0–255)' : '') + '.' });
+function render4() {
+  const F = restore(invGain), f = IP.idft(F), out = IP.toDisplay(f, 'clamp').img;
+  IV.out = out; IV.p = IP.psnr(SQ, out);
+  let big = 0; for (const v of f.data) big = Math.max(big, Math.abs(v));
+  st4.set(DG.g, out);
+  $('i-d0-v').textContent = noCut() ? '= none (divide everywhere)' : '= ' + IV.D0;
+  $('i-key').innerHTML = '<span>smallest |<i>H</i>| inside the cutoff: ' + expo(minHinside()) + '</span><span>so noise there is amplified up to ' + expo(1 / Math.max(minHinside(), 1e-20)) + '×</span>';
+  const g = [], hh = [];
+  for (let u = -H2; u < H2; u++) { const k = (u + N) % N; const h2 = DG.Hre[k] ** 2 + DG.Him[k] ** 2; g.push(Math.sqrt(h2) * invGain(h2, u, 0)); hh.push(Math.sqrt(h2)); }
+  drawLog($('i-gp'), [{ data: hh, color: 'rgba(26,26,26,.45)', dash: [4, 3], label: '|H|' }, { data: g, color: IP.col('vermillion'), width: 1.8, label: 'inverse gain' }], { lo: 1e-3, hi: 1e6 });
+  $('sb4').innerHTML =
+    score('Restored', db(IV.p), 'PSNR against the original', true) +
+    score('Degraded', db(DG.pDeg), 'for comparison') +
+    score('Largest value', big > 1e5 ? expo(big) : f1(big), big > 255 ? 'far outside 0–255' : 'in range');
+  if (noCut() && DG.sigma === 0) IV.seen0 = true;
+  tries4.check();
+}
+function minHinside() {
+  let m = Infinity;
+  for (let k = 0; k < NN; k++) { const { u, v } = IP.freqOf(k, N); if (noCut() || Math.hypot(u, v) <= IV.D0) m = Math.min(m, Math.hypot(DG.Hre[k], DG.Him[k])); }
+  return m;
+}
+const tries4 = IP.tries('t4', [
+  { text: 'With no cutoff and noise σ = 0, divide everywhere. The only noise left comes from rounding to 8 bits. Why is that still enough to ruin the result?',
+    test: () => IV.seen0 },
+  { text: 'Now lower the cutoff D₀ until the restored image beats the degraded one on PSNR.',
+    test: () => !noCut() && IV.p > DG.pDeg + 0.5 }
+]);
+
+/* ═════ 05 — Wiener and CLS ═════ */
+
+const WN = { method: 'wiener', K: 1e-3, gamma: 1e-3, found: false, peeked: false, seen: new Set() };
+// |P(u,v)|² for the Laplacian kernel of eq. 5-90, zero-padded and centred on the origin
+const P2 = new Float64Array(NN);
+for (let k = 0; k < NN; k++) { const { u, v } = IP.freqOf(k, N); const p = 4 - 2 * Math.cos(2 * Math.PI * u / N) - 2 * Math.cos(2 * Math.PI * v / N); P2[k] = p * p; }
+const wGain = K => h2 => 1 / (h2 + K);
+const cGain = g => (h2, u, v) => 1 / (h2 + g * P2[((v + N) % N) * N + (u + N) % N]);
+
+function buildW() {
+  seg('w-method', ['wiener', 'cls'], WN.method, v => { WN.method = v; buildW(); render5(); }, ['Wiener', 'CLS']);
+  $('w-k-w').style.display = WN.method === 'wiener' ? '' : 'none';
+  $('w-g-w').style.display = WN.method === 'cls' ? '' : 'none';
+}
+$('w-k').addEventListener('input', e => { WN.K = Math.pow(10, +e.target.value); render5(); });
+$('w-g').addEventListener('input', e => { WN.gamma = Math.pow(10, +e.target.value); render5(); });
+
+/** Mean square error from the spectra alone (Parseval), for fast parameter searches. */
+function mseOf(F) { let s = 0; for (let k = 0; k < NN; k++) s += (F.re[k] - FQ.re[k]) ** 2 + (F.im[k] - FQ.im[k]) ** 2; return s / (NN * NN); }
+$('w-bestk').addEventListener('click', () => {
+  let best = null;
+  for (let e = -7; e <= 0; e += 0.05) { const m = mseOf(restore(wGain(Math.pow(10, e)))); if (!best || m < best[1]) best = [e, m]; }
+  WN.K = Math.pow(10, best[0]); $('w-k').value = best[0]; WN.method = 'wiener'; WN.peeked = true; buildW(); render5();
+});
+/** The book's procedure: adjust γ until ‖r‖² = ‖η‖² ± a, with ‖η‖² = MN(σ²η + m²η). */
+$('w-findg').addEventListener('click', () => {
+  const target = NN * (DG.noiseVar + DG.noiseMean ** 2), a = 0.025 * target;
+  const r2 = g => { const F = restore(cGain(g)); let s = 0; for (let k = 0; k < NN; k++) { const hr = DG.Hre[k], hi = DG.Him[k]; const rr = DG.G.re[k] - (hr * F.re[k] - hi * F.im[k]), ri = DG.G.im[k] - (hr * F.im[k] + hi * F.re[k]); s += rr * rr + ri * ri; } return s / NN; };
+  let lo = -10, hi = 4, e = -3, it = 0;
+  for (; it < 60; it++) {                             // ‖r‖² grows with γ, so bisect on log γ
+    e = (lo + hi) / 2; const v = r2(Math.pow(10, e));
+    if (v < target - a) lo = e; else if (v > target + a) hi = e; else break;
+  }
+  WN.gamma = Math.pow(10, e); $('w-g').value = clamp(e, -8, 2); WN.method = 'cls'; WN.found = true; WN.iters = it + 1; WN.target = target; buildW(); render5();
+});
+
+const st5 = IP.stage('st5', { beforeLabel: 'Degraded', afterLabel: 'Restored',
+  explain: (r, s, x, y) => 'Degraded <b>' + r + '</b> → restored <b>' + s + '</b> · original ' + SQ.data[y * N + x] });
+
+function render5() {
+  if (!DG.G) return;
+  const img = F => IP.toDisplay(IP.idft(F), 'clamp').img;
+  const outs = [DG.g, IV.out || img(restore(invGain)), img(restore(wGain(WN.K))), img(restore(cGain(WN.gamma)))];
+  const ps = outs.map(o => IP.psnr(SQ, o));
+  WN.ps = ps;
+  outs.forEach((o, i) => { IP.drawGray($('w-c' + i), o); $('w-p' + i).textContent = db(ps[i]); });
+  st5.set(DG.g, WN.method === 'wiener' ? outs[2] : outs[3]);
+  $('w-k-v').innerHTML = '= ' + expo(WN.K);
+  $('w-g-v').innerHTML = '= ' + expo(WN.gamma) + (WN.found ? ' (' + WN.iters + ' iterations)' : '');
+  $('w-eq').innerHTML = WN.method === 'wiener'
+    ? '<i>F̂</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;[&nbsp;<span>(1/<i>H</i>)&nbsp;·&nbsp;|<i>H</i>|² / (|<i>H</i>|² + <i>K</i>)</span>&nbsp;]&nbsp;<i>G</i>(<i>u</i>, <i>v</i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-85)</span>'
+    : '<i>F̂</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;[&nbsp;<i>H</i>* / (|<i>H</i>|² + <i>γ</i>|<i>P</i>|²)&nbsp;]&nbsp;<i>G</i>(<i>u</i>, <i>v</i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(5-89) · <i>P</i> = DFT of the Laplacian kernel (5-90)</span>';
+  $('w-key').innerHTML = WN.method === 'wiener'
+    ? '<span><i>K</i> = ' + expo(WN.K) + '</span><span>where |<i>H</i>|² ≫ <i>K</i>: acts like 1/<i>H</i></span><span>where |<i>H</i>|² ≪ <i>K</i>: gain → |<i>H</i>|/<i>K</i> → 0</span>'
+    : '<span><i>γ</i> = ' + expo(WN.gamma) + '</span>' + (WN.found ? '<span>target ‖<i>η</i>‖² = <i>MN</i>(<i>σ</i>²<sub><i>η</i></sub> + <i>m</i>²<sub><i>η</i></sub>) = ' + expo(WN.target) + '  (5-98)</span>' : '<span>press <i>Find γ</i> to run the book\'s iteration</span>');
+  const inv = [], wi = [], cl = [];
+  for (let u = -H2; u < H2; u++) {
+    const k = (u + N) % N, h2 = DG.Hre[k] ** 2 + DG.Him[k] ** 2, h = Math.sqrt(h2);
+    inv.push(h * invGain(h2, u, 0)); wi.push(h * wGain(WN.K)(h2)); cl.push(h * cGain(WN.gamma)(h2, u, 0));
+  }
+  drawLog($('w-gp'), [
+    { data: inv, color: 'rgba(26,26,26,.35)', label: 'inverse' },
+    { data: wi, color: IP.col('vermillion'), width: 1.8, label: 'Wiener' },
+    { data: cl, color: IP.col('sage'), width: 1.8, dash: [5, 3], label: 'CLS' }
+  ], { lo: 1e-3, hi: 1e6 });
+  $('sb5').innerHTML =
+    score('Inverse', db(ps[1]), noCut() ? 'no cutoff' : 'D₀ = ' + IV.D0) +
+    score('Wiener', db(ps[2]), 'K = ' + WN.K.toExponential(1), WN.method === 'wiener') +
+    score('CLS', db(ps[3]), 'γ = ' + WN.gamma.toExponential(1), WN.method === 'cls') +
+    score('Degraded', db(ps[0]), 'starting point');
+  WN.seen.add(DG.sigma >= 10 ? 'noisy:' + WN.method : 'quiet:' + WN.method);
+  tries5.check();
+}
+const tries5 = IP.tries('t5', [
+  { text: 'Beat the inverse filter by at least 3 dB with Wiener, tuning <i>K</i> by eye before you peek.',
+    test: () => !WN.peeked && WN.ps[2] - WN.ps[1] >= 3 },
+  { text: 'Press <i>Find γ</i>. It uses only the noise variance, never the original image. How close does CLS get to the best Wiener result?',
+    test: () => WN.found },
+  { text: 'Raise the noise σ in section 03 to 10 or more, then redo both filters. Which parameter had to change, and in which direction?',
+    test: () => WN.seen.has('noisy:wiener') && WN.seen.has('noisy:cls') }
+]);
+
+/* ═════ wiring ═════ */
+
+['pick1', 'pick2', 'pick3', 'pick4', 'pick5'].forEach(id => IP.picker(id));
+IP.onImage(img => {
+  IMG = img; SQ = IP.square(img, N); FQ = IP.dft(SQ);
+  N1.box = null; M.cache = {};
+  render1(); render2(); degrade();
+});
+IP.onResize(() => { render1(); render3(); render4(); render5(); });
+
+buildN1(); buildM(); buildD(); buildW();
+IP.useSample('chart');
+</script>
+</body>
+</html>
