@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Morphology Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive image processing lab following Gonzalez & Woods chapter 9: erosion and dilation on a paintable grid, opening and closing, hit-or-miss, boundary extraction, hole filling, connected components, skeletons, morphological reconstruction and grayscale top-hat — on sample images or your own photograph." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+section{scroll-margin-top:64px}
+
+/* paintable grids */
+.pg-row{display:flex;flex-wrap:wrap;gap:1.6rem 2.2rem;align-items:flex-start;margin-top:.6rem}
+.pg-row > div:not(:last-child){flex:1 1 280px;max-width:420px;min-width:0}
+.pg{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);width:100%;touch-action:none;user-select:none}
+.pg div{aspect-ratio:1/1;background:#f8f3ea;position:relative}
+.pg div.on{background:var(--ink)}
+.pg div.se{box-shadow:inset 0 0 0 2px var(--sage)}
+.pg div.miss{box-shadow:inset 0 0 0 2px var(--vermillion)}
+.pg div.o::after{content:"";position:absolute;inset:35%;border-radius:50%;background:var(--vermillion)}
+.pg.res div.on{background:var(--vermillion)}
+.pg.res div.gone{background:repeating-linear-gradient(45deg,#f8f3ea 0 3px,rgba(26,26,26,.18) 3px 5px)}
+.pg.res div.added{background:rgba(184,65,46,.45)}
+.se-ed{display:grid;gap:2px;width:fit-content}
+.se-ed button{width:34px;height:34px;border:1px solid var(--line);background:#f8f3ea;font-family:'Inter',sans-serif;font-size:.7rem;
+  color:var(--ink-light);cursor:pointer;position:relative;padding:0}
+.se-ed button.v1{background:var(--ink);color:var(--paper)}
+.se-ed button.v0{background:#f8f3ea;color:var(--vermillion)}
+.se-ed button.org::after{content:"";position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;background:var(--vermillion)}
+.pg-read{font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink-soft);line-height:1.8;max-width:42ch;margin-top:.6rem}
+.pg-read b{color:var(--vermillion);font-weight:500}
+.pg-read i{font-family:'Cormorant Garamond',serif;font-size:1.05rem}
+
+.fd-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1.2rem 1.4rem;margin-top:1.2rem;align-items:start}
+.fd-cell{min-width:0}
+.fd-cell canvas{display:block;width:100%;border:1px solid var(--line);background:var(--paper-dark)}
+.fd-cell .cap{font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-light);display:block;margin-bottom:.4rem}
+.fd-cell .cap em{font-style:normal;color:var(--vermillion);text-transform:none;letter-spacing:.04em}
+.bin-ctl{display:flex;flex-wrap:wrap;gap:1rem 1.6rem;align-items:end;margin:1.2rem 0 .4rem;padding:.9rem 1.1rem;border:1px dashed var(--line)}
+.bin-ctl .label{margin-bottom:.35rem}
+.bin-ctl input[type=range]{width:180px}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#erode">Erosion</a><a href="#open">Opening</a><a href="#algos">Algorithms</a>
+    <a href="#recon">Reconstruction</a><a href="#gray">Grayscale</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">形 · 態 · 学</div>
+  <h1>Morphology <em>Lab</em></h1>
+  <div class="hero-divider"></div>
+  <p>Earlier labs treated an image as a grid of numbers to multiply and add. Mathematical morphology treats a binary image as a <em>set</em> of foreground pixels, and asks one question over and over: does a small probe shape, the structuring element, fit inside it here? That single question gives you erosion and dilation. From those two operations you can build noise removal, outlines, hole filling, object counting and skeletons. This lab follows Chapter 9 of Gonzalez &amp; Woods.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="erode">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">収 · 縮 · と · 膨 · 張</div>
+    <h2 class="section-heading-text">Erosion and dilation</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §9.1 Preliminaries (p. 636); §9.2: Erosion (p. 639), Dilation (p. 641), Duality (p. 644), eqs. 9-1 to 9-9</p>
+  <p class="lede reveal d1">Paint a set <i>A</i> on the left grid, and click cells of the structuring element <i>B</i> to switch them on or off. Its origin is the centre cell, marked with a dot. Then hover over the result grid. You will see <i>B</i> placed at that point on <i>A</i>, with each of its cells marked green if it sits on foreground and red if it sits on background.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="pg-eq"></div>
+    <div class="eqkey" id="pg-key"></div>
+    <p class="eqgloss">Erosion keeps a point only if <i>B</i>, moved there, fits <em>entirely</em> inside <i>A</i>. Dilation keeps a point if the <em>reflected</em> <i>B̂</i>, moved there, touches <i>A</i> anywhere. With a symmetric <i>B</i> the reflection changes nothing. Make <i>B</i> lopsided and you will see which way dilation pushes. The two are duals (eq. 9-8): eroding the foreground gives the same result as dilating the background with <i>B̂</i>, then taking the complement.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Operation</span><div class="chiprow" id="pg-op"></div></div>
+    <div><span class="label">Paint A</span><div class="chiprow" id="pg-pre"></div></div>
+    <div><span class="label">B size</span><div class="seg" id="pg-n"></div></div>
+  </div>
+  <div class="pg-row">
+    <div><span class="label">A · click or drag to paint</span><div class="pg" id="pg-a"></div></div>
+    <div><span class="label" id="pg-res-l">Result</span><div class="pg res" id="pg-r"></div>
+      <div class="pg-read" id="pg-read">Hover over the result.</div></div>
+    <div><span class="label" id="pg-se-l">B</span><div class="se-ed" id="pg-se"></div>
+      <div class="pg-read" id="pg-se-read"></div></div>
+  </div>
+
+  <h3 class="sub-h">The same operations on a real image</h3>
+  <p class="lede">First the image is thresholded into a binary set, using Otsu's method from lab 02, and you choose whether dark or bright pixels are the foreground. This binary image carries through to sections 02–04. Try the structuring element's shape as well as its size. A horizontal line erases vertical strokes but leaves horizontal ones alone.</p>
+  <div id="pick1"></div>
+  <div class="bin-ctl" id="bin1"></div>
+  <div class="controls" style="margin-top:.6rem">
+    <div><span class="label">Operation</span><div class="seg" id="e-op"></div></div>
+    <div style="grid-column:span 2"><span class="label">Structuring element</span><div class="seg" id="e-shape"></div></div>
+    <div><span class="label">Radius r <span class="mono" id="e-r-v"></span></span><input type="range" id="e-r" min="1" max="10" value="2" aria-label="Structuring element radius"></div>
+  </div>
+  <div id="st1" style="margin-top:1rem"></div>
+  <div class="scoreboard" id="sb1"></div>
+  <div id="t1"></div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="open">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">開 · と · 閉</div>
+    <h2 class="section-heading-text">Opening and closing</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §9.3 Opening and Closing (p. 644), eqs. 9-10 to 9-15</p>
+  <p class="lede reveal d1">Erosion removes small specks, but it shrinks everything else as well. Opening fixes that by dilating afterwards, which grows back whatever survived. Picture <i>B</i> rolling around inside <i>A</i>: everything it can reach is kept, and anything too thin for it to enter is lost. Closing is the reverse and fills in gaps too small for <i>B</i> to enter from outside. The book's fingerprint example uses both: open to remove the specks, then close to rejoin the ridges.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>A</i>&nbsp;∘&nbsp;<i>B</i>&nbsp;=&nbsp;(<i>A</i>&nbsp;⊖&nbsp;<i>B</i>)&nbsp;⊕&nbsp;<i>B</i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>A</i>&nbsp;•&nbsp;<i>B</i>&nbsp;=&nbsp;(<i>A</i>&nbsp;⊕&nbsp;<i>B</i>)&nbsp;⊖&nbsp;<i>B</i></div>
+    <div class="eqkey" id="o-key"></div>
+    <p class="eqgloss">Both operations are <i>idempotent</i>: opening an image that has already been opened changes nothing, and the same goes for closing. The scoreboard checks this for you. The score here is the fraction of pixels that disagree with the noise-free binary image, so lower is better.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Noise <span class="mono" id="o-p-v"></span></span><input type="range" id="o-p" min="0" max="20" value="5" aria-label="Fraction of pixels flipped"></div>
+    <div style="grid-column:span 2"><span class="label">Operation</span><div class="seg" id="o-op"></div></div>
+    <div><span class="label">Structuring element</span><div class="seg" id="o-shape"></div></div>
+    <div><span class="label">Radius r <span class="mono" id="o-r-v"></span></span><input type="range" id="o-r" min="1" max="6" value="1" aria-label="Structuring element radius"></div>
+  </div>
+  <div id="pick2"></div>
+  <div class="bin-ctl" id="bin2"></div>
+  <div id="st2" style="margin-top:1rem"></div>
+  <div class="scoreboard" id="sb2"></div>
+  <div id="t2"></div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="algos">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">基 · 本 · 算 · 法</div>
+    <h2 class="section-heading-text">Boundaries, holes, components, skeletons</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §9.5: Boundary Extraction, Hole Filling (p. 653), Extraction of Connected Components (p. 655), Skeletons (p. 662), eqs. 9-18 to 9-20 and 9-28 to 9-30</p>
+  <p class="lede reveal d1">Each of these algorithms is made only of erosions, dilations and set operations. Hole filling and component extraction share one idea, <i>conditional dilation</i>: grow from a seed one step at a time, but never beyond a mask. Click on the image to place a seed, then step through the iterations and watch the region spread.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="a-eq"></div>
+    <div class="eqkey" id="a-key"></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Algorithm</span><div class="seg" id="a-algo"></div></div>
+    <div id="a-r-w"><span class="label">Thickness r <span class="mono" id="a-r-v"></span></span><input type="range" id="a-r" min="1" max="4" value="1" aria-label="Boundary thickness"></div>
+  </div>
+  <div class="transport" id="a-tr">
+    <button id="a-reset">Reset</button><button id="a-prev">Back</button>
+    <button class="play" id="a-play">Play</button><button id="a-next">Step</button>
+    <div class="speed"><label for="a-speed">Speed</label><input type="range" id="a-speed" min="1" max="10" value="8"></div>
+    <span class="counter" id="a-counter"></span>
+  </div>
+  <div id="pick3"></div>
+  <div class="bin-ctl" id="bin3"></div>
+  <div id="st3" style="margin-top:1rem"></div>
+  <div class="scoreboard" id="sb3"></div>
+  <div id="t3"></div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="recon">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">再 · 構 · 成</div>
+    <h2 class="section-heading-text">Morphological reconstruction</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §9.6: Geodesic Dilation and Erosion (p. 667), Morphological Reconstruction by Dilation and by Erosion (p. 668), Sample Applications (p. 669), eqs. 9-38 to 9-48</p>
+  <p class="lede reveal d1">Section 03 needed you to click a seed. Reconstruction removes that step. It takes a <i>marker</i> image and grows it by conditional dilation inside a <i>mask</i> until nothing more changes. With the right marker, three jobs become fully automatic: keeping only objects that contain a given feature, filling every hole, and removing everything that touches the border.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="r-eq"></div>
+    <div class="eqkey" id="r-key"></div>
+    <p class="eqgloss" id="r-gloss"></p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Application</span><div class="seg" id="r-task"></div></div>
+    <div id="r-l-w" style="grid-column:span 2"><span class="label">Vertical line length <span class="mono" id="r-l-v"></span></span><input type="range" id="r-l" min="3" max="41" step="2" value="15" aria-label="Vertical line length"></div>
+  </div>
+  <div id="pick4"></div>
+  <div class="bin-ctl" id="bin4"></div>
+  <div class="fd-row">
+    <div class="fd-cell"><span class="cap">Mask <em id="r-c0"></em></span><canvas id="r-0"></canvas></div>
+    <div class="fd-cell"><span class="cap">Marker <em id="r-c1"></em></span><canvas id="r-1"></canvas></div>
+    <div class="fd-cell"><span class="cap" id="r-c2">Ordinary opening</span><canvas id="r-2"></canvas></div>
+    <div class="fd-cell"><span class="cap">Result <em id="r-c3"></em></span><canvas id="r-3"></canvas></div>
+  </div>
+  <div class="scoreboard" id="sb4"></div>
+  <div id="t4"></div>
+</section>
+
+<!-- ══════ 05 ══════ -->
+<section id="gray">
+  <div class="section-heading reveal">
+    <span class="section-num">— 05 —</span>
+    <div class="section-heading-kanji">濃 · 淡 · 形 · 態</div>
+    <h2 class="section-heading-text">Grayscale morphology and the top-hat</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §9.8: Grayscale Erosion and Dilation (p. 674), Grayscale Opening and Closing (p. 680), Some Basic Grayscale Morphological Algorithms (p. 682), eqs. 9-49, 9-50, 9-56, 9-57, 9-60 to 9-62</p>
+  <p class="lede reveal d1">For a grayscale image, "fits inside" turns into a minimum and "touches" into a maximum. With a flat structuring element, erosion is the min filter and dilation is the max filter from lab 03. Opening and closing then remove bright or dark details that are smaller than <i>B</i>. Subtracting the opening from the image leaves only those small bright details, and that is the <i>top-hat</i>. The book uses it to correct uneven lighting before thresholding. Try it on <i>Uneven page</i>, where lab 02's Otsu threshold failed.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="g-eq"></div>
+    <div class="eqkey" id="g-key"><span>Point at the image to see the window.</span></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Operation</span><div class="chiprow" id="g-op"></div></div>
+    <div><span class="label">Structuring element</span><div class="seg" id="g-shape"></div></div>
+    <div><span class="label">Radius r <span class="mono" id="g-r-v"></span></span><input type="range" id="g-r" min="1" max="12" value="4" aria-label="Structuring element radius"></div>
+    <div><span class="label">Then</span><button type="button" class="chip" id="g-otsu" aria-pressed="false">Threshold with Otsu</button></div>
+  </div>
+  <div id="pick5"></div>
+  <div id="st5" style="margin-top:1rem"></div>
+  <div class="scoreboard" id="sb5"></div>
+  <div id="t5"></div>
+</section>
+
+<nav class="lab-pager">
+  <a href="restoration-lab.html" class="prev">
+    <span class="pager-dir">← Previous</span>
+    <span class="pager-title">05 · Image Restoration</span>
+  </a>
+  <a href="labs.html" class="next">
+    <span class="pager-dir">The series →</span>
+    <span class="pager-title">All labs</span>
+  </a>
+</nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+    <p style="margin-top:.6rem">Your images never leave the browser. Everything runs on your own machine.</p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script src="../assets/imgproc.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Morphology Lab — Gonzalez & Woods, 4th ed., chapter 9
+   ═══════════════════════════════════════════════════════════════════ */
+
+let IMG = null;
+const $ = id => document.getElementById(id);
+const pctOf = (n, d) => (n / d * 100).toFixed(1) + '%';
+
+/* ═════ binary core ═════
+   A binary image is { w, h, d: Uint8Array of 0/1 }. Outside the image counts
+   as background, as in the book's examples. A structuring element is a list
+   of offsets { dx, dy } from its origin. */
+
+const bin = (w, h) => ({ w, h, d: new Uint8Array(w * h) });
+function seShape(shape, r) {
+  const o = [];
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    let on = false;
+    if (shape === 'square') on = true;
+    else if (shape === 'disk') on = dx * dx + dy * dy <= r * r + r * 0.6;
+    else if (shape === 'cross') on = dx === 0 || dy === 0;
+    else if (shape === 'lineh') on = dy === 0;
+    else if (shape === 'linev') on = dx === 0;
+    if (on) o.push({ dx, dy });
+  }
+  return o;
+}
+/** A ⊖ B: 1 where every cell of B, translated to (x, y), lands on foreground (eq. 9-3). */
+function erodeB(A, offs) {
+  const { w, h, d } = A, out = bin(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!d[y * w + x] && offs.some(o => !o.dx && !o.dy)) continue;
+    let ok = 1;
+    for (const o of offs) { const xx = x + o.dx, yy = y + o.dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h || !d[yy * w + xx]) { ok = 0; break; } }
+    out.d[y * w + x] = ok;
+  }
+  return out;
+}
+/** A ⊕ B: 1 where the reflected B̂, translated to (x, y), overlaps A (eq. 9-6). */
+function dilateB(A, offs) {
+  const { w, h, d } = A, out = bin(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let hit = 0;
+    for (const o of offs) { const xx = x - o.dx, yy = y - o.dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h && d[yy * w + xx]) { hit = 1; break; } }
+    out.d[y * w + x] = hit;
+  }
+  return out;
+}
+const openB = (A, o) => dilateB(erodeB(A, o), o);
+const closeB = (A, o) => erodeB(dilateB(A, o), o);
+const minus = (A, B) => { const o = bin(A.w, A.h); for (let i = 0; i < o.d.length; i++) o.d[i] = A.d[i] && !B.d[i] ? 1 : 0; return o; };
+const count = A => { let n = 0; for (const v of A.d) n += v; return n; };
+const diff = (A, B) => { let n = 0; for (let i = 0; i < A.d.length; i++) if (A.d[i] !== B.d[i]) n++; return n; };
+const toGray = (A, on, off) => { const g = IP.make(A.w, A.h); for (let i = 0; i < A.d.length; i++) g.data[i] = A.d[i] ? (on == null ? 255 : on) : (off || 0); return g; };
+
+/**
+ * Conditional dilation from a seed, layer by layer: X_k = (X_{k−1} ⊕ B) ∩ mask.
+ * Done as a breadth-first search, which reaches exactly the same pixels at each
+ * step k as repeating the dilation, without re-scanning the whole image each time.
+ * conn 4 = the book's 3×3 cross, conn 8 = its 3×3 square. Returns the step at which each pixel joins.
+ */
+function geodesic(seeds, mask, conn) {
+  const { w, h } = mask, dist = new Int32Array(w * h).fill(-1);
+  let q = [];
+  for (const i of seeds) if (mask.d[i] && dist[i] < 0) { dist[i] = 0; q.push(i); }
+  const nb = conn === 4 ? [[1, 0], [-1, 0], [0, 1], [0, -1]] : [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  let k = 0;
+  while (q.length) {
+    const next = [];
+    k++;
+    for (const i of q) {
+      const x = i % w, y = (i / w) | 0;
+      for (const [dx, dy] of nb) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (mask.d[j] && dist[j] < 0) { dist[j] = k; next.push(j); }
+      }
+    }
+    q = next;
+  }
+  let K = 0; for (const v of dist) if (v > K) K = v;
+  return { dist, K };
+}
+/** Object count: connected components, 8-connectivity, by flood fill. */
+function countObjects(A) {
+  const { w, h, d } = A, seen = new Uint8Array(w * h);
+  let n = 0; const st = [];
+  for (let i = 0; i < d.length; i++) if (d[i] && !seen[i]) {
+    n++; seen[i] = 1; st.push(i);
+    while (st.length) {
+      const p = st.pop(), x = p % w, y = (p / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (d[j] && !seen[j]) { seen[j] = 1; st.push(j); }
+      }
+    }
+  }
+  return n;
+}
+
+/* ═════ the shared binary image ═════ */
+
+const BIN = { T: null, dark: null, of: null, A: null, ctl: [] };
+function otsu(img) {
+  const h = IP.histogram(img), n = img.data.length;
+  let mG = 0; for (let k = 0; k < 256; k++) mG += k * h[k] / n;
+  let P = 0, m = 0, best = -1, bk = 128, vG = 0;
+  for (let k = 0; k < 256; k++) vG += (k - mG) ** 2 * h[k] / n;
+  for (let k = 0; k < 255; k++) {
+    P += h[k] / n; m += k * h[k] / n;
+    if (P <= 0 || P >= 1) continue;
+    const s = (mG * P - m) ** 2 / (P * (1 - P));
+    if (s > best) { best = s; bk = k; }
+  }
+  return { T: bk, eta: vG ? best / vG : 0 };
+}
+function makeBinary() {
+  if (BIN.of !== IMG) {
+    BIN.of = IMG; BIN.T = otsu(IMG).T;
+    let above = 0; for (const v of IMG.data) if (v > BIN.T) above++;
+    BIN.dark = above > IMG.data.length / 2;        // foreground = the minority side
+  }
+  const A = bin(IMG.w, IMG.h);
+  for (let i = 0; i < A.d.length; i++) A.d[i] = BIN.dark ? (IMG.data[i] <= BIN.T ? 1 : 0) : (IMG.data[i] > BIN.T ? 1 : 0);
+  BIN.A = A;
+  return A;
+}
+function binCtl(id) {
+  const el = $(id);
+  el.innerHTML = '<div><span class="label">Threshold T <span class="mono"></span></span><input type="range" min="1" max="254" aria-label="Threshold"></div>' +
+    '<div><span class="label">Foreground is</span><div class="seg"></div></div>' +
+    '<div><button type="button" class="chip">Otsu</button></div>' +
+    '<span class="drag-hint" style="margin:0">Shared by sections 01–04</span>';
+  const rng = el.querySelector('input'), sg = el.querySelector('.seg'), val = el.querySelector('.mono');
+  sg.id = id + '-pol';
+  rng.addEventListener('input', () => { BIN.T = +rng.value; binChanged(); });
+  el.querySelector('.chip').addEventListener('click', () => { BIN.T = otsu(IMG).T; binChanged(); });
+  const sync = () => {
+    rng.value = BIN.T; val.textContent = '= ' + BIN.T;
+    seg(sg.id, [true, false], BIN.dark, v => { BIN.dark = v; binChanged(); }, ['Dark pixels', 'Bright pixels']);
+  };
+  BIN.ctl.push(sync);
+}
+function binChanged() { makeBinary(); BIN.ctl.forEach(f => f()); render1(); render2(); render3(); render4(); }
+
+/* ═════ 01 — the paintable playground ═════ */
+
+const GW = 20, GH = 13;
+const PG = { A: bin(GW, GH), n: 3, se: null, op: 'erode', hover: -1, asymDil: false, hmtSeen: false };
+const PGOPS = [['erode', 'Erosion'], ['dilate', 'Dilation'], ['open', 'Opening'], ['close', 'Closing'], ['boundary', 'Boundary'], ['hmt', 'Hit-or-miss']];
+function pgPreset(k) {
+  const A = PG.A; A.d.fill(0);
+  const set = (x, y) => { if (x >= 0 && y >= 0 && x < GW && y < GH) A.d[y * GW + x] = 1; };
+  if (k === 'shapes') {
+    for (let y = 2; y <= 9; y++) for (let x = 2; x <= 8; x++) set(x, y);          // block with a hole
+    A.d[5 * GW + 5] = 0; A.d[6 * GW + 5] = 0;
+    for (let x = 9; x <= 12; x++) set(x, 6);                                       // thin bridge
+    for (let y = 3; y <= 9; y++) for (let x = 13; x <= 16; x++) set(x, y);
+    set(18, 2); set(17, 11);                                                        // specks
+  } else if (k === 'letters') {
+    [[3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7], [3, 8], [3, 9], [4, 9], [5, 9], [6, 9],                       // L
+     [9, 2], [9, 3], [9, 4], [9, 5], [9, 6], [9, 7], [9, 8], [9, 9], [10, 2], [11, 2], [12, 2], [10, 5], [11, 5], [10, 9], [11, 9], [12, 9], // E
+     [15, 2], [15, 3], [15, 4], [15, 5], [15, 6], [15, 7], [15, 8], [15, 9], [16, 9], [17, 9], [16, 2], [17, 2]].forEach(([x, y]) => set(x, y));
+  } else if (k === 'random') {
+    const r = IP.rng(Date.now() & 0xffff);
+    for (let i = 0; i < A.d.length; i++) A.d[i] = r() < 0.45 ? 1 : 0;
+  }
+  renderPG();
+}
+function defaultSE(n) {
+  const se = new Int8Array(n * n).fill(-1);       // −1 = not in B (or "don't care" for hit-or-miss)
+  const c = n >> 1;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (n === 3 || Math.abs(x - c) + Math.abs(y - c) <= c) se[y * n + x] = 1;
+  return se;
+}
+PG.se = defaultSE(3);
+const seList = (v) => { const o = [], c = PG.n >> 1; for (let y = 0; y < PG.n; y++) for (let x = 0; x < PG.n; x++) if (PG.se[y * PG.n + x] === v) o.push({ dx: x - c, dy: y - c }); return o; };
+function pgResult() {
+  const B1 = seList(1);
+  switch (PG.op) {
+    case 'erode': return erodeB(PG.A, B1);
+    case 'dilate': return dilateB(PG.A, B1);
+    case 'open': return openB(PG.A, B1);
+    case 'close': return closeB(PG.A, B1);
+    case 'boundary': return minus(PG.A, erodeB(PG.A, seShape('square', 1)));
+    case 'hmt': {
+      // eq. 9-16 with B1 = foreground cells and B2 = background cells: (A ⊖ B1) ∩ (Aᶜ ⊖ B2)
+      const Ac = bin(GW, GH); for (let i = 0; i < Ac.d.length; i++) Ac.d[i] = 1 - PG.A.d[i];
+      const e1 = B1.length ? erodeB(PG.A, B1) : null, e2 = seList(0).length ? erodeB(Ac, seList(0)) : null;
+      const o = bin(GW, GH); for (let i = 0; i < o.d.length; i++) o.d[i] = (e1 ? e1.d[i] : 1) && (e2 ? e2.d[i] : 1) ? 1 : 0;
+      return o;
+    }
+  }
+}
+function buildPG() {
+  const a = $('pg-a'), r = $('pg-r');
+  [a, r].forEach(g => { g.style.gridTemplateColumns = 'repeat(' + GW + ',minmax(0,1fr))'; g.innerHTML = ''; for (let i = 0; i < GW * GH; i++) g.appendChild(document.createElement('div')); });
+  let paint = null;
+  const cellOf = e => { const t = document.elementFromPoint(e.clientX, e.clientY); return t && t.parentElement === a ? Array.prototype.indexOf.call(a.children, t) : -1; };
+  a.addEventListener('pointerdown', e => { const i = cellOf(e); if (i < 0) return; paint = PG.A.d[i] ? 0 : 1; PG.A.d[i] = paint; a.setPointerCapture(e.pointerId); PG.pre = null; renderPG(); });
+  a.addEventListener('pointermove', e => { if (paint == null) return; const i = cellOf(e); if (i >= 0 && PG.A.d[i] !== paint) { PG.A.d[i] = paint; renderPG(); } });
+  const end = () => { paint = null; };
+  a.addEventListener('pointerup', end); a.addEventListener('pointercancel', end);
+  Array.from(r.children).forEach((c, i) => c.addEventListener('pointerenter', () => { PG.hover = i; renderPG(); }));
+  r.addEventListener('pointerleave', () => { PG.hover = -1; renderPG(); });
+}
+function buildPGctl() {
+  chips('pg-op', PGOPS, PG.op, k => { PG.op = k; if (k === 'hmt') PG.hmtSeen = true; buildPGctl(); renderPG(); });
+  chips('pg-pre', [['shapes', 'Shapes'], ['letters', 'Letters'], ['random', 'Random'], ['clear', 'Clear']], null, k => pgPreset(k));
+  seg('pg-n', [3, 5], PG.n, n => { PG.n = n; PG.se = defaultSE(n); buildPGctl(); renderPG(); }, ['3 × 3', '5 × 5']);
+  const el = $('pg-se'), c = PG.n >> 1;
+  el.style.gridTemplateColumns = 'repeat(' + PG.n + ',34px)';
+  el.innerHTML = '';
+  for (let i = 0; i < PG.n * PG.n; i++) {
+    const b = document.createElement('button'), v = PG.se[i];
+    b.type = 'button';
+    b.className = (v === 1 ? 'v1' : v === 0 ? 'v0' : '') + (i === c * PG.n + c ? ' org' : '');
+    b.textContent = v === 1 ? '1' : v === 0 ? (PG.op === 'hmt' ? '0' : '') : (PG.op === 'hmt' ? '×' : '');
+    b.setAttribute('aria-label', 'Structuring element cell ' + (i % PG.n - c) + ', ' + (Math.floor(i / PG.n) - c) + ': ' + b.textContent);
+    b.addEventListener('click', () => {
+      // plain ops toggle in / out; hit-or-miss cycles 1 → 0 → don't care
+      PG.se[i] = PG.op === 'hmt' ? (v === 1 ? 0 : v === 0 ? -1 : 1) : (v === 1 ? -1 : 1);
+      buildPGctl(); renderPG();
+    });
+    el.appendChild(b);
+  }
+  $('pg-se-l').textContent = PG.op === 'hmt' ? 'B · 1 = must be foreground, 0 = must be background, × = don\'t care' : 'B · click cells to switch them';
+}
+function renderPG() {
+  const R = pgResult(), a = $('pg-a').children, r = $('pg-r').children;
+  const hx = PG.hover % GW, hy = (PG.hover / GW) | 0, mark = new Map();
+  if (PG.hover >= 0 && ['erode', 'dilate', 'hmt'].includes(PG.op)) {
+    const refl = PG.op === 'dilate' ? -1 : 1;
+    seList(1).forEach(o => mark.set((hy + refl * o.dy) + ',' + (hx + refl * o.dx), 1));
+    if (PG.op === 'hmt') seList(0).forEach(o => mark.set((hy + o.dy) + ',' + (hx + o.dx), 0));
+  }
+  for (let i = 0; i < GW * GH; i++) {
+    const x = i % GW, y = (i / GW) | 0, m = mark.get(y + ',' + x);
+    a[i].className = (PG.A.d[i] ? 'on' : '') + (m === undefined ? '' : ((m === 1) === Boolean(PG.A.d[i]) ? ' se' : ' miss')) + (i === PG.hover && mark.size ? ' o' : '');
+    r[i].className = R.d[i] ? (PG.A.d[i] ? 'on' : 'on added') : (PG.A.d[i] ? 'gone' : '');
+  }
+  $('pg-res-l').textContent = PGOPS.find(o => o[0] === PG.op)[1] + ' · red = result, hatched = removed';
+  const EQ = {
+    erode: '<i>A</i>&nbsp;⊖&nbsp;<i>B</i>&nbsp;=&nbsp;{&nbsp;<i>z</i>&nbsp;|&nbsp;(<i>B</i>)<sub><i>z</i></sub>&nbsp;⊆&nbsp;<i>A</i>&nbsp;}&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-3)</span>',
+    dilate: '<i>A</i>&nbsp;⊕&nbsp;<i>B</i>&nbsp;=&nbsp;{&nbsp;<i>z</i>&nbsp;|&nbsp;(<i>B̂</i>)<sub><i>z</i></sub>&nbsp;∩&nbsp;<i>A</i>&nbsp;≠&nbsp;∅&nbsp;}&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-6)</span>',
+    open: '<i>A</i>&nbsp;∘&nbsp;<i>B</i>&nbsp;=&nbsp;(<i>A</i>&nbsp;⊖&nbsp;<i>B</i>)&nbsp;⊕&nbsp;<i>B</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-10)</span>',
+    close: '<i>A</i>&nbsp;•&nbsp;<i>B</i>&nbsp;=&nbsp;(<i>A</i>&nbsp;⊕&nbsp;<i>B</i>)&nbsp;⊖&nbsp;<i>B</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-11)</span>',
+    boundary: '<i>β</i>(<i>A</i>)&nbsp;=&nbsp;<i>A</i>&nbsp;−&nbsp;(<i>A</i>&nbsp;⊖&nbsp;<i>B</i>),&nbsp;&nbsp;<i>B</i> = 3 × 3 of 1s&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-18)</span>',
+    hmt: '<i>I</i>&nbsp;⊛&nbsp;<i>B</i><sub>1,2</sub>&nbsp;=&nbsp;(<i>A</i>&nbsp;⊖&nbsp;<i>B</i><sub>1</sub>)&nbsp;∩&nbsp;(<i>A</i><sup><i>c</i></sup>&nbsp;⊖&nbsp;<i>B</i><sub>2</sub>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-16)</span>'
+  };
+  $('pg-eq').innerHTML = EQ[PG.op];
+  const nA = count(PG.A), nR = count(R);
+  $('pg-key').innerHTML = '<span>|<i>A</i>| = ' + nA + '</span><span>|result| = <b>' + nR + '</b></span><span>|<i>B</i>| = ' + seList(1).length + (PG.op === 'hmt' ? ' foreground + ' + seList(0).length + ' background' : '') + '</span>';
+  let read = 'Hover over the result.';
+  if (PG.hover >= 0) {
+    const inA = PG.A.d[PG.hover], outR = R.d[PG.hover], B1 = seList(1);
+    if (PG.op === 'erode') {
+      const hits = B1.filter(o => { const x = hx + o.dx, y = hy + o.dy; return x >= 0 && y >= 0 && x < GW && y < GH && PG.A.d[y * GW + x]; }).length;
+      read = '<i>B</i> placed at (' + hx + ', ' + hy + '): <b>' + hits + ' of ' + B1.length + '</b> cells on foreground. ' + (outR ? 'It fits, so the point stays.' : 'It does not fit, so the point is removed' + (inA ? ', even though it was in <i>A</i>.' : '.'));
+    } else if (PG.op === 'dilate') {
+      const hits = B1.filter(o => { const x = hx - o.dx, y = hy - o.dy; return x >= 0 && y >= 0 && x < GW && y < GH && PG.A.d[y * GW + x]; }).length;
+      read = '<i>B̂</i> placed at (' + hx + ', ' + hy + ') touches <b>' + hits + '</b> foreground cell' + (hits === 1 ? '' : 's') + '. ' + (outR ? (inA ? 'The point was already in <i>A</i>.' : 'At least one hit, so the point is <b>added</b>.') : 'No hits, so it stays background.');
+    } else if (PG.op === 'hmt') {
+      read = outR ? 'Every 1 lands on foreground and every 0 lands on background: <b>a match</b>.' : 'At least one cell disagrees, so there is no match here.';
+    } else read = outR ? 'In the result.' : inA ? 'In <i>A</i> but <b>removed</b>.' : 'Background.';
+  }
+  $('pg-read').innerHTML = read;
+  const asym = !PG.se.every((v, i) => v === PG.se[PG.se.length - 1 - i]);
+  $('pg-se-read').innerHTML = asym ? '<i>B</i> is not symmetric, so <i>B̂</i> ≠ <i>B</i>. Compare how erosion and dilation shift the shape.' : '<i>B</i> is symmetric: <i>B̂</i> = <i>B</i>.';
+  if (asym && PG.op === 'dilate') PG.asymDil = true;
+  if (typeof tries1 !== 'undefined') tries1.check();
+}
+
+/* ═════ 01 — on a real image ═════ */
+
+const E1 = { op: 'erode', shape: 'square', r: 2, objBefore: 0, objAfter: 0, split: false, merged: false };
+const SHAPES = [['square', 'Square'], ['disk', 'Disk'], ['cross', 'Cross'], ['lineh', 'Line —'], ['linev', 'Line |']];
+function buildE1() {
+  seg('e-op', ['erode', 'dilate'], E1.op, v => { E1.op = v; buildE1(); render1(); }, ['Erosion', 'Dilation']);
+  seg('e-shape', SHAPES.map(s => s[0]), E1.shape, v => { E1.shape = v; buildE1(); render1(); }, SHAPES.map(s => s[1]));
+}
+$('e-r').addEventListener('input', e => { E1.r = +e.target.value; render1(); });
+const st1 = IP.stage('st1', { beforeLabel: 'A', afterLabel: 'Result',
+  explain: (r, s, x, y) => {
+    const offs = seShape(E1.shape, E1.r), A = BIN.A;
+    let hits = 0;
+    for (const o of offs) { const xx = x + (E1.op === 'erode' ? o.dx : -o.dx), yy = y + (E1.op === 'erode' ? o.dy : -o.dy); if (xx >= 0 && yy >= 0 && xx < A.w && yy < A.h && A.d[yy * A.w + xx]) hits++; }
+    return E1.op === 'erode'
+      ? '<i>B</i> here covers <b>' + hits + ' of ' + offs.length + '</b> foreground pixels → ' + (s ? '<b>fits</b>, kept' : 'does not fit, background')
+      : '<i>B̂</i> here touches <b>' + hits + '</b> foreground pixels → ' + (s ? (r ? 'already foreground' : '<b>added</b>') : 'background');
+  } });
+function render1() {
+  if (!BIN.A) return;
+  const A = BIN.A, offs = seShape(E1.shape, E1.r), R = E1.op === 'erode' ? erodeB(A, offs) : dilateB(A, offs);
+  st1.set(toGray(A), toGray(R));
+  E1.objBefore = countObjects(A); E1.objAfter = countObjects(R);
+  $('e-r-v').textContent = '= ' + E1.r + ' (' + offs.length + ' pixels)';
+  $('sb1').innerHTML =
+    score('Foreground', pctOf(count(R), R.d.length), 'was ' + pctOf(count(A), A.d.length), true) +
+    score('Objects', E1.objAfter, 'was ' + E1.objBefore + ' (8-connected)') +
+    score('|B|', offs.length, SHAPES.find(s => s[0] === E1.shape)[1].toLowerCase() + ', r = ' + E1.r);
+  if (E1.op === 'erode' && E1.objAfter > E1.objBefore) E1.split = true;
+  if (E1.op === 'dilate' && E1.objBefore > 3 && E1.objAfter <= E1.objBefore / 2) E1.merged = true;
+  tries1.check();
+}
+const tries1 = IP.tries('t1', [
+  { text: 'In the grid, make <i>B</i> lopsided (for example, only the centre and the cell to its right) and dilate. Which way does <i>A</i> grow, and why is that the <em>opposite</em> of the cell you switched on?',
+    test: () => PG.asymDil },
+  { text: 'Use the grid\'s hit-or-miss with a 3 × 3 <i>B</i>: 1 in the centre and 0 all around. What does it find?',
+    test: () => PG.hmtSeen && PG.op === 'hmt' && PG.se[4] === 1 && [0, 1, 2, 3, 5, 6, 7, 8].every(i => PG.se[i] === 0) },
+  { text: 'On the real image, erode until the object count goes <em>up</em>. What happened to the objects that split?',
+    test: () => E1.split },
+  { text: 'Dilate until the object count falls to half or less.',
+    test: () => E1.merged }
+]);
+
+/* ═════ 02 — opening and closing ═════ */
+
+const O2 = { p: 5, op: 'openclose', shape: 'square', r: 1, seen: new Set() };
+const OOPS = [['open', 'Opening'], ['close', 'Closing'], ['openclose', 'Open → close'], ['closeopen', 'Close → open']];
+function buildO2() {
+  seg('o-op', OOPS.map(o => o[0]), O2.op, v => { O2.op = v; buildO2(); render2(); }, OOPS.map(o => o[1]));
+  seg('o-shape', ['square', 'disk', 'cross'], O2.shape, v => { O2.shape = v; buildO2(); render2(); }, ['Square', 'Disk', 'Cross']);
+}
+$('o-p').addEventListener('input', e => { O2.p = +e.target.value; render2(); });
+$('o-r').addEventListener('input', e => { O2.r = +e.target.value; render2(); });
+const st2 = IP.stage('st2', { beforeLabel: 'Noisy A', afterLabel: 'Result',
+  explain: (r, s, x, y) => (O2.clean.d[y * O2.clean.w + x] ? 'Clean pixel: foreground' : 'Clean pixel: background') + ' · noisy: ' + (r ? 'foreground' : 'background') + ' · result: <b>' + (s ? 'foreground' : 'background') + '</b>' +
+    ((s ? 1 : 0) === O2.clean.d[y * O2.clean.w + x] ? ' ✓' : ' ✗') });
+function applyO(A, op, o) {
+  return op === 'open' ? openB(A, o) : op === 'close' ? closeB(A, o) : op === 'openclose' ? closeB(openB(A, o), o) : openB(closeB(A, o), o);
+}
+function render2() {
+  if (!BIN.A) return;
+  const clean = BIN.A, r = IP.rng(77), A = bin(clean.w, clean.h);
+  for (let i = 0; i < A.d.length; i++) A.d[i] = r() < O2.p / 100 ? 1 - clean.d[i] : clean.d[i];
+  O2.clean = clean;
+  const offs = seShape(O2.shape, O2.r), R = applyO(A, O2.op, offs);
+  st2.set(toGray(A), toGray(R));
+  const eB = diff(A, clean) / A.d.length, eA = diff(R, clean) / A.d.length;
+  O2.eB = eB; O2.eA = eA;
+  let again = '—';
+  if (O2.op === 'open' || O2.op === 'close') again = diff(applyO(R, O2.op, offs), R);
+  $('o-p-v').textContent = O2.p + '% of pixels flipped';
+  $('o-r-v').textContent = '= ' + O2.r;
+  $('o-key').innerHTML = '<span>' + OOPS.find(o => o[0] === O2.op)[1] + '</span><span><i>B</i>: ' + O2.shape + ', ' + offs.length + ' pixels</span>';
+  $('sb2').innerHTML =
+    score('Wrong pixels', pctOf(eA * A.d.length, A.d.length), 'was ' + pctOf(eB * A.d.length, A.d.length) + ' before', true) +
+    score('Objects', countObjects(R), 'clean image has ' + countObjects(clean)) +
+    score('Apply again', again === '—' ? '—' : again + ' changed', again === '—' ? 'only for a single opening or closing' : again === 0 ? 'idempotent, as the book says' : 'pixels');
+  O2.seen.add(O2.op + (again === 0 ? ':idem' : ''));
+  tries2.check();
+}
+const tries2 = IP.tries('t2', [
+  { text: 'With 5% noise, get the wrong-pixel rate down to a fifth of what it was.',
+    test: () => O2.p >= 5 && O2.eA <= O2.eB / 5 },
+  { text: 'Pick a single <i>Opening</i> or <i>Closing</i> and read <i>Apply again</i>. Why must it be zero?',
+    test: () => O2.seen.has('open:idem') || O2.seen.has('close:idem') },
+  { text: 'Compare <i>Open → close</i> with <i>Close → open</i>. Which order suits this noise, and why does the order matter at all?',
+    test: () => O2.seen.has('openclose') && O2.seen.has('closeopen') }
+]);
+
+/* ═════ 03 — basic algorithms ═════ */
+
+const A3 = { algo: 'holes', r: 1, seed: null, g: null, k: 0, K: 0, filledOnce: false, compOnce: false, skelSeen: false };
+const ALGOS = [['boundary', 'Boundary'], ['holes', 'Hole filling'], ['comp', 'Connected component'], ['skel', 'Skeleton']];
+function buildA3() {
+  seg('a-algo', ALGOS.map(a => a[0]), A3.algo, v => { A3.algo = v; A3.seed = null; A3.g = null; A3.k = 0; if (v === 'skel') A3.skelSeen = true; buildA3(); render3(); }, ALGOS.map(a => a[1]));
+  $('a-r-w').style.display = A3.algo === 'boundary' ? '' : 'none';
+  $('a-tr').style.display = A3.algo === 'holes' || A3.algo === 'comp' || A3.algo === 'skel' ? '' : 'none';
+}
+$('a-r').addEventListener('input', e => { A3.r = +e.target.value; render3(); });
+const tr3 = new Transport({
+  ids: { reset: 'a-reset', prev: 'a-prev', play: 'a-play', next: 'a-next', speed: 'a-speed', counter: 'a-counter' },
+  max: () => Math.max(1, A3.K + 1), get: () => A3.k, set: i => { A3.k = i; }, render: () => render3(true),
+  label: (i, max) => A3.algo === 'skel' ? (A3.K ? 'Skeleton subsets S₀ … S' + subK(i) + ' of ' + A3.K : 'No skeleton yet') : A3.g ? 'k = ' + i + ' of ' + A3.K + (i === A3.K ? ' (stable: X_k = X_k−1)' : '') : 'Click the image to place a seed',
+  interval: v => 360 - v * 32
+});
+const subK = i => String(i).split('').map(c => '₀₁₂₃₄₅₆₇₈₉'[c]).join('');
+const st3 = IP.stage('st3', { compare: false, explain: (r, s, x, y) => A3.algo === 'holes' ? 'Click inside a hole (a background region enclosed by foreground) to seed <i>X</i>₀.' : A3.algo === 'comp' ? 'Click on an object to seed <i>X</i>₀.' : 'Value ' + r });
+// clicks on the stage place the seed
+document.querySelector('#st3 .ip-frame').addEventListener('pointerdown', e => {
+  if (!(A3.algo === 'holes' || A3.algo === 'comp')) return;
+  const f = e.currentTarget, rc = f.getBoundingClientRect(), A = BIN.A;
+  const x = clamp(Math.floor((e.clientX - rc.left) / rc.width * A.w), 0, A.w - 1), y = clamp(Math.floor((e.clientY - rc.top) / rc.height * A.h), 0, A.h - 1);
+  A3.seed = y * A.w + x; A3.g = null; A3.k = 0; tr3.stop(); render3(); tr3.start();
+});
+let skel = null;
+function render3(fromTransport) {
+  if (!BIN.A) return;
+  const A = BIN.A, n = A.d.length, g = IP.make(A.w, A.h);
+  if (A3.algo === 'boundary') {
+    const E = erodeB(A, seShape('square', A3.r)), Bd = minus(A, E);
+    for (let i = 0; i < n; i++) g.data[i] = Bd.d[i] ? 255 : A.d[i] ? 60 : 0;
+    $('a-eq').innerHTML = '<i>β</i>(<i>A</i>)&nbsp;=&nbsp;<i>A</i>&nbsp;−&nbsp;(<i>A</i>&nbsp;⊖&nbsp;<i>B</i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-18)</span>';
+    $('a-key').innerHTML = '<span><i>B</i> = ' + (2 * A3.r + 1) + ' × ' + (2 * A3.r + 1) + ' of 1s → boundary ' + A3.r + ' px thick</span><span>' + count(Bd) + ' boundary pixels</span>';
+    $('a-r-v').textContent = '= ' + A3.r;
+    $('sb3').innerHTML = score('Boundary pixels', count(Bd), 'of ' + count(A) + ' in A', true);
+  } else if (A3.algo === 'holes' || A3.algo === 'comp') {
+    const holes = A3.algo === 'holes';
+    let mask = A;
+    if (holes) { mask = bin(A.w, A.h); for (let i = 0; i < n; i++) mask.d[i] = 1 - A.d[i]; }
+    if (A3.seed != null && !A3.g) {
+      if (!mask.d[A3.seed]) { A3.seed = null; A3.bad = true; }
+      else { A3.g = geodesic([A3.seed], mask, holes ? 4 : 8); A3.K = A3.g.K; A3.bad = false; }
+    }
+    let got = 0;
+    for (let i = 0; i < n; i++) {
+      const inX = A3.g && A3.g.dist[i] >= 0 && A3.g.dist[i] <= A3.k;
+      if (inX) got++;
+      g.data[i] = inX ? (holes ? 255 : 255) : A.d[i] ? (holes ? 110 : 70) : 0;
+    }
+    const touches = holes && A3.g && (() => { const { w, h } = A; for (let i = 0; i < n; i++) if (A3.g.dist[i] >= 0) { const x = i % w, y = (i / w) | 0; if (!x || !y || x === w - 1 || y === h - 1) return true; } return false; })();
+    $('a-eq').innerHTML = holes
+      ? '<i>X<sub>k</sub></i>&nbsp;=&nbsp;(<i>X</i><sub><i>k</i>−1</sub>&nbsp;⊕&nbsp;<i>B</i>)&nbsp;∩&nbsp;<i>I</i><sup><i>c</i></sup>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-19) · <i>B</i> = 3 × 3 cross</span>'
+      : '<i>X<sub>k</sub></i>&nbsp;=&nbsp;(<i>X</i><sub><i>k</i>−1</sub>&nbsp;⊕&nbsp;<i>B</i>)&nbsp;∩&nbsp;<i>I</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-20) · <i>B</i> = 3 × 3 of 1s</span>';
+    $('a-key').innerHTML = A3.g
+      ? '<span><i>k</i> = ' + A3.k + '</span><span>|<i>X<sub>k</sub></i>| = ' + got + '</span><span>stops at <i>k</i> = ' + A3.K + '</span>'
+      : '<span>' + (A3.bad ? (holes ? 'That point is foreground. Click inside a hole instead.' : 'That point is background. Click on an object.') : 'Click the image to seed <i>X</i>₀.') + '</span>';
+    $('sb3').innerHTML =
+      score(holes ? 'Filled' : 'Extracted', got + ' px', A3.g ? 'after ' + A3.k + ' iterations' : 'no seed yet', true) +
+      score('Objects in A', countObjects(A), '8-connected') +
+      (holes && touches ? score('Warning', 'Leaked', 'this "hole" reaches the border: it is background, not a hole') : '');
+    if (A3.g && A3.k === A3.K) { if (holes && !touches) A3.filledOnce = true; if (!holes) A3.compOnce = true; }
+  } else {
+    if (!skel || skel.of !== A) {
+      // S_k(A) = (A ⊖ kB) − (A ⊖ kB) ∘ B, for k = 0 … K (eqs. 9-28 to 9-31)
+      const B = seShape('square', 1), parts = [];
+      let Ek = A;
+      while (count(Ek)) { parts.push(minus(Ek, openB(Ek, B))); Ek = erodeB(Ek, B); }
+      skel = { of: A, parts };
+      A3.K = parts.length - 1;
+    }
+    const upto = Math.min(A3.k, skel.parts.length - 1);
+    let tot = 0;
+    for (let i = 0; i < n; i++) {
+      let v = A.d[i] ? 45 : 0;
+      for (let k = 0; k <= upto; k++) if (skel.parts[k].d[i]) { v = 255 - Math.round(k / Math.max(1, A3.K) * 110); tot++; break; }
+      g.data[i] = v;
+    }
+    $('a-eq').innerHTML = '<i>S</i>(<i>A</i>)&nbsp;=&nbsp;∪<sub><i>k</i>=0</sub><sup><i>K</i></sup>&nbsp;<i>S<sub>k</sub></i>(<i>A</i>),&nbsp;&nbsp;<i>S<sub>k</sub></i>(<i>A</i>)&nbsp;=&nbsp;(<i>A</i>&nbsp;⊖&nbsp;<i>kB</i>)&nbsp;−&nbsp;(<i>A</i>&nbsp;⊖&nbsp;<i>kB</i>)&nbsp;∘&nbsp;<i>B</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-28, 9-29)</span>';
+    $('a-key').innerHTML = '<span><i>K</i> = ' + A3.K + ' erosions before <i>A</i> vanishes</span><span>showing <i>S</i>₀ … <i>S</i>' + subK(upto) + ', brighter = smaller <i>k</i></span>';
+    $('sb3').innerHTML = score('Skeleton pixels', tot, 'of ' + count(A) + ' in A', true) + score('K', A3.K, 'eq. 9-31');
+    if (!fromTransport && A3.k === 0) { A3.k = A3.K; }
+  }
+  st3.set(g);
+  tr3.sync();
+  tries3.check();
+}
+const tries3 = IP.tries('t3', [
+  { text: '<i>Hole filling</i>: click inside a real hole and play the iterations to the end. How many steps did it take, and what decided that number?',
+    test: () => A3.filledOnce },
+  { text: 'Now click on background that is <em>not</em> enclosed. Why does the book need you to supply a point that is known to be inside a hole?',
+    test: () => A3.algo === 'holes' && A3.g && $('sb3').textContent.includes('Leaked') },
+  { text: '<i>Connected component</i>: extract one object, then read off how many objects the image has in total.',
+    test: () => A3.compOnce },
+  { text: '<i>Skeleton</i>: look at a round object. Is its skeleton the single centre point you might expect, and is it connected?',
+    test: () => A3.skelSeen }
+]);
+
+/* ═════ 04 — reconstruction ═════ */
+
+const R4 = { task: 'obr', L: 15, seen: new Set() };
+const RT = [['obr', 'Opening by reconstruction'], ['fill', 'Fill all holes'], ['border', 'Clear border objects']];
+function buildR4() {
+  seg('r-task', RT.map(t => t[0]), R4.task, v => { R4.task = v; buildR4(); render4(); }, RT.map(t => t[1]));
+  $('r-l-w').style.display = R4.task === 'obr' ? '' : 'none';
+}
+$('r-l').addEventListener('input', e => { R4.L = +e.target.value; render4(); });
+function render4() {
+  if (!BIN.A) return;
+  const A = BIN.A, n = A.d.length, { w, h } = A;
+  let mask = A, marker = bin(w, h), result = bin(w, h), plain = null, K = 0;
+  const border = i => { const x = i % w, y = (i / w) | 0; return !x || !y || x === w - 1 || y === h - 1; };
+  const grow = (mk, mask8, conn) => { const seeds = []; for (let i = 0; i < n; i++) if (mk.d[i]) seeds.push(i); const g = geodesic(seeds, mask8, conn); const o = bin(w, h); for (let i = 0; i < n; i++) o.d[i] = g.dist[i] >= 0 ? 1 : 0; return { o, K: g.K }; };
+  if (R4.task === 'obr') {
+    const line = seShape('linev', (R4.L - 1) / 2);
+    marker = erodeB(A, line); plain = dilateB(marker, line);
+    const g = grow(marker, A, 8); result = g.o; K = g.K;
+    $('r-eq').innerHTML = '<i>O<sub>R</sub></i><sup>(<i>n</i>)</sup>(<i>F</i>)&nbsp;=&nbsp;<i>R<sub>F</sub></i><sup><i>D</i></sup>[&nbsp;(<i>F</i>&nbsp;⊖&nbsp;<i>nB</i>)&nbsp;]&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-44)</span>';
+    $('r-gloss').innerHTML = 'Erode with a vertical line, so only objects containing a tall stroke leave a mark. Then reconstruct from those marks inside the original image. Each surviving object comes back <em>whole</em>. An ordinary opening with the same line keeps only the vertical strokes themselves.';
+    $('r-c1').textContent = 'F ⊖ B, B = ' + R4.L + ' × 1 vertical line';
+    $('r-c2').textContent = 'Ordinary opening F ∘ B';
+    $('r-l-v').textContent = '= ' + R4.L + ' px';
+  } else if (R4.task === 'fill') {
+    const Ic = bin(w, h); for (let i = 0; i < n; i++) Ic.d[i] = 1 - A.d[i];
+    for (let i = 0; i < n; i++) marker.d[i] = border(i) ? Ic.d[i] : 0;
+    mask = Ic;
+    const g = grow(marker, Ic, 4); K = g.K;
+    for (let i = 0; i < n; i++) result.d[i] = 1 - g.o.d[i];
+    $('r-eq').innerHTML = '<i>H</i>&nbsp;=&nbsp;[&nbsp;<i>R</i><sup><i>D</i></sup><sub><i>I</i><sup><i>c</i></sup></sub>(<i>F</i>)&nbsp;]<sup><i>c</i></sup>,&nbsp;&nbsp;<i>F</i> = 1 − <i>I</i> on the border, 0 inside&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-45, 9-46)</span>';
+    $('r-gloss').innerHTML = 'Background that can be reached from the border is true background. Grow it in from the edges inside <i>I<sup>c</sup></i>, and whatever it could not reach must be a hole. Then take the complement. No seed points are needed.';
+    $('r-c1').textContent = 'F: background on the border';
+    $('r-c2').textContent = 'Reached from the border';
+    plain = g.o;
+  } else {
+    for (let i = 0; i < n; i++) marker.d[i] = border(i) ? A.d[i] : 0;
+    const g = grow(marker, A, 8); K = g.K;
+    result = minus(A, g.o); plain = g.o;
+    $('r-eq').innerHTML = '<i>X</i>&nbsp;=&nbsp;<i>I</i>&nbsp;−&nbsp;<i>R<sub>I</sub></i><sup><i>D</i></sup>(<i>F</i>),&nbsp;&nbsp;<i>F</i> = <i>I</i> on the border, 0 inside&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-47, 9-48)</span>';
+    $('r-gloss').innerHTML = 'Useful before measuring objects: anything cut off by the frame gives wrong sizes and shapes. Reconstruct from the foreground on the border to find every object that touches it, then subtract those objects.';
+    $('r-c1').textContent = 'F: foreground on the border';
+    $('r-c2').textContent = 'Objects touching the border';
+  }
+  const draw = (id, B) => { const c = $(id); c.style.aspectRatio = w + ' / ' + h; IP.drawGray(c, toGray(B)); };
+  draw('r-0', mask); draw('r-1', marker); draw('r-2', plain); draw('r-3', result);
+  $('r-c0').textContent = R4.task === 'fill' ? 'Iᶜ' : 'F = A';
+  $('r-c3').textContent = '· ' + K + ' iterations to stability';
+  $('r-key').innerHTML = '<span>reconstruction reached stability after <b>' + K + '</b> geodesic dilations</span>';
+  $('sb4').innerHTML =
+    score('Objects', countObjects(result), 'was ' + countObjects(A), true) +
+    score('Foreground', pctOf(count(result), n), 'was ' + pctOf(count(A), n)) +
+    score('Iterations', K, 'until stable');
+  R4.seen.add(R4.task + ':' + IP.key);
+  R4.last = { before: countObjects(A), after: countObjects(result) };
+  tries4.check();
+}
+const tries4 = IP.tries('t4', [
+  { text: '<i>Test chart</i>, dark pixels as foreground: opening by reconstruction with a line of 11 px or more. Which objects come back whole? Compare with the ordinary opening, which keeps only their vertical strokes.',
+    test: () => IP.key === 'chart' && BIN.dark && R4.task === 'obr' && R4.L >= 11 },
+  { text: '<i>Fill all holes</i> on the test chart. Which shape had a hole, and how many iterations did it take?',
+    test: () => R4.seen.has('fill:chart') },
+  { text: '<i>Foggy hills</i>: clear border objects. Which region survives, and why would you do this before measuring object sizes?',
+    test: () => IP.key === 'fog' && R4.task === 'border' && R4.last.after < R4.last.before }
+]);
+
+/* ═════ 05 — grayscale morphology ═════ */
+
+const G5 = { op: 'bothat', shape: 'square', r: 4, otsu: false, seen: new Set() };
+const GOPS = [['erode', 'Erosion (min)'], ['dilate', 'Dilation (max)'], ['open', 'Opening'], ['close', 'Closing'], ['grad', 'Gradient'], ['tophat', 'Top-hat'], ['bothat', 'Bottom-hat']];
+function buildG5() {
+  chips('g-op', GOPS, G5.op, v => { G5.op = v; buildG5(); render5(); });
+  seg('g-shape', ['square', 'disk'], G5.shape, v => { G5.shape = v; buildG5(); render5(); }, ['Square', 'Disk']);
+  $('g-otsu').setAttribute('aria-pressed', String(G5.otsu));
+}
+$('g-r').addEventListener('input', e => { G5.r = +e.target.value; render5(); });
+$('g-otsu').addEventListener('click', () => { G5.otsu = !G5.otsu; buildG5(); render5(); });
+
+/** Flat grayscale erosion (min) or dilation (max), eqs. 9-49 and 9-50. Square is done separably. */
+function grayMM(img, isMax, shape, r) {
+  const { w, h, data } = img, pick = isMax ? Math.max : Math.min;
+  if (shape === 'square') {
+    const tmp = new Uint8ClampedArray(w * h), out = IP.make(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = data[y * w + x]; for (let d = -r; d <= r; d++) { const xx = clamp(x + d, 0, w - 1); v = pick(v, data[y * w + xx]); } tmp[y * w + x] = v; }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = tmp[y * w + x]; for (let d = -r; d <= r; d++) { const yy = clamp(y + d, 0, h - 1); v = pick(v, tmp[yy * w + x]); } out.data[y * w + x] = v; }
+    return out;
+  }
+  const offs = seShape('disk', r), out = IP.make(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let v = isMax ? 0 : 255;
+    for (const o of offs) { const xx = clamp(x + o.dx, 0, w - 1), yy = clamp(y + o.dy, 0, h - 1), p = data[yy * w + xx]; v = isMax ? (p > v ? p : v) : (p < v ? p : v); }
+    out.data[y * w + x] = v;
+  }
+  return out;
+}
+const sub = (a, b) => { const o = IP.make(a.w, a.h); for (let i = 0; i < o.data.length; i++) o.data[i] = a.data[i] - b.data[i]; return o; };
+const GEQ = {
+  erode: '[<i>f</i>&nbsp;⊖&nbsp;<i>b</i>](<i>x</i>, <i>y</i>)&nbsp;=&nbsp;min<sub>(<i>s</i>,<i>t</i>)∈<i>b</i></sub>&nbsp;{&nbsp;<i>f</i>(<i>x</i> + <i>s</i>, <i>y</i> + <i>t</i>)&nbsp;}&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-49)</span>',
+  dilate: '[<i>f</i>&nbsp;⊕&nbsp;<i>b</i>](<i>x</i>, <i>y</i>)&nbsp;=&nbsp;max<sub>(<i>s</i>,<i>t</i>)∈<i>b</i></sub>&nbsp;{&nbsp;<i>f</i>(<i>x</i> − <i>s</i>, <i>y</i> − <i>t</i>)&nbsp;}&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-50)</span>',
+  open: '<i>f</i>&nbsp;∘&nbsp;<i>b</i>&nbsp;=&nbsp;(<i>f</i>&nbsp;⊖&nbsp;<i>b</i>)&nbsp;⊕&nbsp;<i>b</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-56)</span>',
+  close: '<i>f</i>&nbsp;•&nbsp;<i>b</i>&nbsp;=&nbsp;(<i>f</i>&nbsp;⊕&nbsp;<i>b</i>)&nbsp;⊖&nbsp;<i>b</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-57)</span>',
+  grad: '<i>g</i>&nbsp;=&nbsp;(<i>f</i>&nbsp;⊕&nbsp;<i>b</i>)&nbsp;−&nbsp;(<i>f</i>&nbsp;⊖&nbsp;<i>b</i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-60)</span>',
+  tophat: '<i>T</i><sub>hat</sub>(<i>f</i>)&nbsp;=&nbsp;<i>f</i>&nbsp;−&nbsp;(<i>f</i>&nbsp;∘&nbsp;<i>b</i>)&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-61)</span>',
+  bothat: '<i>B</i><sub>hat</sub>(<i>f</i>)&nbsp;=&nbsp;(<i>f</i>&nbsp;•&nbsp;<i>b</i>)&nbsp;−&nbsp;<i>f</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(9-62)</span>'
+};
+const st5 = IP.stage('st5', { afterLabel: 'Result',
+  explain: (r, s, x, y) => {
+    const offs = seShape(G5.shape, G5.r), f = IMG;
+    let lo = 255, hi = 0;
+    for (const o of offs) { const v = f.data[clamp(y + o.dy, 0, f.h - 1) * f.w + clamp(x + o.dx, 0, f.w - 1)]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    const i = y * f.w + x, op = G5.op;
+    const base = 'Under <i>b</i> (' + offs.length + ' pixels): min = <b>' + lo + '</b>, max = <b>' + hi + '</b>. ';
+    if (op === 'tophat') return base + '<i>f</i> − opening = ' + r + ' − ' + G5.opened.data[i] + ' = <b>' + G5.raw.data[i] + '</b>' + (G5.otsu ? ' → ' + (s ? 'foreground' : 'background') : '');
+    if (op === 'bothat') return base + 'closing − <i>f</i> = ' + G5.closed.data[i] + ' − ' + r + ' = <b>' + G5.raw.data[i] + '</b>' + (G5.otsu ? ' → ' + (s ? 'foreground' : 'background') : '');
+    return base + 'Result <b>' + G5.raw.data[i] + '</b>';
+  } });
+function render5() {
+  if (!IMG) return;
+  const f = IMG, sh = G5.shape, r = G5.shape === 'disk' ? Math.min(G5.r, 7) : G5.r;
+  const er = () => grayMM(f, false, sh, r), di = () => grayMM(f, true, sh, r);
+  const opened = () => grayMM(grayMM(f, false, sh, r), true, sh, r), closed = () => grayMM(grayMM(f, true, sh, r), false, sh, r);
+  let raw;
+  G5.opened = G5.closed = null;
+  switch (G5.op) {
+    case 'erode': raw = er(); break;
+    case 'dilate': raw = di(); break;
+    case 'open': raw = opened(); break;
+    case 'close': raw = closed(); break;
+    case 'grad': raw = sub(di(), er()); break;
+    case 'tophat': G5.opened = opened(); raw = sub(f, G5.opened); break;
+    case 'bothat': G5.closed = closed(); raw = sub(G5.closed, f); break;
+  }
+  G5.raw = raw;
+  let shown = raw;
+  const oR = otsu(raw), oF = otsu(f);
+  if (G5.otsu) { shown = IP.make(f.w, f.h); for (let i = 0; i < raw.data.length; i++) shown.data[i] = raw.data[i] > oR.T ? 255 : 0; }
+  st5.set(f, shown);
+  $('g-eq').innerHTML = GEQ[G5.op];
+  $('g-r-v').textContent = '= ' + r + (G5.shape === 'disk' && G5.r > 7 ? ' (disk capped at 7)' : '') + ' → ' + seShape(sh, r).length + ' pixels';
+  $('sb5').innerHTML =
+    score('Otsu on the result', 'T* = ' + oR.T, 'η = ' + oR.eta.toFixed(3), true) +
+    score('Otsu on the original', 'T* = ' + oF.T, 'η = ' + oF.eta.toFixed(3)) +
+    score('Showing', G5.otsu ? 'Thresholded' : 'Grayscale', GOPS.find(o => o[0] === G5.op)[1].toLowerCase());
+  G5.seen.add(G5.op + ':' + IP.key + (G5.otsu ? ':t' : ''));
+  G5.gain = oR.eta - oF.eta;
+  tries5.check();
+}
+const tries5 = IP.tries('t5', [
+  { text: '<i>Uneven page</i>: apply the bottom-hat (the text is dark), then threshold with Otsu. Compare that with thresholding the original page in lab 02.',
+    test: () => G5.seen.has('bothat:page:t') },
+  { text: 'Why the <em>bottom</em>-hat for the page and the <em>top</em>-hat for <i>Night street</i>\'s windows? Try both on each image.',
+    test: () => G5.seen.has('tophat:night') && G5.seen.has('bothat:page') },
+  { text: 'Compare the morphological gradient with lab 03\'s Sobel magnitude on the test chart. What is different about the edges it finds?',
+    test: () => G5.seen.has('grad:chart') }
+]);
+
+/* ═════ wiring ═════ */
+
+['pick1', 'pick2', 'pick3', 'pick4', 'pick5'].forEach(id => IP.picker(id));
+['bin1', 'bin2', 'bin3', 'bin4'].forEach(binCtl);
+IP.onImage(img => {
+  IMG = img; skel = null; A3.seed = null; A3.g = null; A3.k = 0;
+  binChanged(); render5();
+});
+
+buildPG(); buildPGctl(); pgPreset('shapes');
+buildE1(); buildO2(); buildA3(); buildR4(); buildG5();
+IP.useSample('coins');
+</script>
+</body>
+</html>
