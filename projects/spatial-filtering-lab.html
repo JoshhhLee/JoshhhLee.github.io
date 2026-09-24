@@ -69,7 +69,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">A kernel and its neighbourhood</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.4 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §3.4 Fundamentals of Spatial Filtering (pp. 153–163) &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters</p>
   <p class="lede reveal d1">Place the kernel over a pixel, multiply each weight by the pixel beneath it, and add up the products. The sum is the output value for that pixel. Point at the image and the inspector shows every product. You can type your own weights into the kernel; fractions like <span class="mono">1/9</span> work too.</p>
 
   <div class="eqbox">
@@ -106,7 +106,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Smoothing: box versus Gaussian</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.5.1 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters: smoothing, separability</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §3.5: Box and Lowpass Gaussian Filter Kernels (pp. 165–166); §3.4: Separable Filter Kernels (p. 161) &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters: smoothing, separability</p>
   <p class="lede reveal d1">A smoothing kernel has positive weights that add up to 1, so it replaces each pixel with a weighted average of its neighbours. A box kernel weights every neighbour equally. A Gaussian kernel gives most weight to the nearest neighbours and less to the far ones. The row profile below plots the brightness along one row of the image, so you can see how each kernel spreads out a sharp edge. Point at the image to choose which row is plotted.</p>
 
   <div class="eqbox">
@@ -138,7 +138,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Noise, and why the median wins</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.5.2, §5.2–5.3 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters: nonlinear filters</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §3.5: Order-Statistic (Nonlinear) Filters (p. 174); §5.2 Noise Models; §5.3 Restoration in the Presence of Noise Only &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters: nonlinear filters</p>
   <p class="lede reveal d1">Averaging reduces noise, but it also blurs whatever the noise is sitting on. A single 255 among eight values of 40 raises a 3×3 mean by almost 24. The median ignores that outlier completely: sort the nine values and take the middle one. That makes it an <i>order-statistic</i> filter. Unlike every filter in section 01, it is not a weighted sum, so no kernel can represent it. The scoreboard measures each result against the clean image using PSNR, where higher means closer to the original.</p>
 
   <div class="eqbox">
@@ -171,7 +171,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Sharpening: adding the detail back</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.6.1–3.6.3 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Edges and contours: sharpening</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §3.6: The Laplacian (p. 178), Unsharp Masking and Highboost Filtering (p. 182) &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Edges and contours: sharpening</p>
   <p class="lede reveal d1">Smoothing averages detail away. Sharpening works in the opposite direction: it measures the detail and adds more of it back. The Laplacian measures detail with a second derivative, which is zero where the image is flat and large where brightness changes abruptly. Unsharp masking measures detail as the difference between the image and a blurred copy of it. Either way, watch the row profile for <i>overshoot</i>: values pushed past the original on both sides of an edge. That overshoot is what makes an edge look crisp, and when it is too strong it shows up as a halo or gets clipped at 0 or 255.</p>
 
   <div class="eqbox">
@@ -204,13 +204,13 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Gradients and edges</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.6.4, §10.2 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Edges and contours</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §3.6: The Gradient (p. 184), eqs. 3-58 to 3-65; §10.2 Point, Line, and Edge Detection &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Edges and contours</p>
   <p class="lede reveal d1">The first derivative measures how quickly brightness changes. You need two kernels: one responds to change from left to right, the other to change from top to bottom. Together they form the gradient, a vector that points uphill in brightness. Its length is the edge strength. The Sobel kernel is a derivative with a small amount of smoothing built in, which is why it copes with noise better than the plain Roberts cross.</p>
 
   <div class="eqbox">
     <div class="eqmath"><i>M</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;√(<i>g<sub>x</sub></i>² + <i>g<sub>y</sub></i>²)&nbsp;&nbsp;≈&nbsp;&nbsp;|<i>g<sub>x</sub></i>| + |<i>g<sub>y</sub></i>|</div>
     <div class="eqkey" id="eq5"><span>Point at an edge to see <i>g<sub>x</sub></i> and <i>g<sub>y</sub></i> computed from its nine neighbours.</span></div>
-    <p class="eqgloss">A note on axes when reading the book: Gonzalez &amp; Woods take <i>x</i> down the rows and <i>y</i> across the columns. Here, as in most software, <i>x</i> runs left to right. So this lab's <i>g<sub>x</sub></i> is the book's <i>g<sub>y</sub></i>, and the other way round. The magnitude is the same either way.</p>
+    <p class="eqgloss">A note on axes when reading the book: Gonzalez &amp; Woods take <i>x</i> down the rows and <i>y</i> across the columns. Here, as in most software, <i>x</i> runs left to right. So for all three operators, this lab's <i>g<sub>x</sub></i> is the book's <i>g<sub>y</sub></i> and the other way round (compare the book's eqs. 3-60, 3-63 and 3-64). The magnitude is the same either way.</p>
   </div>
 
   <div class="controls" style="margin-top:0">
@@ -568,7 +568,8 @@ function buildH() {
   $('h-sig-w').style.display = $('h-k-w').style.display = lap ? 'none' : '';
   $('eq4-main').innerHTML = lap
     ? '<i>g</i>&nbsp;=&nbsp;<i>f</i>&nbsp;−&nbsp;<i>c</i>&nbsp;∇²<i>f</i>,&nbsp;&nbsp;&nbsp;∇²<i>f</i>&nbsp;=&nbsp;' +
-      (H.neigh === 4 ? '<i>f</i><sub>up</sub> + <i>f</i><sub>down</sub> + <i>f</i><sub>left</sub> + <i>f</i><sub>right</sub> − 4<i>f</i>' : '(sum of 8 neighbours) − 8<i>f</i>')
+      (H.neigh === 4 ? '<i>f</i><sub>up</sub> + <i>f</i><sub>down</sub> + <i>f</i><sub>left</sub> + <i>f</i><sub>right</sub> − 4<i>f</i>' : '(sum of 8 neighbours) − 8<i>f</i>') +
+      '<span style="display:block;font-size:.62em;color:var(--ink-light);margin-top:.3rem">The book&rsquo;s eq. 3-54 writes <i>g</i> = <i>f</i> + <i>c</i>∇²<i>f</i> with <i>c</i> = −1 for this kernel. Here <i>c</i> is kept positive and the minus sign is written out, which is the same thing.</span>'
     : '<i>g</i>&nbsp;=&nbsp;<i>f</i>&nbsp;+&nbsp;<i>k</i>&nbsp;(<i>f</i>&nbsp;−&nbsp;<i>f̄</i>)&nbsp;&nbsp;&nbsp;<span style="font-size:.8em;color:var(--ink-light)">f̄ = Gaussian blur · k = 1 unsharp mask · k &gt; 1 highboost</span>';
 }
 $('h-c').addEventListener('input', e => { H.c = +e.target.value; render4(); });
@@ -644,8 +645,9 @@ const OPS = {
   prewitt: { label: 'Prewitt', gx: [-1, 0, 1, -1, 0, 1, -1, 0, 1], gy: [-1, -1, -1, 0, 0, 0, 1, 1, 1],
            fx: 'g<sub>x</sub> = (z<sub>3</sub> + z<sub>6</sub> + z<sub>9</sub>) − (z<sub>1</sub> + z<sub>4</sub> + z<sub>7</sub>)',
            fy: 'g<sub>y</sub> = (z<sub>7</sub> + z<sub>8</sub> + z<sub>9</sub>) − (z<sub>1</sub> + z<sub>2</sub> + z<sub>3</sub>)' },
-  roberts: { label: 'Roberts', gx: [0, 0, 0, 0, -1, 0, 0, 0, 1], gy: [0, 0, 0, 0, 0, -1, 0, 1, 0],
-           fx: 'g<sub>x</sub> = z<sub>9</sub> − z<sub>5</sub>', fy: 'g<sub>y</sub> = z<sub>8</sub> − z<sub>6</sub>' }
+  // labels swapped relative to the book's eq. 3-60, like Sobel and Prewitt above — see the axis note
+  roberts: { label: 'Roberts', gx: [0, 0, 0, 0, 0, -1, 0, 1, 0], gy: [0, 0, 0, 0, -1, 0, 0, 0, 1],
+           fx: 'g<sub>x</sub> = z<sub>8</sub> − z<sub>6</sub>', fy: 'g<sub>y</sub> = z<sub>9</sub> − z<sub>5</sub>' }
 };
 const D = { op: 'sobel', view: 'mag', pre: 0, T: 25, seen: new Set() };
 const sq = v => par(v) + '²';
