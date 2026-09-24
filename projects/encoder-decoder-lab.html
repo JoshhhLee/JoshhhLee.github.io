@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Encoder–Decoder Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive lab on encoder–decoder segmentation networks — feature pyramids, pretrained backbones, dilated convolution, ASPP, squeeze-and-excitation, CBAM, and attention gates on the skip connection." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+  /* ── lab 03 specific ── */
+  .pyramid{display:flex;flex-wrap:wrap;gap:1.1rem;align-items:flex-end;margin-top:1.4rem}
+  .stage-block{display:flex;flex-direction:column;align-items:center;gap:.5rem;
+    border:1px solid var(--line);background:transparent;padding:.7rem .6rem;cursor:pointer;
+    transition:border-color .3s var(--ease-soft),background .3s var(--ease-soft)}
+  .stage-block:hover{border-color:var(--vermillion)}
+  .stage-block[aria-pressed="true"]{border-color:var(--vermillion);background:rgba(184,65,46,.07)}
+  .stage-block canvas{display:block;image-rendering:pixelated;border:1px solid var(--line);
+    background:var(--paper-dark)}
+  .stage-block .st-name{font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-light)}
+  .stage-block[aria-pressed="true"] .st-name{color:var(--vermillion)}
+  .stage-block .st-dim{font-family:'Inter',sans-serif;font-size:.63rem;color:var(--ink-soft)}
+
+  .rf-note{font-family:'Inter',sans-serif;font-size:.74rem;color:var(--ink-soft);line-height:2}
+  .rf-note b{color:var(--vermillion);font-weight:500}
+
+  .fanout{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem}
+  .fanout canvas{width:76px;height:76px;image-rendering:pixelated;display:block;
+    border:1px solid var(--line);background:var(--paper-dark)}
+  .fanout figure{margin:0;display:flex;flex-direction:column;gap:.35rem;align-items:center}
+  .fanout figcaption{font-family:'Inter',sans-serif;font-size:.58rem;letter-spacing:.08em;
+    color:var(--ink-light);text-align:center}
+
+  /* receptive-field footprint grid */
+  /* at rate 4,4,4 the field is 25 cells wide, so it must be allowed to scroll */
+  .foot{display:grid;gap:2px;margin-top:1rem;width:fit-content;max-width:100%;overflow-x:auto}
+  .foot div{width:15px;height:15px;border:1px solid rgba(26,26,26,.07);background:var(--paper-dark)}
+  .foot div.hit1{background:rgba(184,65,46,.20)}
+  .foot div.hit2{background:rgba(184,65,46,.42)}
+  .foot div.hit3{background:rgba(184,65,46,.66)}
+  .foot div.hit4{background:rgba(184,65,46,.88)}
+  .foot div.centre{outline:2px solid var(--ink);outline-offset:-1px}
+
+  .arch{border:1px solid var(--line);background:var(--card);padding:1.4rem 1.5rem;margin-top:1.2rem}
+  .arch svg{display:block;width:100%;height:auto;max-width:560px;margin:0 auto}
+  .arch-name{font-family:'Cormorant Garamond',serif;font-size:1.5rem;margin:0 0 .3rem}
+  .arch-name em{font-style:italic;color:var(--vermillion)}
+
+  .chanbars{display:flex;flex-direction:column;gap:.45rem;margin-top:.9rem}
+  .chanbar{display:grid;grid-template-columns:3.6rem 1fr 2.6rem;gap:.7rem;align-items:center;
+    font-family:'Inter',sans-serif;font-size:.68rem;color:var(--ink-soft)}
+  .chanbar .track{height:7px;background:var(--paper-dark);border:1px solid var(--line);
+    position:relative;overflow:hidden}
+  .chanbar .fill{position:absolute;inset:0 auto 0 0;background:var(--vermillion);
+    transition:width .5s var(--ease-out)}
+  .chanbar .num{text-align:right;font-variant-numeric:tabular-nums}
+
+  .gate-row{display:flex;flex-wrap:wrap;gap:1.3rem;align-items:flex-start;margin-top:1.2rem}
+  .gate-row .imgblock canvas{width:150px;height:150px}
+  .gate-arrow{align-self:center;font-family:serif;font-size:1.6rem;color:var(--vermillion);
+    padding:0 .2rem}
+
+  @media(max-width:820px){
+    .gate-row .imgblock canvas{width:min(150px,38vw);height:min(150px,38vw)}
+    .fanout canvas{width:62px;height:62px}
+    .foot div{width:11px;height:11px}
+  }
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#pyramid">Pyramid</a><a href="#pretrained">Pretrained</a>
+    <a href="#dilation">Dilation</a><a href="#aspp">ASPP</a>
+    <a href="#se">Attention</a><a href="#gates">Gates</a>
+    <a href="labs.html">The Series</a>
+  </nav>
+</header>
+
+<div class="container">
+
+  <section class="hero">
+    <div class="hero-kanji">符 · 号 · 復 号</div>
+    <h1>Encoder–Decoder <em>Lab</em></h1>
+    <div class="hero-divider"></div>
+    <p>
+      Lab 02 built a U-Net and trained it. This one is about everything people change afterwards:
+      swapping in a pretrained backbone, redesigning the decoder, widening the receptive field
+      without destroying resolution, and bolting attention onto the parts that need it.
+    </p>
+  </section>
+
+  <!-- ════════ 01 PYRAMID ════════ -->
+  <section id="pyramid">
+    <div class="section-heading reveal">
+      <span class="section-num">One</span>
+      <div class="section-heading-kanji">階 · 層</div>
+      <h2 class="section-heading-text">An encoder is a feature pyramid</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      A backbone is not a black box that emits "features". It is a staircase: at every step the
+      map gets smaller, the channel count grows, and each position sees more of the original
+      image. Segmentation lives on the tension between those last two — deep features know
+      <em>what</em>, shallow features know <em>where</em>, and no single stage knows both.
+    </p>
+
+    <div class="stage">
+      <div class="panel">
+        <span class="label">Input &mdash; click to place the probe</span>
+        <canvas id="py-in" class="draggable" width="64" height="64"
+                style="width:232px;height:232px;display:block;border:1px solid var(--line);
+                       background:var(--paper-dark);image-rendering:pixelated"
+                aria-label="Click to move the receptive-field probe"></canvas>
+        <p class="drag-hint">
+          The box shows what one neuron at the selected stage can see. Arrow keys work too.
+        </p>
+      </div>
+      <div class="panel">
+        <span class="label">Selected stage</span>
+        <canvas id="py-feat" width="64" height="64"
+                style="width:232px;height:232px;display:block;border:1px solid var(--line);
+                       background:var(--paper-dark);image-rendering:pixelated"></canvas>
+        <div class="rf-note" id="py-stats" style="margin-top:1rem"></div>
+      </div>
+    </div>
+
+    <span class="label" style="margin-top:2rem">The pyramid</span>
+    <div class="pyramid" id="py-stages"></div>
+
+    <span class="label" style="margin-top:2rem">All channels at this stage</span>
+    <div class="fanout" id="py-fan"></div>
+
+    <div class="note" id="py-verdict"></div>
+  </section>
+
+  <!-- ════════ 02 PRETRAINED ════════ -->
+  <section id="pretrained">
+    <div class="section-heading reveal">
+      <span class="section-num">Two</span>
+      <div class="section-heading-kanji">転 · 移</div>
+      <h2 class="section-heading-text">What a pretrained encoder actually buys</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      The argument for pretrained backbones is usually made with a citation. Here it is made with
+      a measurement &mdash; and the measurement does not say what you have been told it says.
+      Same network, same camouflage task as lab 02. The only difference is what the first layer's
+      weights are on iteration zero.
+    </p>
+
+    <p class="lede reveal d2">
+      "Scratch" starts from random noise. "Pretrained" starts from six classical filters &mdash;
+      edges, a Laplacian, a blur, a centre-surround &mdash; which is close to what the first layer
+      of a trained vision network converges to anyway. Run both. Then read the box underneath,
+      because the result is the interesting part.
+    </p>
+
+    <div class="cmp">
+      <div class="imgblock wide">
+        <span class="cap">Input</span>
+        <canvas id="pt-x"></canvas>
+        <span class="dim">the shape is in the texture</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Target</span>
+        <canvas id="pt-y"></canvas>
+        <span class="dim" id="pt-y-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Prediction</span>
+        <canvas id="pt-p"></canvas>
+        <span class="dim" id="pt-p-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">IoU over time</span>
+        <canvas id="pt-curve" width="200" height="200"
+                style="image-rendering:auto;background:var(--card)"></canvas>
+        <span class="dim">vermillion scratch · sage pretrained</span>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button type="button" id="pt-reset">Reset</button>
+      <button type="button" class="play" id="pt-play">Train</button>
+      <button type="button" id="pt-step">+10 steps</button>
+      <div class="speed">
+        <label for="pt-speed">Speed</label>
+        <input type="range" id="pt-speed" min="1" max="10" value="6">
+      </div>
+      <span class="counter" id="pt-counter"></span>
+    </div>
+
+    <div class="controls">
+      <div>
+        <span class="label">First layer starts as</span>
+        <div class="seg" id="pt-init"></div>
+      </div>
+      <div>
+        <span class="label">Encoder learning rate <span class="mono" id="pt-enc-val"></span></span>
+        <input type="range" id="pt-enc" min="0" max="100" value="100" aria-label="Encoder learning rate">
+      </div>
+      <div>
+        <span class="label">Decoder learning rate <span class="mono" id="pt-dec-val"></span></span>
+        <input type="range" id="pt-dec" min="10" max="100" value="100" aria-label="Decoder learning rate">
+      </div>
+    </div>
+
+    <span class="label" style="margin-top:2rem">Encoder filters, right now</span>
+    <div class="fanout" id="pt-filters"></div>
+
+    <div class="note" id="pt-verdict"></div>
+
+    <div class="note" style="border-left-color:var(--sage)">
+      <strong>Why the demo refuses to show the effect you were promised.</strong> Measured over
+      five seeds before this page shipped: at full learning rate scratch reached IoU 0.65 and
+      pretrained 0.57; frozen, 0.52 and 0.51; at a tenth encoder rate, 0.66 and 0.69. Pretraining
+      never reliably wins. That is not a broken demo &mdash; it is a network with 77 parameters
+      training on a single image for unlimited epochs. <em>None</em> of the conditions that make
+      transfer learning valuable are present. Transfer pays when data is scarce relative to model
+      capacity, and here data is effectively infinite relative to a very small model.
+    </div>
+
+    <div class="note">
+      <strong>So what does a real pretrained backbone give you?</strong> Not better first-layer
+      filters &mdash; those are cheap, as you have just watched a network rediscover them in a few
+      hundred iterations. What you cannot afford to train yourself is everything section one was
+      about: <b>depth</b>. A ResNet-50 encoder hands you five stages, a receptive field covering
+      most of the image, and 23 million parameters shaped by a million labelled photographs. With
+      a few hundred medical scans or camouflage images you could never fit that from scratch; it
+      would memorise the training set before it learned anything general. You are borrowing the
+      hierarchy, not the edge detectors.
+    </div>
+
+    <div class="note">
+      <strong>The controls are still the real ones.</strong> Set the encoder rate to zero and you
+      have frozen the backbone &mdash; the standard recipe when data is very scarce. Note that
+      freezing costs you something even here: about 0.13 IoU against a fully trainable encoder,
+      because the head alone cannot compensate for features that were never adapted to the task.
+      The range in between is "differential learning rates", a small rate for the encoder and a
+      full one for the decoder, which is what most fine-tuning scripts are quietly doing.
+    </div>
+  </section>
+
+  <!-- ════════ 03 DILATION ════════ -->
+  <section id="dilation">
+    <div class="section-heading reveal">
+      <span class="section-num">Three</span>
+      <div class="section-heading-kanji">膨 · 張</div>
+      <h2 class="section-heading-text">Context without throwing away resolution</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      Section one showed the bind: to see more context you downsample, and downsampling is exactly
+      what destroys the boundaries you need. Dilated convolution is the way out — spread the
+      kernel's taps apart instead of shrinking the map. The grid below is the input, and the
+      shading shows which pixels actually reach one output neuron after three stacked layers.
+    </p>
+
+    <div class="stage">
+      <div class="panel">
+        <span class="label">What one output neuron can see</span>
+        <div class="foot" id="dl-foot"></div>
+        <div class="legend" style="margin-top:.9rem">
+          <span><i class="sw" style="background:rgba(184,65,46,.20)"></i>reached once</span>
+          <span><i class="sw" style="background:rgba(184,65,46,.88)"></i>reached often</span>
+          <span><i class="sw" style="background:#ebe1cf"></i>never reached</span>
+        </div>
+      </div>
+      <div class="panel">
+        <span class="label">Dilation rate, layer by layer</span>
+        <div class="controls" style="margin-top:0">
+          <div>
+            <span class="label">Layer 1 <span class="mono" id="dl-1-val"></span></span>
+            <div class="seg" id="dl-1"></div>
+          </div>
+          <div>
+            <span class="label">Layer 2 <span class="mono" id="dl-2-val"></span></span>
+            <div class="seg" id="dl-2"></div>
+          </div>
+          <div>
+            <span class="label">Layer 3 <span class="mono" id="dl-3-val"></span></span>
+            <div class="seg" id="dl-3"></div>
+          </div>
+          <div style="grid-column:1/-1">
+            <span class="label">Presets</span>
+            <div class="chiprow" id="dl-preset"></div>
+          </div>
+        </div>
+        <div class="scoreboard" id="dl-scores"></div>
+      </div>
+    </div>
+
+    <div class="note" id="dl-verdict"></div>
+  </section>
+
+  <!-- ════════ 04 ASPP ════════ -->
+  <section id="aspp">
+    <div class="section-heading reveal">
+      <span class="section-num">Four</span>
+      <div class="section-heading-kanji">並 · 列</div>
+      <h2 class="section-heading-text">ASPP — look at every scale at once</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      If one dilation rate gives you one scale, the obvious move is to run several in parallel and
+      let the network combine them. That is Atrous Spatial Pyramid Pooling, the centrepiece of
+      DeepLab. Switch branches off and watch the fused map lose the scale each one was providing.
+    </p>
+
+    <div class="cmp" id="aspp-branches"></div>
+
+    <div class="cmp" style="margin-top:1.4rem">
+      <div class="imgblock wide">
+        <span class="cap">Input feature map</span>
+        <canvas id="ap-in"></canvas>
+        <span class="dim">48 × 48</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Fused output</span>
+        <canvas id="ap-out"></canvas>
+        <span class="dim" id="ap-out-dim"></span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div style="grid-column:1/-1">
+        <span class="label">Branches</span>
+        <div class="chiprow" id="ap-toggles"></div>
+      </div>
+    </div>
+
+    <div class="note" id="ap-verdict"></div>
+
+    <div class="note" style="border-left-color:var(--sage)">
+      <strong>Why toggling image pooling does not change the fused picture.</strong> That branch
+      averages the entire map to a single number and broadcasts it back, so it is spatially
+      constant &mdash; it carries global context, not local structure. Real ASPP
+      <em>concatenates</em> its branches into separate channels rather than adding them, so that
+      constant survives as its own channel for later layers to use. The preview here sums the
+      dilated branches to keep them comparable in one image, and leaves the pooling branch out,
+      because adding a constant to every pixel would change nothing you could see.
+    </div>
+  </section>
+
+  <!-- ════════ 05 ATTENTION ════════ -->
+  <section id="se">
+    <div class="section-heading reveal">
+      <span class="section-num">Five</span>
+      <div class="section-heading-kanji">選 · 択</div>
+      <h2 class="section-heading-text">Squeeze-and-excitation, then CBAM</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      A convolutional layer treats all its channels as equally important. They are not. SE asks a
+      simple question — averaged over the whole image, how strongly did each channel fire? — and
+      uses the answer to turn channels up or down. CBAM then adds the same idea across space:
+      which <em>locations</em> matter.
+    </p>
+
+    <div class="stage">
+      <div class="panel">
+        <span class="label">Channels before gating</span>
+        <div class="fanout" id="se-before"></div>
+        <span class="label" style="margin-top:1.4rem">Channels after gating</span>
+        <div class="fanout" id="se-after"></div>
+      </div>
+      <div class="panel">
+        <span class="label">Squeeze &mdash; each channel's global average</span>
+        <div class="chanbars" id="se-squeeze"></div>
+        <span class="label" style="margin-top:1.6rem">Excitation &mdash; the learned gate</span>
+        <div class="chanbars" id="se-excite"></div>
+      </div>
+    </div>
+
+    <div class="note" style="border-left-color:var(--sage)">
+      <strong>Where the gate comes from.</strong> In a real SE block the excitation weights come
+      from a tiny two-layer network trained end to end. Training that here would take longer than
+      you want to wait, so the gate below is computed by a stand-in rule: how well does this
+      channel's response correlate with the target region? A trained SE block converges on
+      something similar, but do not mistake the stand-in for the real thing.
+    </div>
+
+    <span class="label" style="margin-top:2.4rem">CBAM &mdash; the spatial half</span>
+    <div class="cmp">
+      <div class="imgblock wide">
+        <span class="cap">Input</span>
+        <canvas id="cb-in"></canvas>
+        <span class="dim">the scene</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Spatial attention</span>
+        <canvas id="cb-map"></canvas>
+        <span class="dim">avg &amp; max pooled across channels</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">After spatial gating</span>
+        <canvas id="cb-out"></canvas>
+        <span class="dim" id="cb-dim"></span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div>
+        <span class="label">Gate sharpness <span class="mono" id="cb-k-val"></span></span>
+        <input type="range" id="cb-k" min="1" max="30" value="10" aria-label="Gate sharpness">
+      </div>
+      <div>
+        <span class="label">Scene</span>
+        <div class="chiprow" id="se-scene"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 06 GATES ════════ -->
+  <section id="gates">
+    <div class="section-heading reveal">
+      <span class="section-num">Six</span>
+      <div class="section-heading-kanji">門</div>
+      <h2 class="section-heading-text">Attention on the skip connection</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      Lab 02 established that skip connections are the only route by which fine detail reaches the
+      decoder. That is also their problem: they forward <em>everything</em> at that resolution,
+      including a great deal of background the decoder has no use for. Attention U-Net puts a gate
+      on the skip — the decoder's coarse, semantically confident guess decides which parts of the
+      fine-grained skip are allowed through.
+    </p>
+
+    <div class="gate-row">
+      <div class="imgblock">
+        <span class="cap">Skip features</span>
+        <canvas id="ag-skip"></canvas>
+        <span class="dim">fine, but indiscriminate</span>
+      </div>
+      <span class="gate-arrow">×</span>
+      <div class="imgblock">
+        <span class="cap">Gating signal</span>
+        <canvas id="ag-gate"></canvas>
+        <span class="dim">coarse, from deeper down</span>
+      </div>
+      <span class="gate-arrow">→</span>
+      <div class="imgblock">
+        <span class="cap">Attention α</span>
+        <canvas id="ag-alpha"></canvas>
+        <span class="dim" id="ag-alpha-dim"></span>
+      </div>
+      <span class="gate-arrow">=</span>
+      <div class="imgblock">
+        <span class="cap">Gated skip</span>
+        <canvas id="ag-out"></canvas>
+        <span class="dim">only the relevant detail</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div>
+        <span class="label">Gate sharpness <span class="mono" id="ag-k-val"></span></span>
+        <input type="range" id="ag-k" min="1" max="30" value="12" aria-label="Gate sharpness">
+      </div>
+      <div>
+        <span class="label">Gate threshold <span class="mono" id="ag-t-val"></span></span>
+        <input type="range" id="ag-t" min="10" max="90" value="50" aria-label="Gate threshold">
+      </div>
+      <div>
+        <span class="label">How good is the coarse guess <span class="mono" id="ag-q-val"></span></span>
+        <input type="range" id="ag-q" min="0" max="100" value="70" aria-label="How good is the coarse guess">
+      </div>
+    </div>
+
+    <div class="scoreboard" id="ag-scores"></div>
+
+    <div class="note" id="ag-verdict"></div>
+
+    <div class="note" style="border-left-color:var(--sage)">
+      <strong>This is the bridge to lab 05.</strong> A camouflaged animal is precisely the case
+      where the skip connection is carrying an overwhelming amount of background that looks
+      statistically identical to the target. Gating the skip is one of the main things SINet and
+      its descendants are doing, under various names. Push the coarse-guess quality down and watch
+      the gate confidently suppress the wrong region — a gate is only ever as good as the
+      semantics driving it.
+    </div>
+  </section>
+
+  <!-- ════════ PAGER ════════ -->
+  <nav class="lab-pager">
+    <a href="segmentation-lab.html" class="prev">
+      <span class="pager-dir">← Previous</span>
+      <span class="pager-title">02 · Segmentation Lab</span>
+    </a>
+    <a href="labs.html" class="next">
+      <span class="pager-dir">Next →</span>
+      <span class="pager-title">04 · Attention (planned)</span>
+    </a>
+  </nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script>
+/* ═══════════ shared to this lab ═══════════ */
+const EPSL = 1e-6;
+
+/** Normalise any array to 0-255 for display. */
+function norm255(a) {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < a.length; i++) { if (a[i] < lo) lo = a[i]; if (a[i] > hi) hi = a[i]; }
+  const span = hi - lo < EPSL ? 1 : hi - lo;
+  const o = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i++) o[i] = ((a[i] - lo) / span) * 255;
+  return o;
+}
+
+/** 3x3 convolution with a dilation rate, zero padding, 'same' size. */
+function convDil(src, n, kern, rate) {
+  const out = new Float32Array(n * n), r = rate || 1;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    let s = 0;
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const yy = y + (a - 1) * r, xx = x + (b - 1) * r;
+      if (yy < 0 || xx < 0 || yy >= n || xx >= n) continue;
+      s += src[yy * n + xx] * kern[a * 3 + b];
+    }
+    out[y * n + x] = s;
+  }
+  return out;
+}
+const relu = a => { const o = new Float32Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] > 0 ? a[i] : 0; return o; };
+const halve = (src, n) => {
+  const m = n >> 1, o = new Float32Array(m * m);
+  for (let y = 0; y < m; y++) for (let x = 0; x < m; x++) {
+    o[y * m + x] = (src[2 * y * n + 2 * x] + src[2 * y * n + 2 * x + 1] +
+                    src[(2 * y + 1) * n + 2 * x] + src[(2 * y + 1) * n + 2 * x + 1]) / 4;
+  }
+  return o;
+};
+const bilinUp = (src, n, s) => {
+  const N = n * s, o = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const fx = (x + 0.5) / s - 0.5, fy = (y + 0.5) / s - 0.5;
+    const x0 = clamp(Math.floor(fx), 0, n - 1), y0 = clamp(Math.floor(fy), 0, n - 1);
+    const x1 = clamp(x0 + 1, 0, n - 1), y1 = clamp(y0 + 1, 0, n - 1);
+    const ax = clamp(fx - x0, 0, 1), ay = clamp(fy - y0, 0, 1);
+    o[y * N + x] = src[y0 * n + x0] * (1 - ax) * (1 - ay) + src[y0 * n + x1] * ax * (1 - ay) +
+                   src[y1 * n + x0] * (1 - ax) * ay + src[y1 * n + x1] * ax * ay;
+  }
+  return o;
+};
+
+/* The six filters used as the "pretrained" initialisation. These are the classical
+   operators, and they are very close to what layer one of a trained network converges to. */
+const CLASSIC = [
+  { name: 'Sobel ∂x',      k: [1, 0, -1, 2, 0, -2, 1, 0, -1] },
+  { name: 'Sobel ∂y',      k: [1, 2, 1, 0, 0, 0, -1, -2, -1] },
+  { name: 'Laplacian',     k: [0, 1, 0, 1, -4, 1, 0, 1, 0] },
+  { name: 'Blur',          k: [1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9] },
+  { name: 'Diagonal',      k: [2, 1, 0, 1, 0, -1, 0, -1, -2] },
+  { name: 'Centre–surround', k: [-1, -1, -1, -1, 8, -1, -1, -1, -1] }
+];
+
+/** A shape hidden in texture — the same scene family as lab 02. */
+function scene(n, kind, contrast) {
+  const a = new Float32Array(n * n);
+  const cx = n * 0.56, cy = n * 0.46, rad = n * 0.19;
+  const mask = new Float32Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const k = y * n + x;
+    const inside = Math.hypot(x - cx, y - cy) < rad;
+    mask[k] = inside ? 1 : 0;
+    let v;
+    if (kind === 'camo') {
+      v = inside ? fbm(x * 0.22, y * 0.22, 31, 4) + contrast : fbm(x * 0.2, y * 0.2, 5, 4);
+    } else if (kind === 'shapes') {
+      v = 0.18 + 0.1 * fbm(x * 0.12, y * 0.12, 3, 3);
+      if (inside) v = 0.8;
+      if (x > n * 0.12 && x < n * 0.34 && y > n * 0.6 && y < n * 0.84) v = 0.55;
+    } else {
+      v = 0.5 + 0.45 * Math.sin(x * 0.55) * Math.cos(y * 0.5);
+      if (inside) v = 1 - v;
+    }
+    a[k] = clamp(v, 0, 1);
+  }
+  return { img: a, mask };
+}
+
+/* ═══════════ 01 — feature pyramid ═══════════ */
+const PY = { n: 64, stage: 2, px: 32, py: 32, maps: [], sizes: [], rf: [], jump: [] };
+
+function pyBuild() {
+  const n = PY.n;
+  const sc = scene(n, 'shapes', 0.3);
+  PY.input = sc.img;
+  PY.maps = []; PY.sizes = []; PY.rf = []; PY.jump = [];
+
+  // stage 0 is the image itself
+  let cur = [PY.input];
+  let size = n, rf = 1, jump = 1;
+  PY.maps.push(cur); PY.sizes.push(size); PY.rf.push(rf); PY.jump.push(jump);
+
+  // four stages of (conv 3x3 -> relu -> halve), channels 2,4,6,6
+  const widths = [3, 4, 6, 6];
+  for (let s = 0; s < 4; s++) {
+    // a 3x3 conv widens the receptive field by 2 * current jump
+    rf = rf + 2 * jump;
+    const next = [];
+    for (let c = 0; c < widths[s]; c++) {
+      const kern = CLASSIC[(c + s) % CLASSIC.length].k;
+      // sum the responses of every incoming channel, as a real conv layer does
+      const acc = new Float32Array(size * size);
+      for (const m of cur) {
+        const r = convDil(m, size, kern, 1);
+        for (let i = 0; i < acc.length; i++) acc[i] += r[i] / cur.length;
+      }
+      next.push(relu(acc));
+    }
+    // then pooling halves the map and doubles the stride between neighbouring neurons
+    const pooled = next.map(m => halve(m, size));
+    size = size >> 1; jump = jump * 2;
+    cur = pooled;
+    PY.maps.push(cur); PY.sizes.push(size); PY.rf.push(rf); PY.jump.push(jump);
+  }
+}
+
+function pyRender() {
+  const s = PY.stage, size = PY.sizes[s], maps = PY.maps[s];
+
+  // input with the receptive-field box for a neuron at the probe position
+  const n = PY.n, ctx = document.getElementById('py-in').getContext('2d');
+  const can = document.getElementById('py-in');
+  can.width = n; can.height = n;
+  const img = ctx.createImageData(n, n);
+  for (let i = 0; i < n * n; i++) {
+    const v = clamp(PY.input[i] * 255, 0, 255);
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+    img.data[i * 4 + 3] = 255;
+  }
+  const rf = PY.rf[s], half = (rf - 1) / 2;
+  const cxp = clamp(Math.round(PY.px), 0, n - 1), cyp = clamp(Math.round(PY.py), 0, n - 1);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const onEdge =
+      (Math.abs(x - cxp) <= half && Math.abs(y - cyp) <= half) &&
+      (Math.abs(x - cxp) === Math.round(half) || Math.abs(y - cyp) === Math.round(half));
+    if (!onEdge) continue;
+    const i = y * n + x;
+    img.data[i * 4] = 184; img.data[i * 4 + 1] = 65; img.data[i * 4 + 2] = 46;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  paint(document.getElementById('py-feat'), norm255(maps[0]), size);
+
+  // the pyramid strip
+  const strip = document.getElementById('py-stages');
+  strip.innerHTML = '';
+  PY.sizes.forEach((sz, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'stage-block';
+    b.setAttribute('aria-pressed', String(i === PY.stage));
+    const c = document.createElement('canvas');
+    const disp = Math.max(30, Math.round(112 * sz / PY.n));
+    c.style.width = disp + 'px'; c.style.height = disp + 'px';
+    b.appendChild(c);
+    const nm = document.createElement('span');
+    nm.className = 'st-name'; nm.textContent = i === 0 ? 'input' : 'stage ' + i;
+    const dm = document.createElement('span');
+    dm.className = 'st-dim';
+    dm.textContent = sz + '×' + sz + ' · ' + PY.maps[i].length + 'ch';
+    b.appendChild(nm); b.appendChild(dm);
+    b.addEventListener('click', () => { PY.stage = i; pyRender(); });
+    strip.appendChild(b);
+    paint(c, norm255(PY.maps[i][0]), sz);
+  });
+
+  // every channel at this stage
+  const fan = document.getElementById('py-fan');
+  fan.innerHTML = '';
+  maps.forEach((m, c) => {
+    const fig = document.createElement('figure');
+    const cv = document.createElement('canvas');
+    const cap = document.createElement('figcaption');
+    cap.textContent = s === 0 ? 'the image' : 'channel ' + (c + 1);
+    fig.appendChild(cv); fig.appendChild(cap); fan.appendChild(fig);
+    paint(cv, norm255(m), size);
+  });
+
+  const cover = Math.min(100, (rf / PY.n) * 100);
+  document.getElementById('py-stats').innerHTML =
+    `Spatial size <b>${size} × ${size}</b><br>` +
+    `Channels <b>${maps.length}</b><br>` +
+    `Stride from the input <b>${PY.jump[s]}</b> &mdash; one step here is ${PY.jump[s]} input pixels<br>` +
+    `Receptive field <b>${rf} × ${rf}</b> &mdash; ${cover.toFixed(0)}% of the image width`;
+
+  const v = document.getElementById('py-verdict');
+  if (s === 0) {
+    v.innerHTML = `The input: perfect resolution, no semantics at all. Every pixel knows only its
+      own brightness. Walk up the pyramid and watch the trade begin.`;
+  } else if (s <= 2) {
+    v.innerHTML = `At stage ${s} a neuron sees <b>${rf}×${rf}</b> pixels and the map is still
+      <b>${size}×${size}</b>. This is the useful middle — enough context to know something,
+      enough resolution to say where. Encoder–decoder architectures fight over exactly this band.`;
+  } else {
+    v.innerHTML = `At stage ${s} a neuron sees <b>${rf}×${rf}</b> pixels — ${cover.toFixed(0)}% of
+      the image — but the map has collapsed to <b>${size}×${size}</b>. It knows what is in the
+      picture and has almost no idea where. Upsampling this alone gives you the blur from lab 02;
+      the skip connections exist to repair precisely this loss.`;
+  }
+}
+
+/* ═══════════ 02 — pretrained vs scratch ═══════════ */
+const PT = {
+  N: 48, C: 6, lr: 0.03, contrast: 0.28, init: 'scratch',
+  encLr: 1, decLr: 1, iter: 0, playing: false, raf: null,
+  hist: { scratch: [], pretrained: [] }
+};
+
+function ptInit(keepHist) {
+  const N = PT.N, C = PT.C;
+  const sc = scene(N, 'camo', PT.contrast);
+  PT.x = sc.img; PT.y = sc.mask;
+  PT.W1 = new Float32Array(C * 9); PT.b1 = new Float32Array(C);
+  PT.W2 = new Float32Array(C * 9); PT.b2 = new Float32Array(1);
+
+  if (PT.init === 'pretrained') {
+    for (let c = 0; c < C; c++) {
+      const k = CLASSIC[c % CLASSIC.length].k;
+      // scaled to a comparable magnitude to the random init, so the comparison is fair
+      let norm = 0; for (const w of k) norm += w * w;
+      norm = Math.sqrt(norm) || 1;
+      for (let i = 0; i < 9; i++) PT.W1[c * 9 + i] = k[i] / norm * 0.9;
+    }
+  } else {
+    const std = Math.sqrt(2 / 9);
+    for (let i = 0; i < C * 9; i++) PT.W1[i] = (Math.random() * 2 - 1) * std * 1.73;
+  }
+  const std2 = Math.sqrt(2 / (C * 9));
+  for (let i = 0; i < C * 9; i++) PT.W2[i] = (Math.random() * 2 - 1) * std2 * 1.73;
+
+  PT.m = { W1: new Float32Array(C * 9), b1: new Float32Array(C), W2: new Float32Array(C * 9), b2: new Float32Array(1) };
+  PT.v = { W1: new Float32Array(C * 9), b1: new Float32Array(C), W2: new Float32Array(C * 9), b2: new Float32Array(1) };
+  PT.iter = 0;
+  if (!keepHist) PT.hist = { scratch: [], pretrained: [] };
+  else PT.hist[PT.init] = [];
+}
+
+function ptForward() {
+  const N = PT.N, C = PT.C, n = N * N;
+  const hpre = new Float32Array(C * n), h = new Float32Array(C * n);
+  for (let c = 0; c < C; c++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let s = PT.b1[c];
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const yy = y + a - 1, xx = x + b - 1;
+      if (yy < 0 || xx < 0 || yy >= N || xx >= N) continue;
+      s += PT.W1[c * 9 + a * 3 + b] * PT.x[yy * N + xx];
+    }
+    hpre[c * n + y * N + x] = s;
+    h[c * n + y * N + x] = s > 0 ? s : 0;
+  }
+  const p = new Float32Array(n);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let s = PT.b2[0];
+    for (let c = 0; c < C; c++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const yy = y + a - 1, xx = x + b - 1;
+      if (yy < 0 || xx < 0 || yy >= N || xx >= N) continue;
+      s += PT.W2[c * 9 + a * 3 + b] * h[c * n + yy * N + xx];
+    }
+    p[y * N + x] = 1 / (1 + Math.exp(-s));
+  }
+  return { hpre, h, p };
+}
+
+function ptStep() {
+  const N = PT.N, C = PT.C, n = N * N;
+  const { hpre, h, p } = ptForward();
+
+  // cross-entropy plus Dice, the combination lab 02 measured as the sensible default
+  const dz = new Float32Array(n);
+  let A = 0, B = 0;
+  for (let k = 0; k < n; k++) { A += p[k] * PT.y[k]; B += p[k] + PT.y[k]; }
+  const den = B + EPSL, num = 2 * A + EPSL;
+  for (let k = 0; k < n; k++) {
+    const pk = clamp(p[k], EPSL, 1 - EPSL);
+    dz[k] = (pk - PT.y[k]) / n + ((num - 2 * PT.y[k] * den) / (den * den)) * p[k] * (1 - p[k]);
+  }
+
+  const dW1 = new Float32Array(C * 9), db1 = new Float32Array(C);
+  const dW2 = new Float32Array(C * 9), db2 = new Float32Array(1);
+  const dh = new Float32Array(C * n);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const d = dz[y * N + x];
+    if (!d) continue;
+    db2[0] += d;
+    for (let c = 0; c < C; c++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const yy = y + a - 1, xx = x + b - 1;
+      if (yy < 0 || xx < 0 || yy >= N || xx >= N) continue;
+      dW2[c * 9 + a * 3 + b] += d * h[c * n + yy * N + xx];
+      dh[c * n + yy * N + xx] += d * PT.W2[c * 9 + a * 3 + b];
+    }
+  }
+  for (let c = 0; c < C; c++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const idx = c * n + y * N + x;
+    const d = hpre[idx] > 0 ? dh[idx] : 0;
+    if (!d) continue;
+    db1[c] += d;
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const yy = y + a - 1, xx = x + b - 1;
+      if (yy < 0 || xx < 0 || yy >= N || xx >= N) continue;
+      dW1[c * 9 + a * 3 + b] += d * PT.x[yy * N + xx];
+    }
+  }
+
+  PT.iter++;
+  const t = PT.iter, b1 = 0.9, b2 = 0.999, eps = 1e-8;
+  const upd = (name, arr, grad, scale) => {
+    if (scale === 0) return;                      // a frozen encoder simply skips its update
+    const m = PT.m[name], v = PT.v[name];
+    for (let i = 0; i < arr.length; i++) {
+      m[i] = b1 * m[i] + (1 - b1) * grad[i];
+      v[i] = b2 * v[i] + (1 - b2) * grad[i] * grad[i];
+      const mh = m[i] / (1 - Math.pow(b1, t)), vh = v[i] / (1 - Math.pow(b2, t));
+      arr[i] -= PT.lr * scale * mh / (Math.sqrt(vh) + eps);
+    }
+  };
+  upd('W1', PT.W1, dW1, PT.encLr); upd('b1', PT.b1, db1, PT.encLr);
+  upd('W2', PT.W2, dW2, PT.decLr); upd('b2', PT.b2, db2, PT.decLr);
+
+  let inter = 0, uni = 0;
+  for (let k = 0; k < n; k++) {
+    const pb = p[k] > 0.5 ? 1 : 0;
+    if (pb && PT.y[k]) inter++;
+    if (pb || PT.y[k]) uni++;
+  }
+  const iou = uni ? inter / uni : 0;
+  PT.hist[PT.init].push(iou);
+  if (PT.hist[PT.init].length > 600) PT.hist[PT.init].shift();
+  return { p, iou };
+}
+
+function ptCurve() {
+  const can = document.getElementById('pt-curve'), ctx = can.getContext('2d');
+  const W = can.width, H = can.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#f4ede0'; ctx.fillRect(0, 0, W, H);
+  const maxLen = Math.max(PT.hist.scratch.length, PT.hist.pretrained.length, 2);
+  const draw = (arr, color) => {
+    if (arr.length < 2) return;
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+    arr.forEach((v, i) => {
+      const x = (i / (maxLen - 1)) * (W - 8) + 4;
+      const y = H - 6 - v * (H - 14);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+  };
+  draw(PT.hist.scratch, '#b8412e');
+  draw(PT.hist.pretrained, '#6b7a5a');
+}
+
+function ptRender(res) {
+  const N = PT.N;
+  const xi = new Float32Array(N * N);
+  for (let k = 0; k < N * N; k++) xi[k] = PT.x[k] * 255;
+  paint(document.getElementById('pt-x'), xi, N);
+  paintMask(document.getElementById('pt-y'), PT.y, N, [107, 122, 90], null, 0.85);
+  const p = res ? res.p : ptForward().p;
+  paintMask(document.getElementById('pt-p'), p, N, [184, 65, 46], null, 0.9);
+
+  let frac = 0; for (let k = 0; k < N * N; k++) frac += PT.y[k];
+  document.getElementById('pt-y-dim').textContent = pct(frac / (N * N)) + ' of the image';
+  const hist = PT.hist[PT.init];
+  const last = hist.length ? hist[hist.length - 1] : 0;
+  document.getElementById('pt-p-dim').textContent = hist.length ? 'IoU ' + f3(last) : 'untrained';
+  document.getElementById('pt-counter').textContent = PT.iter + ' iterations';
+  document.getElementById('pt-enc-val').textContent = '×' + f2(PT.encLr);
+  document.getElementById('pt-dec-val').textContent = '×' + f2(PT.decLr);
+
+  // the encoder's filters as they stand
+  const fan = document.getElementById('pt-filters');
+  fan.innerHTML = '';
+  for (let c = 0; c < PT.C; c++) {
+    const fig = document.createElement('figure');
+    const cv = document.createElement('canvas');
+    cv.style.width = '46px'; cv.style.height = '46px';
+    const cap = document.createElement('figcaption');
+    cap.textContent = PT.init === 'pretrained' && PT.iter === 0
+      ? CLASSIC[c % CLASSIC.length].name : 'filter ' + (c + 1);
+    fig.appendChild(cv); fig.appendChild(cap); fan.appendChild(fig);
+    paint(cv, norm255(PT.W1.slice(c * 9, c * 9 + 9)), 3);
+  }
+  ptCurve();
+
+  const bestS = PT.hist.scratch.length ? Math.max(...PT.hist.scratch) : 0;
+  const bestP = PT.hist.pretrained.length ? Math.max(...PT.hist.pretrained) : 0;
+  const v = document.getElementById('pt-verdict');
+  if (!PT.hist.scratch.length || !PT.hist.pretrained.length) {
+    v.innerHTML = `Train one setting, then switch the other on and train that. Both curves stay on
+      the chart — <b style="color:#b8412e">vermillion is scratch</b>,
+      <b style="color:#6b7a5a">sage is pretrained</b> — so you can see which one got there first.`;
+  } else {
+    const diff = bestP - bestS;
+    const lead = Math.abs(diff) < 0.06
+      ? `Within noise of each other`
+      : diff > 0 ? `Pretrained ahead by <b>${f3(diff)}</b>` : `Scratch ahead by <b>${f3(-diff)}</b>`;
+    v.innerHTML = `Scratch reached IoU <b>${f3(bestS)}</b>, pretrained <b>${f3(bestP)}</b>.
+      ${lead} — and across repeated runs offline, neither init reliably wins here. That is the
+      honest result, and it is worth more than the slogan it contradicts.`;
+  }
+}
+
+function ptLoop() {
+  const speed = Number(document.getElementById('pt-speed').value);
+  let res;
+  for (let i = 0; i < Math.max(1, Math.round(speed * 0.8)); i++) res = ptStep();
+  ptRender(res);
+  if (PT.playing) PT.raf = requestAnimationFrame(ptLoop);
+}
+function ptPlay(on) {
+  PT.playing = on;
+  document.getElementById('pt-play').textContent = on ? 'Pause' : 'Train';
+  if (on) PT.raf = requestAnimationFrame(ptLoop);
+  else if (PT.raf) { cancelAnimationFrame(PT.raf); PT.raf = null; }
+}
+
+/* ═══════════ 03 — dilation and the receptive field ═══════════ */
+const DL = { rates: [1, 2, 4] };
+
+/** Which input offsets reach one output neuron through three stacked dilated 3x3 layers. */
+function dlFootprint(rates) {
+  let counts = new Map([['0,0', 1]]);
+  for (const r of rates) {
+    const next = new Map();
+    for (const [key, w] of counts) {
+      const [px, py] = key.split(',').map(Number);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+        const k = (px + b * r) + ',' + (py + a * r);
+        next.set(k, (next.get(k) || 0) + w);
+      }
+    }
+    counts = next;
+  }
+  return counts;
+}
+
+function dlRender() {
+  const counts = dlFootprint(DL.rates);
+  let ext = 0;
+  for (const key of counts.keys()) {
+    const [x, y] = key.split(',').map(Number);
+    ext = Math.max(ext, Math.abs(x), Math.abs(y));
+  }
+  const size = ext * 2 + 1;
+  let maxW = 0;
+  for (const w of counts.values()) maxW = Math.max(maxW, w);
+
+  const el = document.getElementById('dl-foot');
+  el.style.gridTemplateColumns = `repeat(${size}, 15px)`;
+  el.innerHTML = '';
+  let reached = 0;
+  for (let y = -ext; y <= ext; y++) for (let x = -ext; x <= ext; x++) {
+    const d = document.createElement('div');
+    const w = counts.get(x + ',' + y) || 0;
+    if (w > 0) {
+      reached++;
+      const q = w / maxW;
+      d.className = q > 0.6 ? 'hit4' : q > 0.35 ? 'hit3' : q > 0.15 ? 'hit2' : 'hit1';
+    }
+    if (x === 0 && y === 0) d.className += ' centre';
+    d.title = w ? w + ' paths' : 'never reached';
+    el.appendChild(d);
+  }
+
+  const total = size * size;
+  const naiveRf = 1 + 2 * DL.rates.length;   // the same three layers, all at rate 1
+  document.getElementById('dl-scores').innerHTML =
+    score('Receptive field', size + '×' + size, 'with dilation', true) +
+    score('Without dilation', naiveRf + '×' + naiveRf, 'same three layers') +
+    score('Coverage', pct(reached / total), 'of the field actually reached');
+
+  DL.rates.forEach((r, i) => {
+    const el2 = document.getElementById('dl-' + (i + 1) + '-val');
+    if (el2) el2.textContent = 'rate ' + r;
+  });
+
+  const v = document.getElementById('dl-verdict');
+  const gaps = total - reached;
+  if (gaps === 0) {
+    v.innerHTML = `Every pixel in the <b>${size}×${size}</b> field is reachable — no gaps. Three
+      layers at rate 1 would have given you only <b>${naiveRf}×${naiveRf}</b>, and the only way to
+      beat that without dilation is to downsample, which costs you the resolution you need for the
+      boundary.`;
+  } else {
+    v.innerHTML = `The field is <b>${size}×${size}</b>, but <b>${gaps}</b> of its
+      ${total} positions are <b>never reached by any path</b>. This is the
+      <b>gridding artifact</b>: stacking layers that share a common factor in their dilation rates
+      leaves holes in the sampling lattice, and features that fall in a hole are invisible to this
+      neuron no matter how it is trained. Try the 1, 2, 3 preset — coprime rates close the gaps.`;
+  }
+}
+
+/* ═══════════ 04 — ASPP ═══════════ */
+const AP = { n: 48, rates: [1, 2, 4, 8], on: [true, true, true, true], pool: true };
+
+function apRender() {
+  const n = AP.n;
+  const sc = scene(n, 'shapes', 0.3);
+  const src = sc.img;
+  const kern = CLASSIC[2].k;   // Laplacian: responds to structure at whatever scale it is dilated to
+
+  const holder = document.getElementById('aspp-branches');
+  holder.innerHTML = '';
+  const fused = new Float32Array(n * n);
+  let live = 0;
+
+  AP.rates.forEach((r, i) => {
+    const out = relu(convDil(src, n, kern, r));
+    const block = document.createElement('div');
+    block.className = 'imgblock wide';
+    const cap = document.createElement('span');
+    cap.className = 'cap'; cap.textContent = 'rate ' + r;
+    const cv = document.createElement('canvas');
+    const dim = document.createElement('span');
+    dim.className = 'dim';
+    dim.textContent = AP.on[i] ? 'sees ' + (1 + 2 * r) + '×' + (1 + 2 * r) : 'off';
+    block.appendChild(cap); block.appendChild(cv); block.appendChild(dim);
+    block.style.opacity = AP.on[i] ? '1' : '0.32';
+    holder.appendChild(block);
+    paint(cv, norm255(out), n);
+    if (AP.on[i]) {
+      live++;
+      for (let k = 0; k < n * n; k++) fused[k] += out[k];
+    }
+  });
+
+  // the image-level branch: a single global average, broadcast back over the map
+  if (AP.pool) {
+    let mean = 0; for (let k = 0; k < n * n; k++) mean += src[k];
+    mean /= n * n;
+    const block = document.createElement('div');
+    block.className = 'imgblock wide';
+    const cap = document.createElement('span');
+    cap.className = 'cap'; cap.textContent = 'image pooling';
+    const cv = document.createElement('canvas');
+    const dim = document.createElement('span');
+    dim.className = 'dim'; dim.textContent = 'global context';
+    block.appendChild(cap); block.appendChild(cv); block.appendChild(dim);
+    holder.appendChild(block);
+    const flat = new Float32Array(n * n).fill(mean * 255);
+    paint(cv, flat, n);
+    dim.textContent = 'one number: ' + f3(mean);
+    /* Deliberately not summed into the fused preview. ASPP *concatenates* its branches, and
+       this one is spatially constant — adding it would shift every pixel equally and then
+       vanish under normalisation, making the toggle look broken. It travels as its own
+       channel instead, which is what the note below explains. */
+  }
+
+  paint(document.getElementById('ap-in'), norm255(src), n);
+  paint(document.getElementById('ap-out'), norm255(fused), n);
+  document.getElementById('ap-out-dim').textContent =
+    live === 0 ? 'no dilated branches live'
+      : live + ' dilated branch' + (live === 1 ? '' : 'es') + ' summed' +
+        (AP.pool ? ' · pooling travels separately' : '');
+
+  const maxRate = AP.rates.filter((r, i) => AP.on[i]).reduce((a, b) => Math.max(a, b), 0);
+  const v = document.getElementById('ap-verdict');
+  if (live === 0) {
+    v.innerHTML = `Every branch is off, so there is nothing to fuse. ASPP with no branches is just
+      an identity function with extra steps.`;
+  } else if (maxRate >= 8) {
+    v.innerHTML = `The widest live branch sees <b>${1 + 2 * maxRate}×${1 + 2 * maxRate}</b> pixels
+      while the map stays at full <b>${n}×${n}</b> resolution. That is the whole trick — DeepLab
+      gets its context from parallel dilation rather than from depth, so it never has to
+      downsample to 1/32 and try to reconstruct the boundary afterwards.`;
+  } else {
+    v.innerHTML = `With only the small rates alive, the fused map responds to fine structure and
+      misses anything larger than <b>${1 + 2 * maxRate}</b> pixels across. Switch rate 8 back on
+      and watch the large-scale structure reappear.`;
+  }
+}
+
+/* ═══════════ 05 — SE and CBAM ═══════════ */
+const SE = { n: 48, scene: 'shapes', k: 1.0, chans: [], gates: [] };
+
+function seBuild() {
+  const n = SE.n;
+  const sc = scene(n, SE.scene, 0.3);
+  SE.src = sc.img; SE.mask = sc.mask;
+  SE.chans = CLASSIC.map(f => relu(convDil(sc.img, n, f.k, 1)));
+
+  // squeeze: each channel's global average
+  SE.squeeze = SE.chans.map(c => {
+    let s = 0; for (let i = 0; i < c.length; i++) s += c[i];
+    return s / c.length;
+  });
+  // excitation stand-in: how well does this channel line up with the target region?
+  SE.gates = SE.chans.map(c => {
+    let inside = 0, ni = 0, outside = 0, no = 0;
+    for (let i = 0; i < c.length; i++) {
+      if (SE.mask[i]) { inside += c[i]; ni++; } else { outside += c[i]; no++; }
+    }
+    const mi = ni ? inside / ni : 0, mo = no ? outside / no : 0;
+    return 1 / (1 + Math.exp(-(mi - mo) * 8));   // sigmoid, as a real SE gate uses
+  });
+
+  /* CBAM's spatial descriptor: pool across channels with both average and max, then blur —
+     a stand-in for the 7x7 convolution. None of this depends on the sharpness slider, so it
+     is computed once per scene rather than on every drag of the control. */
+  const nn = n * n;
+  const comb = new Float32Array(nn);
+  for (let k = 0; k < nn; k++) {
+    let s = 0, m = -Infinity;
+    for (const c of SE.chans) { s += c[k]; if (c[k] > m) m = c[k]; }
+    comb[k] = s / SE.chans.length + m;
+  }
+  let blurred = comb;
+  for (let pass = 0; pass < 3; pass++) blurred = convDil(blurred, n, CLASSIC[3].k, 2);
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0; k < nn; k++) { if (blurred[k] < lo) lo = blurred[k]; if (blurred[k] > hi) hi = blurred[k]; }
+  const spanv = hi - lo < EPSL ? 1 : hi - lo;
+  SE.pooled = new Float32Array(nn);
+  for (let k = 0; k < nn; k++) SE.pooled[k] = (blurred[k] - lo) / spanv;
+}
+
+function seRender() {
+  const n = SE.n;
+  const before = document.getElementById('se-before');
+  const after = document.getElementById('se-after');
+  before.innerHTML = ''; after.innerHTML = '';
+
+  SE.chans.forEach((c, i) => {
+    const mk = (parent, data, label) => {
+      const fig = document.createElement('figure');
+      const cv = document.createElement('canvas');
+      const cap = document.createElement('figcaption');
+      cap.textContent = label;
+      fig.appendChild(cv); fig.appendChild(cap); parent.appendChild(fig);
+      paint(cv, norm255(data), n);
+    };
+    mk(before, c, CLASSIC[i].name);
+    const g = SE.gates[i];
+    const scaled = new Float32Array(c.length);
+    for (let k = 0; k < c.length; k++) scaled[k] = c[k] * g;
+    mk(after, scaled, '×' + f2(g));
+  });
+
+  const bars = (el, vals, fmtv) => {
+    const mx = Math.max(...vals.map(Math.abs), EPSL);
+    document.getElementById(el).innerHTML = vals.map((v, i) =>
+      `<div class="chanbar"><span>ch ${i + 1}</span>
+        <span class="track"><span class="fill" style="width:${(Math.abs(v) / mx * 100).toFixed(1)}%"></span></span>
+        <span class="num">${fmtv(v)}</span></div>`).join('');
+  };
+  bars('se-squeeze', SE.squeeze, f3);
+  bars('se-excite', SE.gates, f2);
+
+  // ── CBAM spatial half ──
+  // SE.pooled was built once per scene; only this sigmoid depends on the sharpness slider
+  const att = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) {
+    att[k] = 1 / (1 + Math.exp(-(SE.pooled[k] - 0.5) * SE.k * 2));
+  }
+
+  const xi = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) xi[k] = SE.src[k] * 255;
+  paint(document.getElementById('cb-in'), xi, n);
+  paintMask(document.getElementById('cb-map'), att, n, [184, 65, 46], null, 0.95);
+  const gated = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) gated[k] = SE.src[k] * att[k] * 255;
+  paint(document.getElementById('cb-out'), gated, n);
+
+  let inAtt = 0, ni = 0, outAtt = 0, no = 0;
+  for (let k = 0; k < n * n; k++) {
+    if (SE.mask[k]) { inAtt += att[k]; ni++; } else { outAtt += att[k]; no++; }
+  }
+  document.getElementById('cb-dim').textContent =
+    'attention on object ' + f2(ni ? inAtt / ni : 0) + ' vs background ' + f2(no ? outAtt / no : 0);
+  document.getElementById('cb-k-val').textContent = f2(SE.k);
+}
+
+/* ═══════════ 06 — attention gates on the skip ═══════════ */
+const AG = { n: 64, k: 1.2, thresh: 0.5, quality: 0.7 };
+
+/* The scene and its noise field never change, so they are generated once. */
+function agBuildScene() {
+  const n = AG.n;
+  const sc = scene(n, 'shapes', 0.3);
+  AG.skip = sc.img; AG.mask = sc.mask;
+  AG.noise = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) {
+    AG.noise[k] = fbm((k % n) * 0.3, Math.floor(k / n) * 0.3, 17, 3);
+  }
+  agBuildGate();
+}
+
+/* The gating signal is the decoder's coarse idea of where the object is: the true mask,
+   degraded to `quality`, then shrunk and re-expanded the way a deep feature map would be.
+   Only the quality slider changes this, so the two sharpness controls do not pay for it. */
+function agBuildGate() {
+  const n = AG.n;
+  const coarse = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) {
+    coarse[k] = AG.quality * AG.mask[k] + (1 - AG.quality) * AG.noise[k];
+  }
+  let g = halve(halve(coarse, n), n / 2);       // down to n/4, as a deeper stage would be
+  g = bilinUp(g, n / 4, 4);                      // and back up, as the gate does before applying
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0; k < n * n; k++) { if (g[k] < lo) lo = g[k]; if (g[k] > hi) hi = g[k]; }
+  const spanv = hi - lo < EPSL ? 1 : hi - lo;
+  AG.g = g;
+  AG.z = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) AG.z[k] = (g[k] - lo) / spanv;
+}
+
+function agRender() {
+  const n = AG.n;
+  const skip = AG.skip, mask = AG.mask, g = AG.g;
+
+  const alpha = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) {
+    alpha[k] = 1 / (1 + Math.exp(-(AG.z[k] - AG.thresh) * AG.k * 10));
+  }
+
+  const si = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) si[k] = skip[k] * 255;
+  paint(document.getElementById('ag-skip'), si, n);
+  paint(document.getElementById('ag-gate'), norm255(g), n);
+  paintMask(document.getElementById('ag-alpha'), alpha, n, [184, 65, 46], null, 0.95);
+  const out = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) out[k] = skip[k] * alpha[k] * 255;
+  paint(document.getElementById('ag-out'), out, n);
+
+  let ai = 0, ni = 0, ao = 0, no = 0;
+  for (let k = 0; k < n * n; k++) {
+    if (mask[k]) { ai += alpha[k]; ni++; } else { ao += alpha[k]; no++; }
+  }
+  const onObj = ni ? ai / ni : 0, onBg = no ? ao / no : 0;
+  // how much background the gate removed, and how much object it kept
+  const kept = onObj, suppressed = 1 - onBg;
+
+  document.getElementById('ag-alpha-dim').textContent = 'mean α ' + f2((ai + ao) / (n * n));
+  document.getElementById('ag-k-val').textContent = f2(AG.k);
+  document.getElementById('ag-t-val').textContent = f2(AG.thresh);
+  document.getElementById('ag-q-val').textContent = pct(AG.quality);
+  document.getElementById('ag-scores').innerHTML =
+    score('Object kept', pct(kept), 'α on the target', true) +
+    score('Background cut', pct(suppressed), '1 − α off-target') +
+    score('Selectivity', f2(onBg > 0.001 ? onObj / onBg : 0), 'object ÷ background');
+
+  const v = document.getElementById('ag-verdict');
+  if (AG.quality < 0.3) {
+    v.innerHTML = `The coarse guess is mostly noise, and the gate is faithfully passing through
+      whatever that noise happens to favour — keeping <b>${pct(kept)}</b> of the object while
+      cutting <b>${pct(suppressed)}</b> of the background. An attention gate does not find the
+      object. It <em>amplifies a decision already made deeper in the network</em>, and it amplifies
+      a bad decision just as willingly as a good one.`;
+  } else if (kept > 0.7 && suppressed > 0.5) {
+    v.innerHTML = `The gate keeps <b>${pct(kept)}</b> of the object and removes
+      <b>${pct(suppressed)}</b> of the background. The skip is still delivering full-resolution
+      detail, but only where the decoder had reason to want it. That is the entire contribution of
+      Attention U-Net over plain U-Net.`;
+  } else {
+    v.innerHTML = `Keeping <b>${pct(kept)}</b> of the object, cutting <b>${pct(suppressed)}</b> of
+      the background. Push the threshold up and the gate gets stricter — cleaner background, but
+      it starts eating the object's edges, which for a camouflaged target is exactly the part you
+      could least afford to lose.`;
+  }
+}
+
+/* ═══════════ boot ═══════════ */
+
+// 01
+pyBuild();
+dragMask(document.getElementById('py-in'), () => PY.n, (dx, dy) => {
+  PY.px = PY.n / 2 + dx; PY.py = PY.n / 2 + dy; pyRender();
+});
+pyRender();
+
+// 02
+function ptInitSeg() {
+  seg('pt-init', ['scratch', 'pretrained'], PT.init, v => {
+    PT.init = v; ptPlay(false); ptInit(true); ptInitSeg(); ptRender();
+  }, ['Random (scratch)', 'Classical (pretrained)']);
+}
+document.getElementById('pt-play').addEventListener('click', () => ptPlay(!PT.playing));
+document.getElementById('pt-reset').addEventListener('click', () => {
+  ptPlay(false); ptInit(false); ptRender();
+});
+document.getElementById('pt-step').addEventListener('click', () => {
+  ptPlay(false);
+  let res; for (let i = 0; i < 10; i++) res = ptStep();
+  ptRender(res);
+});
+document.getElementById('pt-enc').addEventListener('input', e => {
+  PT.encLr = Number(e.target.value) / 100; ptRender();
+});
+document.getElementById('pt-dec').addEventListener('input', e => {
+  PT.decLr = Number(e.target.value) / 100; ptRender();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) ptPlay(false); });
+ptInitSeg(); ptInit(false); ptRender();
+
+// 03
+function dlSegs() {
+  [1, 2, 3].forEach(i => {
+    seg('dl-' + i, [1, 2, 3, 4], DL.rates[i - 1], v => {
+      DL.rates[i - 1] = v; dlSegs(); dlRender();
+    }, ['1', '2', '3', '4']);
+  });
+}
+function dlPresets() {
+  chips('dl-preset', [
+    ['plain', 'No dilation · 1,1,1'],
+    ['double', 'Doubling · 1,2,4'],
+    ['gridded', 'All equal · 2,2,2'],
+    ['coprime', 'Coprime · 1,2,3']
+  ], null, k => {
+    DL.rates = k === 'plain' ? [1, 1, 1] : k === 'double' ? [1, 2, 4]
+             : k === 'gridded' ? [2, 2, 2] : [1, 2, 3];
+    dlSegs(); dlRender();
+  });
+}
+dlSegs(); dlPresets(); dlRender();
+
+// 04
+function apToggles() {
+  const items = AP.rates.map((r, i) => ['r' + i, 'rate ' + r]);
+  items.push(['pool', 'image pooling']);
+  const el = document.getElementById('ap-toggles');
+  el.innerHTML = '';
+  items.forEach(([key, label]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = label;
+    const active = key === 'pool' ? AP.pool : AP.on[Number(key.slice(1))];
+    b.setAttribute('aria-pressed', String(active));
+    b.addEventListener('click', () => {
+      if (key === 'pool') AP.pool = !AP.pool;
+      else AP.on[Number(key.slice(1))] = !AP.on[Number(key.slice(1))];
+      apToggles(); apRender();
+    });
+    el.appendChild(b);
+  });
+}
+apToggles(); apRender();
+
+// 05
+function seScene() {
+  chips('se-scene', [['shapes', 'Shapes'], ['camo', 'Camouflage'], ['wave', 'Interference']],
+    SE.scene, k => { SE.scene = k; seBuild(); seScene(); seRender(); });
+}
+document.getElementById('cb-k').addEventListener('input', e => {
+  SE.k = Number(e.target.value) / 10; seRender();
+});
+seBuild(); seScene(); seRender();
+
+// 06
+document.getElementById('ag-k').addEventListener('input', e => {
+  AG.k = Number(e.target.value) / 10; agRender();
+});
+document.getElementById('ag-t').addEventListener('input', e => {
+  AG.thresh = Number(e.target.value) / 100; agRender();
+});
+document.getElementById('ag-q').addEventListener('input', e => {
+  AG.quality = Number(e.target.value) / 100;
+  agBuildGate();     // only the quality slider invalidates the gating signal
+  agRender();
+});
+agBuildScene(); agRender();
+</script>
+</body>
+</html>

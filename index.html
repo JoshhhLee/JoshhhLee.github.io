@@ -19,6 +19,9 @@
     --vermillion-dark: #8a2e20;
     --sage: #6b7a5a;
     --gold: #a88848;
+    /* Motion — one easing vocabulary for the whole site */
+    --ease-out: cubic-bezier(0.22, 0.61, 0.24, 1);   /* decelerate, no overshoot */
+    --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);        /* gentle in-out for fades */
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -89,7 +92,7 @@
     font-size: 0.72rem; letter-spacing: 0.25em;
     text-transform: uppercase; color: var(--ink-soft);
     text-decoration: none; transition: color 0.3s;
-    position: relative;
+    position: relative; white-space: nowrap;
   }
   .nav-links a::after {
     content: ""; position: absolute; bottom: -4px; left: 0; right: 0;
@@ -99,6 +102,19 @@
   }
   .nav-links a:hover { color: var(--ink); }
   .nav-links a:hover::after { transform: scaleX(1); }
+  /* The Labs — the one nav item that is a destination, not an anchor */
+  .nav-links a.nav-accent {
+    color: var(--vermillion);
+    border: 1px solid rgba(184, 65, 46, 0.35);
+    padding: 0.42em 0.9em;
+    transition: color 0.3s, background 0.3s, border-color 0.3s;
+  }
+  .nav-links a.nav-accent::after { display: none; }
+  .nav-links a.nav-accent:hover {
+    color: var(--paper);
+    background: var(--vermillion);
+    border-color: var(--vermillion);
+  }
   .seal {
     width: 42px; height: 42px;
     background: var(--vermillion); color: var(--paper);
@@ -678,16 +694,117 @@
     background: var(--ink); color: var(--paper); border-color: var(--ink);
   }
 
-  /* Reveal */
-  .reveal {
-    opacity: 0; transform: translateY(30px);
-    transition: opacity 0.9s ease-out, transform 0.9s cubic-bezier(0.2, 0.6, 0.2, 1);
+  /* ===== Teaching & Learning ===== */
+  .teaching-section { padding: 8rem 2rem; background: var(--paper-dark); position: relative; z-index: 3; }
+  .teaching-lede {
+    max-width: 62ch; margin: -2rem auto 3.5rem; text-align: center;
+    color: var(--ink-soft); font-size: 1.15rem; line-height: 1.8;
   }
-  .reveal.visible { opacity: 1; transform: translateY(0); }
-  .reveal.d1 { transition-delay: 0.1s; }
-  .reveal.d2 { transition-delay: 0.25s; }
-  .reveal.d3 { transition-delay: 0.4s; }
-  .reveal.d4 { transition-delay: 0.55s; }
+  .resource-grid {
+    display: grid; grid-template-columns: 1.55fr 1fr;
+    gap: 2rem; align-items: stretch;
+  }
+  /* Same ink-fill interaction as the Contents blocks, so this reads as native */
+  .resource-card {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(26, 26, 26, 0.12);
+    padding: 3rem 2.4rem;
+    text-decoration: none; color: inherit;
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+    transition: border-color 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+  }
+  .resource-card::before {
+    content: ""; position: absolute; inset: 0;
+    background: var(--ink); transform: translateY(100%);
+    transition: transform 0.55s var(--ease-out); z-index: 0;
+  }
+  .resource-card:hover::before { transform: translateY(0); }
+  .resource-card > * { position: relative; z-index: 1; transition: color 0.5s var(--ease-soft); }
+  .resource-card:hover { transform: translateY(-4px); border-color: rgba(26, 26, 26, 0.3); }
+  .resource-card:hover > *, .resource-card:hover .block-corner { color: var(--paper); }
+  .resource-card:hover .resource-kanji,
+  .resource-card:hover .resource-title em { color: var(--vermillion); opacity: 1; }
+  .resource-card:hover .block-arrow { transform: translateX(8px); color: var(--vermillion); }
+  .resource-card:focus-visible { outline: 2px solid var(--vermillion); outline-offset: 4px; }
+
+  .resource-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 1rem; margin-bottom: 1.4rem;
+  }
+  .resource-kanji {
+    font-family: 'Noto Serif JP', serif; font-weight: 300;
+    color: var(--vermillion); letter-spacing: 0.35em; font-size: 0.95rem; opacity: 0.85;
+  }
+  .resource-tag {
+    font-family: 'Inter', sans-serif; font-size: 0.58rem;
+    letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-light);
+    border: 1px solid currentColor; padding: 0.35em 0.7em; white-space: nowrap;
+  }
+  .resource-title {
+    font-family: 'Cormorant Garamond', serif; font-weight: 400;
+    font-size: clamp(1.7rem, 3vw, 2.3rem); line-height: 1.2;
+    margin: 0 0 1rem; letter-spacing: -0.01em;
+  }
+  .resource-title em { font-style: italic; color: var(--vermillion); }
+  .resource-desc { color: var(--ink-soft); line-height: 1.8; margin: 0 0 1.6rem; max-width: 52ch; }
+  .resource-topics { list-style: none; margin: 0 0 2rem; padding: 0; }
+  .resource-topics li {
+    font-family: 'Inter', sans-serif; font-size: 0.74rem; letter-spacing: 0.02em;
+    color: var(--ink-light); padding: 0.42rem 0 0.42rem 1.5rem; position: relative;
+    border-bottom: 1px solid rgba(26, 26, 26, 0.07);
+  }
+  .resource-topics li::before {
+    content: "—"; position: absolute; left: 0; color: var(--vermillion); opacity: 0.7;
+  }
+  .resource-card:hover .resource-topics li { border-bottom-color: rgba(244, 237, 224, 0.15); }
+  .resource-foot {
+    margin-top: auto; padding-top: 1.4rem;
+    border-top: 1px solid rgba(26, 26, 26, 0.12);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'Inter', sans-serif; font-size: 0.66rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+  }
+  .resource-card:hover .resource-foot { border-top-color: rgba(244, 237, 224, 0.2); }
+
+  @media (max-width: 900px) {
+    .resource-grid { grid-template-columns: 1fr; }
+    .teaching-section { padding: 5rem 1.2rem; }
+    .resource-card { padding: 2.4rem 1.6rem; }
+  }
+
+  /* Reveal — ink settling onto paper: rises, softens in, never bounces */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition:
+      opacity 1s var(--ease-soft),
+      transform 1s var(--ease-out);
+    will-change: opacity, transform;
+  }
+  .reveal.visible {
+    opacity: 1; transform: none;
+    will-change: auto;
+  }
+  .reveal.d1 { transition-delay: 0.08s; }
+  .reveal.d2 { transition-delay: 0.18s; }
+  .reveal.d3 { transition-delay: 0.28s; }
+  .reveal.d4 { transition-delay: 0.38s; }
+  .reveal.d5 { transition-delay: 0.48s; }
+  .reveal.d6 { transition-delay: 0.58s; }
+
+  /* Respect the reader: no motion if the OS asks for none */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .reveal { opacity: 1; transform: none; }
+  }
 
   /* Footer */
   footer {
@@ -714,12 +831,19 @@
   }
   footer a:hover { color: var(--vermillion-dark); }
 
+  /* Seven nav items: tighten tracking before they crowd the brand and seal */
+  @media (max-width: 1200px) {
+    .top-bar { gap: 1.5rem; padding: 1.2rem 2rem; }
+    .brand { letter-spacing: 0.3em; white-space: nowrap; }
+    .nav-links { gap: 1rem; }
+    .nav-links a { font-size: 0.65rem; letter-spacing: 0.12em; }
+  }
   @media (max-width: 900px) {
     .vertical-text { display: none; }
     .top-bar { padding: 1rem 1.5rem; }
     .brand { font-size: 0.8rem; letter-spacing: 0.3em; }
     .nav-links { gap: 1rem; }
-    .nav-links a { font-size: 0.65rem; }
+    .nav-links a { font-size: 0.62rem; letter-spacing: 0.1em; }
     .profile-grid { grid-template-columns: 1fr; gap: 2.5rem; }
     .info-row { grid-template-columns: 100px 1fr; }
     .menu-block { min-height: 240px; padding: 2.5rem 1.8rem; }
@@ -729,7 +853,8 @@
     .timeline-item::before { left: 0; top: 1.9rem; }
     .timeline-date { text-align: left; font-size: 1rem; margin-bottom: 0.5rem; }
   }
-  @media (max-width: 600px) {
+  /* Below this the links no longer fit; "Main Menu" jumps to the Contents grid instead */
+  @media (max-width: 760px) {
     .nav-links { display: none; }
   }
 </style>
@@ -776,8 +901,9 @@
       <a href="#experience">Experience</a>
       <a href="#project">Projects</a>
       <a href="#publication">Publications</a>
+      <a href="#teaching">Teaching</a>
       <a href="#contact">Contact</a>
-      <a href="https://joshhhlee.github.io/ielts-vocab-builder/" target="_blank">IELTS Tool</a>
+      <a href="projects/labs.html" class="nav-accent">The Labs</a>
     </nav>
     <div class="seal" title="印">印</div>
   </header>
@@ -802,7 +928,7 @@
         <span>My Profile</span>
         <span class="hero-cta-arrow">&rarr;</span>
       </a>
-      <a href="assets/cv/CV_ Joshu Leonardy_Updated_2026.pdf" target="_blank" class="hero-cta secondary">
+      <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener" class="hero-cta secondary">
         <span>Download CV</span>
         <span class="hero-cta-arrow">&darr;</span>
       </a>
@@ -862,15 +988,15 @@
         </div>
         <div class="block-foot"><span>Bibliography</span><span class="block-arrow">→</span></div>
       </a>
-      <a href="https://joshhhlee.github.io/ielts-vocab-builder/" target="_blank" class="menu-block reveal d4">
+      <a href="#teaching" class="menu-block reveal d5">
         <span class="block-corner tl"></span>
         <span class="block-corner br"></span>
         <div>
           <div class="block-number">&mdash; 05 &mdash;</div>
-          <div class="block-kanji">IELTS · 語</div>
-          <p class="block-desc">Vocabulary builder with flashcards, quiz, and live dictionary lookup.</p>
+          <div class="block-kanji">teaching · 教</div>
+          <p class="block-desc">Interactive labs and study tools built for students to learn from.</p>
         </div>
-        <div class="block-foot"><span>Study Now</span><span class="block-arrow">→</span></div>
+        <div class="block-foot"><span>Learning Resources</span><span class="block-arrow">→</span></div>
       </a>
     </div>
   </section>
@@ -940,10 +1066,10 @@
             <div class="info-row">
               <div class="info-label">Supervisors</div>
               <div class="info-value">
-                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/74Y9" target="_blank">Dr. Mohd Rashidi Salim</a> &mdash; Faculty of Electrical Engineering, UTM<br>
-                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/wygw" target="_blank">Ir. Dr. Muhammad Yusof Mohd Noor</a> &mdash; Faculty of Electrical Engineering, UTM<br>
-                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/Ek8X" target="_blank">Dr. Azizul Azizan</a> &mdash; Faculty of Artificial Intelligence, UTM<br>
-                <a href="https://brin.go.id/ornm/en/pusat-riset-fotonik/page/wptresna" target="_blank">Dr. Eng. Wildan Panji Tresna</a> &mdash; Micro Opto-Electrical-Mechanical System (MOEMS) Research Group, BRIN
+                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/74Y9" target="_blank" rel="noopener">Dr. Mohd Rashidi Salim</a> &mdash; Faculty of Electrical Engineering, UTM<br>
+                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/wygw" target="_blank" rel="noopener">Ir. Dr. Muhammad Yusof Mohd Noor</a> &mdash; Faculty of Electrical Engineering, UTM<br>
+                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/Ek8X" target="_blank" rel="noopener">Dr. Azizul Azizan</a> &mdash; Faculty of Artificial Intelligence, UTM<br>
+                <a href="https://brin.go.id/ornm/en/pusat-riset-fotonik/page/wptresna" target="_blank" rel="noopener">Dr. Eng. Wildan Panji Tresna</a> &mdash; Micro Opto-Electrical-Mechanical System (MOEMS) Research Group, BRIN
               </div>
             </div>
             <div class="info-row">
@@ -977,10 +1103,10 @@
             <div class="info-row">
               <div class="info-label">Links</div>
               <div class="info-value">
-                <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank">LinkedIn</a> &middot;
-                <a href="https://github.com/JoshhhLee" target="_blank">GitHub</a> &middot;
-                <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank">Google Scholar</a> &middot;
-                <a href="assets/cv/CV_ Joshu Leonardy_Updated_2026.pdf" target="_blank">CV (PDF)</a>
+                <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank" rel="noopener">LinkedIn</a> &middot;
+                <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">GitHub</a> &middot;
+                <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">Google Scholar</a> &middot;
+                <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">CV (PDF)</a>
               </div>
             </div>
           </div>
@@ -1280,7 +1406,7 @@
             </h3>
             <p class="pub-venue">Journal Publication, 2026</p>
             <div class="pub-links">
-              <a href="https://www.researchgate.net/publication/401312609" target="_blank">ResearchGate</a>
+              <a href="https://www.researchgate.net/publication/401312609" target="_blank" rel="noopener">ResearchGate</a>
             </div>
           </div>
         </article>
@@ -1305,7 +1431,7 @@
             </h3>
             <p class="pub-venue">Physica Scripta, 2025</p>
             <div class="pub-links">
-              <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank">Paper</a>
+              <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank" rel="noopener">Paper</a>
             </div>
           </div>
         </article>
@@ -1319,7 +1445,7 @@
             </h3>
             <p class="pub-venue">IEEE Conference Proceedings, 2025</p>
             <div class="pub-links">
-              <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank">Paper</a>
+              <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank" rel="noopener">Paper</a>
             </div>
           </div>
         </article>
@@ -1333,7 +1459,7 @@
             </h3>
             <p class="pub-venue">IEEE Conference Proceedings, 2025</p>
             <div class="pub-links">
-              <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank">Paper</a>
+              <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank" rel="noopener">Paper</a>
             </div>
           </div>
         </article>
@@ -1358,7 +1484,7 @@
             </h3>
             <p class="pub-venue">Results in Optics, 2025</p>
             <div class="pub-links">
-              <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank">Paper</a>
+              <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank" rel="noopener">Paper</a>
             </div>
           </div>
         </article>
@@ -1373,7 +1499,7 @@
             </h3>
             <p class="pub-venue">IEEE Conference Proceedings, 2024 &mdash; Best Paper Award</p>
             <div class="pub-links">
-              <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank">Paper</a>
+              <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank" rel="noopener">Paper</a>
             </div>
           </div>
         </article>
@@ -1415,37 +1541,106 @@
     </div>
   </section>
 
+  <!-- ============ TEACHING ============ -->
+  <section class="teaching-section" id="teaching">
+    <div class="container">
+      <div class="section-heading reveal">
+        <div class="section-heading-kanji">教 · 材</div>
+        <h2 class="section-heading-text">Teaching &amp; Learning</h2>
+      </div>
+
+      <p class="teaching-lede reveal d1">
+        Tools I build for the people I teach. Each one is meant to be opened in a lecture,
+        played with, and argued about &mdash; not read.
+      </p>
+
+      <div class="resource-grid">
+
+        <a href="projects/labs.html" class="resource-card feature reveal d2">
+          <span class="block-corner tl"></span>
+          <span class="block-corner br"></span>
+          <div class="resource-head">
+            <span class="resource-kanji">実 験 室</span>
+            <span class="resource-tag">Interactive series</span>
+          </div>
+          <h3 class="resource-title">The Lab <em>Series</em></h3>
+          <p class="resource-desc">
+            Five labs that build a convolutional network from the sliding window up to
+            camouflaged object detection &mdash; the problem I actually work on. Each one is a
+            single page you open and play with. No install, no notebook, no account.
+          </p>
+          <ul class="resource-topics">
+            <li><strong>01 &middot; Convolution</strong> &mdash; the sliding window, kernels, channels, pooling</li>
+            <li><strong>02 &middot; Segmentation</strong> &mdash; IoU &amp; Dice, losses, upsampling, U-Net skips</li>
+            <li><strong>03 &middot; Encoder&ndash;Decoder</strong> &mdash; backbones, decoders, attention modules</li>
+            <li><strong>04 &middot; Attention</strong> &mdash; self-attention, ViT, DETR &amp; SAM <em>(planned)</em></li>
+            <li><strong>05 &middot; Camouflage</strong> &mdash; COD metrics, SINet, the research landscape <em>(planned)</em></li>
+          </ul>
+          <div class="resource-foot"><span>Open the series</span><span class="block-arrow">→</span></div>
+        </a>
+
+        <a href="https://joshhhlee.github.io/ielts-vocab-builder/" target="_blank" rel="noopener" class="resource-card reveal d3">
+          <span class="block-corner tl"></span>
+          <span class="block-corner br"></span>
+          <div class="resource-head">
+            <span class="resource-kanji">語 彙</span>
+            <span class="resource-tag">Study tool</span>
+          </div>
+          <h3 class="resource-title">IELTS <em>Vocabulary</em></h3>
+          <p class="resource-desc">
+            Flashcards, a quiz mode, and live dictionary lookup &mdash; built while preparing
+            for the exam myself.
+          </p>
+          <div class="resource-foot"><span>Study now</span><span class="block-arrow">↗</span></div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
   <!-- ============ FOOTER ============ -->
   <footer id="contact">
     <div class="footer-seal">印</div>
     <div>© 2026 — Joshu Leonardy · Made with patience &amp; tea</div>
     <div style="margin-top: 0.8rem;">
       <a href="mailto:joshu@graduate.utm.my">joshu@graduate.utm.my</a> &middot;
-      <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank">LinkedIn</a> &middot;
-      <a href="https://github.com/JoshhhLee" target="_blank">GitHub</a> &middot;
-      <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank">Google Scholar</a> &middot;
-      <a href="assets/cv/CV_ Joshu Leonardy_Updated_2026.pdf" target="_blank">CV</a>
+      <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank" rel="noopener">LinkedIn</a> &middot;
+      <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">GitHub</a> &middot;
+      <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">Google Scholar</a> &middot;
+      <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">CV</a>
     </div>
   </footer>
 
   <script>
-    // Reveal on scroll
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-          observer.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Top bar border on scroll
+    // Reveal on scroll
+    const revealEls = document.querySelectorAll('.reveal');
+    if (reduceMotion || !('IntersectionObserver' in window)) {
+      revealEls.forEach(el => el.classList.add('visible'));
+    } else {
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            observer.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+      revealEls.forEach(el => observer.observe(el));
+    }
+
+    // Top bar border on scroll — rAF-throttled so it never fights the scroll
     const topBar = document.getElementById('topBar');
+    let scrollQueued = false;
     window.addEventListener('scroll', () => {
-      if (window.scrollY > 30) topBar.classList.add('scrolled');
-      else topBar.classList.remove('scrolled');
-    });
+      if (scrollQueued) return;
+      scrollQueued = true;
+      requestAnimationFrame(() => {
+        topBar.classList.toggle('scrolled', window.scrollY > 30);
+        scrollQueued = false;
+      });
+    }, { passive: true });
 
     // Rotating left vertical text — cycles through research areas
     const verticalPhrases = [
@@ -1454,18 +1649,26 @@
       '智能 · ARTIFICIAL INTELLIGENCE · 智 能'
     ];
     const leftVertical = document.querySelector('.vertical-text.left');
-    let phraseIdx = 0;
-    // Start cycling after the initial fade-in finishes (~3.8s)
-    setTimeout(() => {
-      setInterval(() => {
+    if (leftVertical && !reduceMotion) {
+      let phraseIdx = 0;
+      let cycleTimer = null;
+      const cycle = () => {
+        // Skip the swap while the tab is hidden — it would fade to nothing visible
+        if (document.hidden) return;
         leftVertical.classList.add('fading');
         setTimeout(() => {
           phraseIdx = (phraseIdx + 1) % verticalPhrases.length;
           leftVertical.textContent = verticalPhrases[phraseIdx];
           leftVertical.classList.remove('fading');
         }, 800);
-      }, 4000);
-    }, 3800);
+      };
+      // Start cycling after the initial fade-in finishes (~3.8s)
+      setTimeout(() => { cycleTimer = setInterval(cycle, 4000); }, 3800);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+        else if (!document.hidden && !cycleTimer) { cycleTimer = setInterval(cycle, 4000); }
+      });
+    }
   </script>
 
 </body>

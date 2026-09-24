@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Convolution Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive lab for learning what a convolutional layer is — the sliding window, kernels, padding, stride, channels, pooling, and where the weights come from." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Shared series chrome. Loaded first so this page's own rules below still win. -->
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+:root{
+  --paper:#f4ede0; --paper-dark:#ebe1cf;
+  --ink:#1a1a1a; --ink-soft:#3d3d3d; --ink-light:#6b6b6b;
+  --vermillion:#b8412e; --vermillion-dark:#8a2e20;
+  --sage:#6b7a5a; --gold:#a88848;
+  --line:rgba(26,26,26,0.12); --card:rgba(255,255,255,0.5);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:'Cormorant Garamond','Noto Serif JP',serif;font-size:1.06rem;line-height:1.75;
+  background-image:
+    radial-gradient(ellipse at top right,rgba(184,65,46,.04),transparent 60%),
+    radial-gradient(ellipse at bottom left,rgba(107,122,90,.05),transparent 60%);
+  background-attachment:fixed;
+}
+.container{max-width:1080px;margin:0 auto;padding:0 2rem}
+
+.top-bar{display:flex;justify-content:space-between;align-items:center;padding:1.1rem 3rem;
+  position:sticky;top:0;z-index:100;background:rgba(244,237,224,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.brand{font-size:1.05rem;letter-spacing:.04em;text-decoration:none;color:var(--ink)}
+.brand em{font-style:italic;color:var(--vermillion)}
+.nav-links{display:flex;gap:1.6rem;align-items:center}
+.nav-links a{font-family:'Inter',sans-serif;font-size:.66rem;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--ink-soft);text-decoration:none;position:relative;transition:color .3s}
+.nav-links a::after{content:"";position:absolute;bottom:-4px;left:0;right:0;height:1px;background:var(--vermillion);transform:scaleX(0);transform-origin:left;transition:transform .3s}
+.nav-links a:hover{color:var(--ink)}
+.nav-links a:hover::after{transform:scaleX(1)}
+@media(max-width:900px){.top-bar{padding:1rem 1.4rem}.nav-links{gap:.9rem}.nav-links a{font-size:.58rem;letter-spacing:.12em}}
+@media(max-width:640px){.nav-links{display:none}}
+
+.hero{padding:5rem 0 3rem;text-align:center}
+.hero-kanji{font-family:'Noto Serif JP',serif;font-weight:300;font-size:1.05rem;color:var(--vermillion);letter-spacing:.5em;margin-bottom:1.8rem}
+.hero h1{font-size:clamp(2.4rem,6vw,3.8rem);font-weight:400;margin:0;letter-spacing:-.01em;line-height:1.1}
+.hero h1 em{font-style:italic;color:var(--vermillion)}
+.hero-divider{width:90px;height:1px;background:var(--ink);margin:1.9rem auto}
+.hero p{max-width:62ch;margin:0 auto;color:var(--ink-soft);font-size:1.12rem}
+
+section{padding:3.2rem 0}
+.section-heading{margin-bottom:2rem}
+.section-num{font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-light);display:block;margin-bottom:.8rem}
+.section-heading-kanji{font-family:'Noto Serif JP',serif;color:var(--vermillion);font-size:.9rem;letter-spacing:.5em;margin-bottom:.6rem}
+.section-heading-text{font-size:2rem;font-weight:400;margin:0 0 1rem;letter-spacing:-.01em}
+.section-heading-rule{width:100%;height:1px;background:var(--line)}
+.lede{max-width:66ch;color:var(--ink-soft);margin:1.3rem 0 2rem}
+.sub-h{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:400;margin:2.8rem 0 .4rem}
+
+.label{font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-light);display:block;margin-bottom:.55rem}
+.mono{font-family:'Inter',sans-serif;font-size:.82rem;letter-spacing:.02em}
+.chip{font-family:'Inter',sans-serif;font-size:.69rem;letter-spacing:.06em;border:1px solid var(--line);
+  background:transparent;color:var(--ink-soft);padding:.35rem .85rem;cursor:pointer;transition:all .25s}
+.chip:hover:not(:disabled){border-color:var(--vermillion);color:var(--ink)}
+.chip:disabled{opacity:.35;cursor:default}
+.chip[aria-pressed="true"]{background:var(--vermillion);border-color:var(--vermillion);color:var(--paper)}
+.chiprow{display:flex;flex-wrap:wrap;gap:.45rem}
+.seg{display:flex;border:1px solid var(--line)}
+.seg button{flex:1;font-family:'Inter',sans-serif;font-size:.74rem;border:0;background:transparent;color:var(--ink-soft);padding:.42rem .3rem;cursor:pointer;transition:all .25s;white-space:nowrap}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg button:disabled{opacity:.3;cursor:default}
+button:focus-visible,input:focus-visible{outline:2px solid var(--vermillion);outline-offset:2px}
+input[type=range]{accent-color:var(--vermillion);width:100%}
+
+.eqbox{border:1px solid var(--line);background:var(--card);padding:1.5rem 1.6rem;margin-bottom:2rem}
+.eqmath{font-family:'Cormorant Garamond',serif;font-size:1.45rem;line-height:1.5;display:flex;flex-wrap:wrap;align-items:center;gap:.08rem}
+.eqmath i{font-style:italic}
+.sym{font-style:italic;transition:color .2s,background .2s;padding:0 .04em;border-radius:2px}
+.sym.on{color:var(--vermillion);font-weight:500;background:rgba(184,65,46,.1)}
+.sigma{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;margin:0 .28rem;line-height:1}
+.sigma .big{font-size:1.45em;line-height:.85}
+.sigma small{font-family:'Inter',sans-serif;font-size:.34em;letter-spacing:0;color:var(--ink-light);white-space:nowrap}
+.eqkey{display:flex;flex-wrap:wrap;gap:.4rem 1.4rem;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--line);
+  font-family:'Inter',sans-serif;font-size:.77rem;color:var(--ink-soft)}
+.eqkey b{color:var(--vermillion);font-weight:500}
+.eqgloss{font-size:1rem;color:var(--ink-soft);margin-top:.9rem;max-width:68ch}
+
+.stage{display:flex;flex-wrap:wrap;gap:2.6rem;align-items:flex-start}
+.panel{flex:1 1 330px;min-width:0}
+.panel h3{font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-light);font-weight:400;margin:0 0 .35rem}
+.panel .sub{font-family:'Inter',sans-serif;font-size:.75rem;color:var(--ink-soft);margin:0 0 .9rem}
+.gridwrap{position:relative;width:fit-content;max-width:100%}
+.grid{display:grid;gap:3px}
+.cell{border:1px solid var(--line);background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;
+  font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink)}
+.cell.pad{background:var(--paper-dark);color:var(--ink-light);border-style:dashed;font-size:.65rem}
+.cell.tap{box-shadow:inset 0 0 0 1px var(--vermillion);border-color:var(--vermillion)}
+.cell.here{background:var(--vermillion);color:var(--paper);border-color:var(--vermillion)}
+.cell.here input{color:var(--paper)}
+.cell input{width:100%;height:100%;border:0;background:transparent;text-align:center;font:inherit;color:inherit;padding:0;-moz-appearance:textfield}
+.cell input::-webkit-outer-spin-button,.cell input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.probe{position:absolute;pointer-events:none;border:2px solid var(--vermillion);background:rgba(184,65,46,.09);
+  transition:left .28s cubic-bezier(.4,.1,.2,1),top .28s cubic-bezier(.4,.1,.2,1),width .2s,height .2s}
+.out.cell{color:var(--ink-light);cursor:pointer}
+.out.cell.done{background:rgba(107,122,90,.15);border-color:var(--sage);color:var(--sage)}
+.out.cell.now{outline:2px solid var(--vermillion);outline-offset:1px}
+.kernel{margin-top:1.8rem}
+
+.transport{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-top:1.8rem;padding:1rem 1.2rem;border:1px solid var(--line);background:var(--card)}
+.transport button{font-family:'Inter',sans-serif;font-size:.75rem;border:1px solid var(--line);background:transparent;color:var(--ink);padding:.42rem .95rem;cursor:pointer;transition:all .25s}
+.transport button:hover:not(:disabled){border-color:var(--vermillion)}
+.transport button:disabled{opacity:.32;cursor:default}
+.transport .play{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:72px}
+.counter{font-family:'Inter',sans-serif;font-size:.73rem;color:var(--ink-light);margin-left:auto}
+.speed{display:flex;align-items:center;gap:.5rem;font-family:'Inter',sans-serif;font-size:.71rem;color:var(--ink-light)}
+.speed input{width:84px}
+.terms{margin-top:.9rem;padding:1rem 1.2rem;border:1px solid var(--line);background:var(--card);font-family:'Inter',sans-serif;font-size:.79rem;line-height:2.1}
+.term{white-space:nowrap;transition:all .2s}
+.term.padterm{color:var(--ink-light);opacity:.55}
+.term.future{opacity:.22}
+.term.active{color:var(--vermillion);font-weight:500}
+.terms .res{color:var(--sage);font-weight:500}
+.eqnote{font-family:'Cormorant Garamond',serif;font-size:1rem;line-height:1.6;color:var(--ink-soft);margin-top:.7rem}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1.4rem 1.6rem;margin-top:1.9rem}
+.formula{margin-top:1.6rem;padding-top:1.2rem;border-top:1px solid var(--line);font-family:'Inter',sans-serif;font-size:.79rem;line-height:1.9;color:var(--ink-light)}
+.formula b{color:var(--vermillion);font-weight:500}
+
+.imgrow{display:flex;flex-wrap:wrap;gap:1.8rem;align-items:flex-start}
+.imgblock{display:flex;flex-direction:column;gap:.55rem}
+.imgblock canvas{display:block;border:1px solid var(--line);background:var(--paper-dark);image-rendering:pixelated;width:224px;height:224px}
+.imgblock.sm canvas{width:134px;height:134px}
+.imgblock .cap{font-family:'Inter',sans-serif;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-light)}
+.imgblock .dim{font-family:'Inter',sans-serif;font-size:.71rem;color:var(--ink-soft)}
+.maps{display:flex;flex-wrap:wrap;gap:.85rem;margin-top:1.5rem}
+.map{border:1px solid var(--line);background:transparent;padding:0;cursor:pointer;display:flex;flex-direction:column;transition:all .25s}
+.map canvas{display:block;width:94px;height:94px;image-rendering:pixelated}
+.map span{font-family:'Inter',sans-serif;font-size:.59rem;letter-spacing:.07em;color:var(--ink-soft);padding:.35rem .25rem;text-align:center}
+.map:hover{border-color:var(--vermillion)}
+.map[aria-pressed="true"]{border-color:var(--vermillion);background:rgba(184,65,46,.08)}
+.map[aria-pressed="true"] span{color:var(--vermillion)}
+.kview{display:grid;gap:3px}
+.kview div,.kview input{border:1px solid var(--line);background:rgba(255,255,255,.55);height:34px;width:34px;
+  display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-size:.7rem;text-align:center;color:var(--ink);padding:0;-moz-appearance:textfield}
+.kview input::-webkit-outer-spin-button,.kview input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.chan{opacity:.32;transition:opacity .35s}
+.chan.live{opacity:1}
+.chan.live .cap{color:var(--vermillion)}
+.filebtn{position:relative;overflow:hidden;display:inline-block}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upload-msg{font-family:'Inter',sans-serif;font-size:.66rem;letter-spacing:.06em;color:var(--vermillion);
+  display:block;max-width:22ch;margin-top:.5rem;opacity:0;transform:translateY(-3px);
+  transition:opacity .4s ease,transform .4s ease}
+.upload-msg.show{opacity:1;transform:none}
+.note{border-left:2px solid var(--vermillion);padding:.2rem 0 .2rem 1.1rem;margin:1.8rem 0 0;color:var(--ink-soft);max-width:68ch}
+.readout{font-family:'Inter',sans-serif;font-size:.79rem;color:var(--ink-soft);line-height:2}
+.readout b{color:var(--vermillion);font-weight:500}
+.bignum{font-family:'Cormorant Garamond',serif;font-size:2.1rem;color:var(--vermillion);line-height:1.3;margin-top:.5rem}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.6rem 2rem;margin-top:1.4rem}
+.card{background:var(--card);border:1px solid var(--line);padding:1.4rem 1.5rem}
+
+footer{padding:3.5rem 0 4rem;border-top:1px solid var(--line);margin-top:2rem;text-align:center}
+.seal{width:40px;height:40px;background:var(--vermillion);color:var(--paper);display:flex;align-items:center;justify-content:center;
+  font-family:'Noto Serif JP',serif;font-weight:700;transform:rotate(-3deg);margin:0 auto 1.4rem}
+footer p{color:var(--ink-light);font-size:.96rem;margin:.3rem 0}
+footer a{color:var(--ink-soft)}
+
+/* Reveal on scroll — same ink-settling motion as the main site */
+:root{--ease-out:cubic-bezier(0.22,0.61,0.24,1);--ease-soft:cubic-bezier(0.4,0,0.2,1)}
+.reveal{opacity:0;transform:translateY(22px);
+  transition:opacity 1s var(--ease-soft),transform 1s var(--ease-out);will-change:opacity,transform}
+.reveal.visible{opacity:1;transform:none;will-change:auto}
+.reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.18s}.reveal.d3{transition-delay:.28s}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
+  html{scroll-behavior:auto}
+  .reveal{opacity:1;transform:none}}
+@media(max-width:820px){.container{padding:0 1.3rem}.section-heading-text{font-size:1.6rem}
+  .eqmath{font-size:1.1rem}.imgblock canvas{width:min(260px,42vw);height:min(260px,42vw)}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a class="brand" href="https://joshhhlee.github.io">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#window">Window</a><a href="#image">Image</a><a href="#layer">Layer</a>
+    <a href="#pooling">Pooling</a><a href="#learn">Learning</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</div>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">畳 · 込 · 演 · 算</div>
+  <h1>Convolution <em>Lab</em></h1>
+  <div class="hero-divider"></div>
+  <p>A convolution is one small grid of numbers sliding over a larger one. Padding, stride and dilation are variations on where that window goes. Channels are what turn it into a layer. And the weights inside it are not designed — they are learned. Five sections, each one a thing you can run.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="window">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">窓 · 走 · 査</div>
+    <h2 class="section-heading-text">The sliding window</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="lede reveal d1">Here is the whole operation in one line. As the window moves below, the symbols in this equation light up with the values they currently hold. Set the stepping to <i>single multiply</i> and you can walk through the nine products one at a time.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="eqmath"></div>
+    <div class="eqkey" id="eqkey"></div>
+    <p class="eqgloss">Two coordinate systems are at work here, and confusing them is the usual stumbling block. <i>x</i> and <i>y</i> say where the window sits on the image, and change once per output value. <i>i</i> and <i>j</i> scan inside the kernel, and reset every time the window moves. The expression <i>I</i>(<i>x</i>+<i>i</i>, <i>y</i>+<i>j</i>) is an address, not a product — add first, then look up that cell. And notice that <i>F</i> takes only <i>i</i> and <i>j</i>: the weights are identical wherever the window is standing.</p>
+  </div>
+
+  <div class="stage">
+    <div class="panel" id="panel-in">
+      <h3>Input</h3>
+      <p class="sub" id="in-sub"></p>
+      <div class="gridwrap" id="in-wrap">
+        <div class="grid" id="in-grid"></div>
+        <div class="probe" id="probe"></div>
+      </div>
+      <div class="kernel" id="kernel-block">
+        <h3>Kernel</h3>
+        <p class="sub" id="k-sub"></p>
+        <div class="chiprow" id="kpick" style="margin-bottom:.8rem"></div>
+        <div class="grid" id="k-grid"></div>
+      </div>
+    </div>
+    <div class="panel" id="panel-out">
+      <h3>Output</h3>
+      <p class="sub" id="out-sub"></p>
+      <div class="gridwrap"><div class="grid" id="out-grid"></div></div>
+      <div class="formula" id="formula"></div>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button id="reset">Reset</button><button id="prev">Back</button>
+    <button class="play" id="play">Play</button><button id="next">Step</button>
+    <div class="speed"><label for="speed">Speed</label><input type="range" id="speed" min="1" max="10" value="5"></div>
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div class="terms"><div id="eq-line"></div><div class="eqnote" id="eq-note"></div></div>
+
+  <div class="controls">
+    <div><span class="label">Step by</span><div class="seg" id="gran-seg"></div></div>
+    <div><span class="label">Operation</span><div class="seg" id="mode-seg"></div></div>
+    <div><span class="label">Padding <span class="mono" id="p-val"></span></span><div class="seg" id="p-seg"></div></div>
+    <div><span class="label">Stride <span class="mono" id="s-val"></span></span><div class="seg" id="s-seg"></div></div>
+    <div><span class="label">Window <span class="mono" id="k-val"></span></span><div class="seg" id="k-seg"></div></div>
+    <div><span class="label">Dilation <span class="mono" id="d-val"></span></span><div class="seg" id="d-seg"></div></div>
+    <div><span class="label">Input size <span class="mono" id="n-val"></span></span><input type="range" id="n" min="4" max="9" value="5" aria-label="Input size"></div>
+    <div style="grid-column:1/-1"><span class="label">Input pattern</span><div class="chiprow" id="ipick"></div></div>
+  </div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="image">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">像 · 特 · 徴</div>
+    <h2 class="section-heading-text">The same operation, on an image</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="lede reveal d1">Nothing changes except the size of the grid. A photograph is a grid of numbers too, so those nine multiplications happen once per pixel. Each kernel below holds a different set of nine weights and produces a different feature map. Try the camouflage image — the animal is there, and most of these filters cannot find it.</p>
+
+  <div class="imgrow">
+    <div class="imgblock">
+      <span class="cap">Input</span>
+      <canvas id="src-c" width="200" height="200"></canvas>
+      <span class="dim" id="src-dim"></span>
+      <div class="chiprow" id="imgpick"></div>
+      <span class="chip filebtn">Use your own image<input type="file" id="upload" accept="image/*"></span>
+      <span class="upload-msg" id="upload-msg" role="status" aria-live="polite"></span>
+    </div>
+    <div class="imgblock">
+      <span class="cap" id="sel-cap">Feature map</span>
+      <canvas id="out-c" width="200" height="200"></canvas>
+      <span class="dim" id="out-dim"></span>
+      <span class="label" style="margin-top:.6rem">Weights</span>
+      <div class="kview" id="kview" style="grid-template-columns:repeat(3,34px)"></div>
+    </div>
+  </div>
+
+  <span class="label" style="margin-top:2rem">One layer, eight filters</span>
+  <div class="maps" id="maps"></div>
+  <div class="note">Your photograph never leaves the browser. Everything here runs on your own machine and nothing is uploaded anywhere.</div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="layer">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">層 · 深 · 度</div>
+    <h2 class="section-heading-text">From one filter to a layer</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="lede reveal d1">Everything above used a single plane of numbers. A real image has three, and deeper in a network a feature map has hundreds. A convolution does not run separately on each — it runs on all of them at once and adds the results into one output. Step through the accumulation and watch a single output map being built from three inputs.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="eqmath2"></div>
+    <div class="eqkey" id="eqkey2"></div>
+    <p class="eqgloss">The sum over <i>c</i><sub>in</sub> sits <em>inside</em> the expression. That is the whole point: a convolution collapses every input channel in one step, which is why the kernel is not a 3×3 grid but a four-dimensional tensor of shape (<i>C</i><sub>out</sub>, <i>C</i><sub>in</sub>, <i>k</i>, <i>k</i>), plus one bias per output channel.</p>
+  </div>
+
+  <div class="imgrow" id="chanrow">
+    <div class="imgblock sm chan" data-ch="0">
+      <span class="cap">Red channel</span><canvas id="ch-r"></canvas>
+      <span class="label" style="margin-top:.4rem">Slice 0</span>
+      <div class="kview" id="kv-r" style="grid-template-columns:repeat(3,34px)"></div>
+    </div>
+    <div class="imgblock sm chan" data-ch="1">
+      <span class="cap">Green channel</span><canvas id="ch-g"></canvas>
+      <span class="label" style="margin-top:.4rem">Slice 1</span>
+      <div class="kview" id="kv-g" style="grid-template-columns:repeat(3,34px)"></div>
+    </div>
+    <div class="imgblock sm chan" data-ch="2">
+      <span class="cap">Blue channel</span><canvas id="ch-b"></canvas>
+      <span class="label" style="margin-top:.4rem">Slice 2</span>
+      <div class="kview" id="kv-b" style="grid-template-columns:repeat(3,34px)"></div>
+    </div>
+    <div class="imgblock">
+      <span class="cap" id="acc-cap">Running sum</span>
+      <canvas id="ch-out"></canvas>
+      <span class="dim" id="acc-dim"></span>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button id="c-reset">Reset</button><button id="c-prev">Back</button>
+    <button class="play" id="c-play">Play</button><button id="c-next">Step</button>
+    <div class="speed"><label for="c-speed">Speed</label><input type="range" id="c-speed" min="1" max="10" value="4"></div>
+    <span class="counter" id="c-counter"></span>
+  </div>
+  <div style="margin-top:1rem"><span class="label">Kernel</span><div class="chiprow" id="c-pick"></div></div>
+
+  <h3 class="sub-h">What a layer actually costs</h3>
+  <p class="lede" style="margin-top:.4rem">This is where most people's intuition is wrong. A 3×3 convolution does not have nine parameters.</p>
+
+  <div class="grid2">
+    <div>
+      <span class="label">Input channels <span class="mono" id="ci-val"></span></span>
+      <input type="range" id="ci" min="0" max="7" value="1" aria-label="Input channels">
+      <span class="label" style="margin-top:1.1rem">Output channels <span class="mono" id="co-val"></span></span>
+      <input type="range" id="co" min="0" max="7" value="5" aria-label="Output channels">
+      <span class="label" style="margin-top:1.1rem">Kernel size <span class="mono" id="kk-val"></span></span>
+      <div class="seg" id="kk-seg"></div>
+      <span class="label" style="margin-top:1.1rem">Groups <span class="mono" id="gr-val"></span></span>
+      <div class="seg" id="gr-seg"></div>
+    </div>
+    <div class="card">
+      <div class="readout" id="param-out"></div>
+      <div class="bignum" id="param-big"></div>
+      <div class="readout" id="param-cmp" style="margin-top:.8rem"></div>
+    </div>
+  </div>
+  <div class="note">Notice what the formula does not contain: image height and width. The same kernel is reused at every position, so the parameter count is independent of input size. That is weight sharing, and it is why a convolutional layer is so much smaller than a fully connected one on the same input.</div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="pooling">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">縮 · 約 · 化</div>
+    <h2 class="section-heading-text">Pooling throws information away</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="lede reveal d1">Pooling has no weights and learns nothing. It divides the map into blocks and replaces each block with one number — the largest, or the average. On a grid of digits that difference looks trivial. On an image it is not.</p>
+
+  <div style="max-width:340px;margin-bottom:1.8rem">
+    <span class="label">Block size <span class="mono" id="pool-val"></span></span>
+    <div class="seg" id="pool-seg"></div>
+  </div>
+
+  <div class="imgrow">
+    <div class="imgblock"><span class="cap">Original</span><canvas id="p-src" width="200" height="200"></canvas><span class="dim" id="p-src-dim"></span></div>
+    <div class="imgblock"><span class="cap">Max pooling</span><canvas id="p-max"></canvas><span class="dim" id="p-max-dim"></span></div>
+    <div class="imgblock"><span class="cap">Average pooling</span><canvas id="p-avg"></canvas><span class="dim" id="p-avg-dim"></span></div>
+  </div>
+  <div class="readout" id="pool-stat" style="margin-top:1.2rem"></div>
+  <div class="note">Max pooling keeps the brightest value in each block, so bright structure survives and edges harden. Average pooling pulls everything toward the local mean, so texture disappears. Watch the mean brightness as you raise the block size — max pooling drifts upward while average pooling holds steady. Max pooling is not a neutral downsampler: it biases the feature distribution, and the bias grows with how aggressive you are.</div>
+</section>
+
+<!-- ══════ 05 ══════ -->
+<section id="learn">
+  <div class="section-heading reveal">
+    <span class="section-num">— 05 —</span>
+    <div class="section-heading-kanji">学 · 習 · 重</div>
+    <h2 class="section-heading-text">Where the weights come from</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="lede reveal d1">Every filter you have used so far was designed by a person decades ago. A convolutional network designs its own. Below, nine weights start as random numbers and a target output is given. Press play and watch gradient descent turn noise into an edge detector — nobody tells it the answer, only how wrong it currently is.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="eqmath3"></div>
+    <div class="eqkey" id="eqkey3"></div>
+    <p class="eqgloss">The error <i>δ</i> is simply the difference between what the filter produced and what was wanted. The gradient with respect to each weight is that error correlated against the input — another cross-correlation, the same operation running backwards. Each weight then takes a small step downhill. This is the entire learning algorithm.</p>
+  </div>
+
+  <div class="imgrow">
+    <div class="imgblock sm"><span class="cap">Input</span><canvas id="l-x"></canvas></div>
+    <div class="imgblock sm"><span class="cap">Target output</span><canvas id="l-y"></canvas></div>
+    <div class="imgblock sm"><span class="cap">Current output</span><canvas id="l-p"></canvas></div>
+    <div class="imgblock sm"><span class="cap">Error</span><canvas id="l-d"></canvas></div>
+  </div>
+
+  <div class="grid2" style="margin-top:1.8rem">
+    <div>
+      <span class="label">Learned weights</span>
+      <div class="kview" id="l-kern" style="grid-template-columns:repeat(3,46px)"></div>
+      <span class="label" style="margin-top:1.2rem">True weights</span>
+      <div class="kview" id="l-true" style="grid-template-columns:repeat(3,46px)"></div>
+    </div>
+    <div>
+      <span class="label">Loss</span>
+      <canvas id="l-curve" width="330" height="112" style="width:100%;max-width:370px;border:1px solid var(--line);background:var(--card)"></canvas>
+      <div class="readout" id="l-stat" style="margin-top:.7rem"></div>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button id="l-reset">Reset</button><button id="l-prev">Back</button>
+    <button class="play" id="l-play">Play</button><button id="l-next">Step</button>
+    <div class="speed"><label for="l-speed">Speed</label><input type="range" id="l-speed" min="1" max="10" value="7"></div>
+    <span class="counter" id="l-counter"></span>
+  </div>
+
+  <div class="grid2" style="margin-top:1.4rem">
+    <div><span class="label">Target filter</span><div class="chiprow" id="l-pick"></div></div>
+    <div><span class="label">Optimiser</span><div class="seg" id="l-opt"></div>
+      <span class="label" style="margin-top:1.1rem">Learning rate <span class="mono" id="l-lr-val"></span></span>
+      <input type="range" id="l-lr" min="1" max="60" value="20" aria-label="Learning rate">
+    </div>
+  </div>
+
+  <div class="note">Switch to plain gradient descent and watch it crawl. The reason is conditioning. Neighbouring pixels in an image are strongly correlated, so the loss surface is a long narrow valley and one step size cannot suit every direction at once. Adam gives each weight its own effective step size and arrives in a couple of hundred iterations. This is not an artefact of the toy — it is why nobody trains a real network with plain gradient descent.</div>
+</section>
+
+<nav class="lab-pager">
+  <a href="labs.html" class="prev">
+    <span class="pager-dir">← The series</span>
+    <span class="pager-title">All five labs</span>
+  </a>
+  <a href="segmentation-lab.html" class="next">
+    <span class="pager-dir">Next →</span>
+    <span class="pager-title">02 · Segmentation Lab</span>
+  </a>
+</nav>
+
+<footer>
+  <div class="seal">印</div>
+  <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+  <p style="font-size:.88rem;color:var(--ink-light)">Keyboard: ← → to step, space to play</p>
+</footer>
+
+</div>
+
+<script>
+/* ════════ shared helpers ════════ */
+function seg(id,values,cur,onPick,labels,disabled){
+  const el=document.getElementById(id);el.innerHTML='';
+  values.forEach((v,i)=>{
+    const b=document.createElement('button');
+    b.textContent=labels?labels[i]:v;
+    b.setAttribute('aria-pressed',String(v===cur));
+    if(disabled)b.disabled=true;
+    b.addEventListener('click',()=>onPick(v));
+    el.appendChild(b);
+  });
+}
+function chips(id,items,cur,onPick,disabledFn){
+  const el=document.getElementById(id);el.innerHTML='';
+  items.forEach(([k,label])=>{
+    const b=document.createElement('button');
+    b.className='chip';b.textContent=label;
+    b.setAttribute('aria-pressed',String(k===cur));
+    if(disabledFn&&disabledFn(k))b.disabled=true;
+    b.addEventListener('click',()=>onPick(k));
+    el.appendChild(b);
+  });
+}
+function fmt(v){
+  if(v===-Infinity)return '−∞';
+  if(!isFinite(v))return '·';
+  const s=Math.abs(v-Math.round(v))<1e-9?String(Math.round(v)):v.toFixed(1);
+  return s.replace('-','−');
+}
+const f2=v=>v.toFixed(2).replace('-','−');
+const sigma=(sub,sup)=>`<span class="sigma"><small>${sup}</small><span class="big">Σ</span><small>${sub}</small></span>`;
+function paint(canvas,data,n){
+  canvas.width=n;canvas.height=n;
+  const ctx=canvas.getContext('2d'),img=ctx.createImageData(n,n);
+  for(let i=0;i<n*n;i++){
+    const v=Math.max(0,Math.min(255,Math.round(data[i])));
+    img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+}
+function hash2(x,y,s){const n=Math.sin(x*127.1+y*311.7+s*74.7)*43758.5453;return n-Math.floor(n);}
+function vnoise(x,y,s){
+  const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+  const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash2(xi,yi,s),b=hash2(xi+1,yi,s),c=hash2(xi,yi+1,s),d=hash2(xi+1,yi+1,s);
+  return (a*(1-u)+b*u)*(1-v)+(c*(1-u)+d*u)*v;
+}
+function fbm(x,y,s,oct){let val=0,amp=.5,f=1;for(let i=0;i<(oct||4);i++){val+=amp*vnoise(x*f,y*f,s+i*13);f*=2;amp*=.5;}return val;}
+function conv3(src,n,m){
+  const out=new Float32Array(n*n);
+  let sum=0;for(const v of m)sum+=v;
+  const centre=Math.abs(sum)<1e-9,div=centre?1:sum;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    let acc=0,q=0;
+    for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){
+      const yy=Math.min(n-1,Math.max(0,y+i)),xx=Math.min(n-1,Math.max(0,x+j));
+      acc+=src[yy*n+xx]*m[q++];
+    }
+    out[y*n+x]=centre?128+acc*.55:acc/div;
+  }
+  return out;
+}
+
+/* ════════ 01 — sliding window ════════ */
+const G={mode:'conv',n:5,k:3,pad:1,stride:1,dil:1,input:[],kernel:[],pos:0,tap:0,gran:false,playing:false,timer:null,kpreset:'vedge'};
+const K_PRESETS={
+  vedge:{label:'Vertical edge',m:[[1,0,-1],[1,0,-1],[1,0,-1]]},
+  hedge:{label:'Horizontal edge',m:[[1,1,1],[0,0,0],[-1,-1,-1]]},
+  lap:{label:'Laplacian',m:[[0,1,0],[1,-4,1],[0,1,0]]},
+  sharp:{label:'Sharpen',m:[[0,-1,0],[-1,5,-1],[0,-1,0]]},
+  box:{label:'Box sum',m:[[1,1,1],[1,1,1],[1,1,1]]},
+  id:{label:'Identity',m:[[0,0,0],[0,1,0],[0,0,0]]}
+};
+const mine5=()=>[[1,2,3,0,1],[4,5,6,1,0],[7,8,9,2,1],[1,0,2,3,4],[0,1,2,3,4]];
+function makeInput(kind){
+  const n=G.n,a=[];
+  for(let r=0;r<n;r++){a.push([]);for(let c=0;c<n;c++){
+    let v=0;
+    if(kind==='step')v=c<Math.floor(n/2)?1:8;
+    if(kind==='ramp')v=Math.round((c/(n-1))*9);
+    if(kind==='blob')v=(r>=Math.floor(n/4)&&r<n-Math.floor(n/4)&&c>=Math.floor(n/4)&&c<n-Math.floor(n/4))?9:1;
+    if(kind==='rand')v=Math.floor(Math.random()*10);
+    a[r].push(v);
+  }}
+  return a;
+}
+function makeKernel(k,preset){
+  if(k===3&&K_PRESETS[preset])return K_PRESETS[preset].m.map(r=>r.slice());
+  const a=[],h=Math.floor(k/2);
+  for(let i=0;i<k;i++){a.push([]);for(let j=0;j<k;j++)a[i].push(j<h?1:(j>h?-1:0));}
+  return a;
+}
+const padVal=()=>G.mode==='max'?-Infinity:0;
+const padN=()=>G.n+2*G.pad;
+const spanK=()=>G.dil*(G.k-1)+1;
+const outN=()=>Math.floor((G.n+2*G.pad-spanK())/G.stride)+1;
+const total=()=>outN()*outN();
+const nTaps=()=>G.k*G.k;
+const isPad=(r,c)=>{const a=r-G.pad,b=c-G.pad;return a<0||b<0||a>=G.n||b>=G.n;};
+const padded=(r,c)=>isPad(r,c)?padVal():G.input[r-G.pad][c-G.pad];
+function taps(ox,oy){
+  const t=[];
+  for(let i=0;i<G.k;i++)for(let j=0;j<G.k;j++){
+    const r=ox*G.stride+i*G.dil,c=oy*G.stride+j*G.dil;
+    t.push({i,j,r,c,v:padded(r,c),pad:isPad(r,c)});
+  }
+  return t;
+}
+function valueAt(ox,oy,upto){
+  const t=taps(ox,oy),lim=upto===undefined?t.length:upto+1,s=t.slice(0,lim);
+  if(!s.length)return 0;
+  if(G.mode==='conv')return s.reduce((a,x)=>a+(x.v===-Infinity?0:x.v)*G.kernel[x.i][x.j],0);
+  if(G.mode==='max')return Math.max(...s.map(x=>x.v));
+  return s.reduce((a,x)=>a+(x.v===-Infinity?0:x.v),0)/t.length;
+}
+const cellSize=(cols,el)=>Math.max(17,Math.min(38,Math.floor(((el.clientWidth||330)-(cols-1)*3)/cols)));
+const stepMax=()=>G.gran?total()*nTaps():total();
+const stepIdx=()=>G.gran?G.pos*nTaps()+G.tap:G.pos;
+function setStep(i){
+  i=Math.max(0,Math.min(stepMax()-1,i));
+  if(G.gran){G.pos=Math.floor(i/nTaps());G.tap=i%nTaps();}else{G.pos=i;G.tap=nTaps()-1;}
+}
+function buildEq(){
+  document.getElementById('eqmath').innerHTML=
+    `<i>S</i>(<span class="sym" data-s="x">x</span>,&nbsp;<span class="sym" data-s="y">y</span>)&nbsp;=&nbsp;`+
+    sigma('<span class="sym" data-s="i">i</span>&thinsp;=&thinsp;0','m−1')+
+    sigma('<span class="sym" data-s="j">j</span>&thinsp;=&thinsp;0','n−1')+
+    `&nbsp;<i>I</i>(<span class="sym" data-s="x">x</span>+<span class="sym" data-s="i">i</span>,&nbsp;`+
+    `<span class="sym" data-s="y">y</span>+<span class="sym" data-s="j">j</span>)&nbsp;·&nbsp;`+
+    `<i>F</i>(<span class="sym" data-s="i">i</span>,&nbsp;<span class="sym" data-s="j">j</span>)`;
+}
+function bindEq(ox,oy,t){
+  const on=G.gran?['x','y','i','j']:['x','y'];
+  document.querySelectorAll('#eqmath .sym').forEach(s=>s.classList.toggle('on',on.includes(s.dataset.s)));
+  const cur=t[Math.min(G.tap,t.length-1)];
+  const parts=[`<span><b>x</b> = ${ox}</span>`,`<span><b>y</b> = ${oy}</span>`];
+  if(G.gran){
+    parts.push(`<span><b>i</b> = ${cur.i}</span>`,`<span><b>j</b> = ${cur.j}</span>`,
+      `<span><b>I</b>(${cur.r-G.pad}, ${cur.c-G.pad}) = ${fmt(cur.v)}${cur.pad?' · padding':''}</span>`,
+      `<span><b>F</b>(${cur.i}, ${cur.j}) = ${fmt(G.mode==='conv'?G.kernel[cur.i][cur.j]:1)}</span>`,
+      `<span>running total = <b>${fmt(valueAt(ox,oy,G.tap))}</b></span>`);
+  }else{
+    parts.push(`<span><b>i</b>, <b>j</b> = 0 … ${G.k-1}</span>`,`<span>window covers ${nTaps()} cells</span>`,
+      `<span><b>S</b>(${ox}, ${oy}) = ${fmt(valueAt(ox,oy))}</span>`);
+  }
+  document.getElementById('eqkey').innerHTML=parts.join('');
+}
+function buildInput(){
+  const el=document.getElementById('in-grid'),cs=cellSize(padN(),document.getElementById('panel-in'));
+  el.dataset.cs=cs;el.style.gridTemplateColumns=`repeat(${padN()}, ${cs}px)`;el.innerHTML='';
+  for(let r=0;r<padN();r++)for(let c=0;c<padN();c++){
+    const d=document.createElement('div');
+    d.className='cell'+(isPad(r,c)?' pad':'');
+    d.style.width=d.style.height=cs+'px';d.dataset.r=r;d.dataset.c=c;
+    if(isPad(r,c))d.textContent=fmt(padVal());
+    else{
+      const inp=document.createElement('input');
+      inp.type='number';inp.value=G.input[r-G.pad][c-G.pad];
+      inp.setAttribute('aria-label',`input row ${r-G.pad}, column ${c-G.pad}`);
+      inp.addEventListener('input',()=>{const v=parseFloat(inp.value);G.input[r-G.pad][c-G.pad]=isFinite(v)?v:0;stepNow();});
+      d.appendChild(inp);
+    }
+    el.appendChild(d);
+  }
+  document.getElementById('in-sub').textContent=G.pad>0?`${G.n}×${G.n} padded to ${padN()}×${padN()}`:`${G.n}×${G.n}, no padding`;
+}
+function buildKernel(){
+  const b=document.getElementById('kernel-block');
+  b.style.display=G.mode==='conv'?'':'none';
+  if(G.mode!=='conv')return;
+  const el=document.getElementById('k-grid'),cs=34;
+  el.style.gridTemplateColumns=`repeat(${G.k}, ${cs}px)`;el.innerHTML='';
+  for(let i=0;i<G.k;i++)for(let j=0;j<G.k;j++){
+    const d=document.createElement('div');
+    d.className='cell';d.style.width=d.style.height=cs+'px';d.dataset.ki=i;d.dataset.kj=j;
+    const inp=document.createElement('input');
+    inp.type='number';inp.value=G.kernel[i][j];
+    inp.setAttribute('aria-label',`kernel row ${i}, column ${j}`);
+    inp.addEventListener('input',()=>{const v=parseFloat(inp.value);G.kernel[i][j]=isFinite(v)?v:0;G.kpreset='custom';paintChips();stepNow();});
+    d.appendChild(inp);el.appendChild(d);
+  }
+  document.getElementById('k-sub').textContent=`${G.k}×${G.k}, editable`;
+}
+function buildOutput(){
+  const el=document.getElementById('out-grid'),cs=cellSize(outN(),document.getElementById('panel-out'));
+  el.style.gridTemplateColumns=`repeat(${outN()}, ${cs}px)`;el.innerHTML='';
+  for(let i=0;i<total();i++){
+    const d=document.createElement('div');
+    d.className='cell out';d.style.width=d.style.height=cs+'px';
+    d.dataset.idx=i;d.tabIndex=0;d.setAttribute('role','button');
+    d.setAttribute('aria-label',`output position ${i+1}`);
+    const go=()=>{stop();G.pos=i;G.tap=G.gran?0:nTaps()-1;stepNow();};
+    d.addEventListener('click',go);
+    d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
+    el.appendChild(d);
+  }
+  document.getElementById('out-sub').textContent=`${outN()}×${outN()}`;
+}
+function stepNow(){
+  const N=outN();
+  if(G.pos>=total())G.pos=total()-1;
+  if(G.pos<0)G.pos=0;
+  if(G.tap>=nTaps())G.tap=nTaps()-1;
+  const ox=Math.floor(G.pos/N),oy=G.pos%N,t=taps(ox,oy);
+  document.querySelectorAll('#in-grid .cell').forEach(c=>c.classList.remove('tap','here'));
+  t.forEach((x,ix)=>{
+    const c=document.querySelector(`#in-grid .cell[data-r="${x.r}"][data-c="${x.c}"]`);
+    if(!c)return;
+    c.classList.add('tap');
+    if(G.gran&&ix===G.tap)c.classList.add('here');
+  });
+  document.querySelectorAll('#k-grid .cell').forEach(c=>c.classList.remove('here'));
+  if(G.gran&&G.mode==='conv'){
+    const cur=t[G.tap],kc=document.querySelector(`#k-grid .cell[data-ki="${cur.i}"][data-kj="${cur.j}"]`);
+    if(kc)kc.classList.add('here');
+  }
+  const cs=+document.getElementById('in-grid').dataset.cs||36,pitch=cs+3,pr=document.getElementById('probe');
+  pr.style.left=(oy*G.stride*pitch)+'px';pr.style.top=(ox*G.stride*pitch)+'px';
+  pr.style.width=((spanK()-1)*pitch+cs)+'px';pr.style.height=((spanK()-1)*pitch+cs)+'px';
+  document.querySelectorAll('#out-grid .cell').forEach(c=>{
+    const i=+c.dataset.idx;
+    c.classList.toggle('now',i===G.pos);
+    const complete=i<G.pos||(i===G.pos&&(!G.gran||G.tap===nTaps()-1));
+    if(complete){c.classList.add('done');c.textContent=fmt(valueAt(Math.floor(i/N),i%N));}
+    else if(i===G.pos&&G.gran){c.classList.remove('done');c.textContent=fmt(valueAt(ox,oy,G.tap));}
+    else{c.classList.remove('done');c.textContent='';}
+  });
+  document.getElementById('counter').textContent=G.gran
+    ? `multiply ${G.tap+1} / ${nTaps()} · output ${G.pos+1} / ${total()}`
+    : `position ${G.pos+1} / ${total()} · output (${ox}, ${oy})`;
+  document.getElementById('prev').disabled=stepIdx()===0;
+  document.getElementById('next').disabled=stepIdx()>=stepMax()-1;
+  bindEq(ox,oy,t);
+  writeTerms(t,valueAt(ox,oy),ox,oy);
+  writeFormula();
+}
+function writeTerms(t,res,ox,oy){
+  const line=document.getElementById('eq-line'),note=document.getElementById('eq-note');
+  if(G.mode==='conv'){
+    line.innerHTML=t.map((x,i)=>{
+      const w=G.kernel[x.i][x.j],v=x.v===-Infinity?0:x.v;
+      let cls='term';
+      if(x.pad)cls+=' padterm';
+      if(G.gran&&i>G.tap)cls+=' future';
+      if(G.gran&&i===G.tap)cls+=' active';
+      return `<span class="${cls}">${i?' + ':''}(${fmt(v)}×${fmt(w)})</span>`;
+    }).join('<wbr>')+` <span class="res">= ${fmt(G.gran?valueAt(ox,oy,G.tap):res)}</span>`;
+    note.textContent=G.pad>0
+      ? 'Faded terms multiply a padded zero. They cost exactly as much arithmetic as a real pixel and carry no information about the image.'
+      : 'Every term uses a real pixel. Without padding the window never leaves the image — and the output shrinks.';
+  }else{
+    const fn=G.mode==='max'?'max':'mean';
+    line.innerHTML=`<span class="term">${fn}(</span>`+
+      t.map((x,i)=>`<span class="term${x.pad?' padterm':''}${G.gran&&i>G.tap?' future':''}${G.gran&&i===G.tap?' active':''}">${i?', ':''}${fmt(x.v)}</span>`).join('<wbr>')+
+      `<span class="term">)</span> <span class="res">= ${fmt(res)}</span>`;
+    note.textContent=G.mode==='max'
+      ? 'Max pooling pads with −∞ rather than 0, so a padded cell can never win the maximum. There are no weights here — nothing in this operation is learned.'
+      : 'Average pooling pads with 0 and still divides by the full block count, so padded blocks are dragged toward zero. There are no weights here — nothing is learned.';
+  }
+}
+function writeFormula(){
+  document.getElementById('formula').innerHTML=
+    `H<sub>out</sub> = ⌊(H + 2p − d(k−1) − 1) / s⌋ + 1<br>`+
+    `= ⌊(${G.n} + 2·${G.pad} − ${G.dil}·(${G.k}−1) − 1) / ${G.stride}⌋ + 1 = <b>${outN()}</b>`;
+}
+function stop(){G.playing=false;clearInterval(G.timer);document.getElementById('play').textContent='Play';}
+function play(){
+  if(G.playing){stop();return;}
+  if(stepIdx()>=stepMax()-1)setStep(0);
+  G.playing=true;document.getElementById('play').textContent='Pause';
+  const sp=+document.getElementById('speed').value;
+  G.timer=setInterval(()=>{
+    if(stepIdx()>=stepMax()-1){stop();return;}
+    setStep(stepIdx()+1);stepNow();
+  },(G.gran?520:1250)-sp*(G.gran?45:110));
+}
+function paintChips(){
+  chips('kpick',Object.entries(K_PRESETS).map(([k,p])=>[k,p.label]),G.k===3?G.kpreset:null,
+    k=>{G.kpreset=k;G.kernel=makeKernel(3,k);rebuild();},()=>G.k!==3);
+  chips('ipick',[['mine','Worked example'],['step','Vertical step'],['ramp','Gradient'],['blob','Bright square'],['rand','Random']],null,
+    k=>{if(k==='mine'){G.n=5;G.input=mine5();document.getElementById('n').value=5;}else G.input=makeInput(k);rebuild();});
+}
+function syncControls(){
+  document.getElementById('n-val').textContent=`${G.n}×${G.n}`;
+  document.getElementById('p-val').textContent=G.pad;
+  document.getElementById('s-val').textContent=G.stride;
+  document.getElementById('k-val').textContent=`${G.k}×${G.k}`;
+  document.getElementById('d-val').textContent=G.dil;
+  seg('gran-seg',[false,true],G.gran,v=>{G.gran=v;G.tap=v?0:nTaps()-1;rebuild();},['Output pixel','Single multiply']);
+  seg('mode-seg',['conv','max','avg'],G.mode,v=>{G.mode=v;if(v!=='conv')G.dil=1;G.pos=0;G.tap=0;rebuild();},['Convolve','Max pool','Avg pool']);
+  seg('p-seg',[0,1,2],G.pad,v=>{G.pad=v;rebuild();});
+  seg('s-seg',[1,2,3],G.stride,v=>{G.stride=v;rebuild();});
+  seg('k-seg',[2,3,5],G.k,v=>{G.k=v;G.kernel=makeKernel(v,G.kpreset);G.tap=0;rebuild();});
+  seg('d-seg',[1,2,3],G.dil,v=>{G.dil=v;rebuild();},null,G.mode!=='conv');
+}
+function guard(){
+  if(spanK()>padN()){if(G.dil>1)G.dil=1;else if(G.k>2){G.k=2;G.kernel=makeKernel(2,G.kpreset);}}
+  if(G.pos>=total())G.pos=0;
+  if(G.tap>=nTaps())G.tap=0;
+}
+function rebuild(){stop();guard();buildInput();buildKernel();buildOutput();paintChips();syncControls();stepNow();}
+
+document.getElementById('n').addEventListener('input',e=>{G.n=+e.target.value;G.input=makeInput('ramp');G.pos=0;G.tap=0;rebuild();});
+document.getElementById('next').addEventListener('click',()=>{stop();setStep(stepIdx()+1);stepNow();});
+document.getElementById('prev').addEventListener('click',()=>{stop();setStep(stepIdx()-1);stepNow();});
+document.getElementById('play').addEventListener('click',play);
+document.getElementById('reset').addEventListener('click',()=>{stop();setStep(0);stepNow();});
+document.getElementById('speed').addEventListener('input',()=>{if(G.playing){stop();play();}});
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){e.preventDefault();stop();setStep(stepIdx()+1);stepNow();}
+  if(e.key==='ArrowLeft'){e.preventDefault();stop();setStep(stepIdx()-1);stepNow();}
+  if(e.key===' '){e.preventDefault();play();}
+});
+
+/* ════════ 02 / 04 — image feature maps and pooling ════════ */
+const N=200;
+let SRC=new Float32Array(N*N);
+const FILTERS=[
+  {id:'id',label:'Identity',m:[0,0,0,0,1,0,0,0,0]},
+  {id:'sx',label:'Sobel X',m:[1,0,-1,2,0,-2,1,0,-1]},
+  {id:'sy',label:'Sobel Y',m:[1,2,1,0,0,0,-1,-2,-1]},
+  {id:'lap',label:'Laplacian',m:[0,1,0,1,-4,1,0,1,0]},
+  {id:'blur',label:'Box blur',m:[1,1,1,1,1,1,1,1,1]},
+  {id:'gaus',label:'Gaussian',m:[1,2,1,2,4,2,1,2,1]},
+  {id:'shrp',label:'Sharpen',m:[0,-1,0,-1,5,-1,0,-1,0]},
+  {id:'emb',label:'Emboss',m:[-2,-1,0,-1,1,1,0,1,2]}
+];
+let SEL='sx',POOL=2,IMGKIND='shapes';
+function inCreature(x,y){
+  const cx=N*.44,cy=N*.58,dx=(x-cx)/(N*.30),dy=(y-cy)/(N*.15);
+  const ang=Math.atan2(dy,dx),r=Math.sqrt(dx*dx+dy*dy)*(1+.18*Math.sin(ang*3+1.2));
+  if(r<1)return true;
+  const hx=(x-N*.76)/(N*.095),hy=(y-N*.44)/(N*.085);
+  return hx*hx+hy*hy<1;
+}
+function makeImage(kind){
+  const a=new Float32Array(N*N);
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    let v;
+    if(kind==='camo'){
+      v=48+fbm(x/24,y/24,1,5)*150;
+      if(inCreature(x,y))v=52+fbm(x/22+3.1,y/22+1.7,2,5)*142;
+    }else if(kind==='shapes'){
+      v=210;
+      if(Math.hypot(x-N*.32,y-N*.36)<N*.20)v=60;
+      if(x>N*.56&&x<N*.88&&y>N*.20&&y<N*.52)v=140;
+      if(Math.abs((x-y)-N*.34)<N*.045)v=30;
+      if(y>N*.70)v=90+((x/N)*130);
+    }else if(kind==='texture'){
+      v=30+fbm(x/14,y/14,7,6)*220;
+    }else{
+      v=20+(x/N)*215;
+      if(y>N*.5)v=235-(x/N)*215;
+    }
+    a[y*N+x]=Math.max(0,Math.min(255,v));
+  }
+  return a;
+}
+function pool(src,size,mode){
+  const M=Math.floor(N/size),out=new Float32Array(M*M);
+  for(let i=0;i<M;i++)for(let j=0;j<M;j++){
+    let mx=-Infinity,s=0;
+    for(let a=0;a<size;a++)for(let b=0;b<size;b++){
+      const v=src[(i*size+a)*N+(j*size+b)];
+      if(v>mx)mx=v;s+=v;
+    }
+    out[i*M+j]=mode==='max'?mx:s/(size*size);
+  }
+  return {d:out,n:M};
+}
+function renderImage(){
+  paint(document.getElementById('src-c'),SRC,N);
+  document.getElementById('src-dim').textContent=`${N} × ${N}`;
+  const f=FILTERS.find(x=>x.id===SEL);
+  paint(document.getElementById('out-c'),conv3(SRC,N,f.m),N);
+  document.getElementById('out-dim').textContent=`${N} × ${N} · replicate padding`;
+  document.getElementById('sel-cap').textContent=f.label;
+  const kv=document.getElementById('kview');kv.innerHTML='';
+  f.m.forEach(v=>{const d=document.createElement('div');d.textContent=String(Math.round(v*100)/100).replace('-','−');kv.appendChild(d);});
+  document.querySelectorAll('#maps .map').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.f===SEL)));
+  document.querySelectorAll('#maps .map canvas').forEach(c=>paint(c,conv3(SRC,N,FILTERS.find(x=>x.id===c.dataset.f).m),N));
+}
+function renderPool(){
+  paint(document.getElementById('p-src'),SRC,N);
+  document.getElementById('p-src-dim').textContent=`${N} × ${N}`;
+  const mx=pool(SRC,POOL,'max'),av=pool(SRC,POOL,'avg');
+  paint(document.getElementById('p-max'),mx.d,mx.n);
+  paint(document.getElementById('p-avg'),av.d,av.n);
+  document.getElementById('p-max-dim').textContent=`${mx.n} × ${mx.n}`;
+  document.getElementById('p-avg-dim').textContent=`${av.n} × ${av.n}`;
+  document.getElementById('pool-val').textContent=`${POOL}×${POOL}`;
+  const mean=a=>{let s=0;for(const v of a)s+=v;return s/a.length;};
+  document.getElementById('pool-stat').innerHTML=
+    `mean brightness — original <b>${mean(SRC).toFixed(1)}</b> · max pooled <b>${mean(mx.d).toFixed(1)}</b> · average pooled <b>${mean(av.d).toFixed(1)}</b>`;
+}
+function buildMaps(){
+  const el=document.getElementById('maps');el.innerHTML='';
+  FILTERS.forEach(f=>{
+    const b=document.createElement('button');
+    b.className='map';b.dataset.f=f.id;b.setAttribute('aria-pressed',String(f.id===SEL));
+    const c=document.createElement('canvas');c.dataset.f=f.id;
+    const s=document.createElement('span');s.textContent=f.label;
+    b.append(c,s);
+    b.addEventListener('click',()=>{SEL=f.id;renderImage();});
+    el.appendChild(b);
+  });
+}
+function buildImagePickers(){
+  chips('imgpick',[['camo','Camouflage'],['shapes','Shapes'],['texture','Texture'],['ramp','Gradient']],IMGKIND,
+    k=>{IMGKIND=k;SRC=makeImage(k);buildImagePickers();renderImage();renderPool();});
+}
+let uploadMsgTimer;
+function uploadMsg(text){
+  const el=document.getElementById('upload-msg');if(!el)return;
+  clearTimeout(uploadMsgTimer);
+  el.textContent=text;el.classList.toggle('show',Boolean(text));
+  if(text)uploadMsgTimer=setTimeout(()=>{el.classList.remove('show');},5000);
+}
+document.getElementById('upload').addEventListener('change',e=>{
+  const file=e.target.files&&e.target.files[0];if(!file)return;
+  uploadMsg('');
+  const url=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{
+    const c=document.createElement('canvas');c.width=c.height=N;
+    const ctx=c.getContext('2d'),s=Math.min(im.width,im.height);
+    ctx.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,N,N);
+    const d=ctx.getImageData(0,0,N,N).data;
+    for(let i=0;i<N*N;i++)SRC[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+    URL.revokeObjectURL(url);IMGKIND='own';buildImagePickers();renderImage();renderPool();
+  };
+  im.onerror=()=>{URL.revokeObjectURL(url);uploadMsg('Could not read that file — try a JPG or PNG.');};
+  im.src=url;
+});
+function buildPoolSeg(){seg('pool-seg',[2,4,8,10],POOL,v=>{POOL=v;buildPoolSeg();renderPool();},['2×2','4×4','8×8','10×10']);}
+
+/* ════════ 03 — channels and layer cost ════════ */
+const NC=140;
+const C={planes:null,step:0,playing:false,timer:null,preset:'edge',slices:null};
+const C_PRESETS={
+  edge:{label:'Edges in every channel',s:{r:[1,0,-1,2,0,-2,1,0,-1],g:[1,0,-1,2,0,-2,1,0,-1],b:[1,0,-1,2,0,-2,1,0,-1]}},
+  red:{label:'Red against green',s:{r:[0,0,0,0,1,0,0,0,0],g:[0,0,0,0,-1,0,0,0,0],b:[0,0,0,0,0,0,0,0,0]}},
+  blue:{label:'Blue detector',s:{r:[0,0,0,0,-.5,0,0,0,0],g:[0,0,0,0,-.5,0,0,0,0],b:[0,0,0,0,1,0,0,0,0]}},
+  bright:{label:'Brightness',s:{r:[0,0,0,0,.33,0,0,0,0],g:[0,0,0,0,.33,0,0,0,0],b:[0,0,0,0,.34,0,0,0,0]}}
+};
+function loadCPreset(k){C.slices={r:C_PRESETS[k].s.r.slice(),g:C_PRESETS[k].s.g.slice(),b:C_PRESETS[k].s.b.slice()};}
+function makeRGB(){
+  const r=new Float32Array(NC*NC),g=new Float32Array(NC*NC),b=new Float32Array(NC*NC);
+  for(let y=0;y<NC;y++)for(let x=0;x<NC;x++){
+    const n=fbm(x/20,y/20,5,4)*26;
+    let R=196+n,Gc=196+n,B=192+n;
+    if(Math.hypot(x-NC*.30,y-NC*.33)<NC*.19){R=214;Gc=58;B=48;}
+    if(x>NC*.54&&x<NC*.87&&y>NC*.16&&y<NC*.47){R=62;Gc=178;B=72;}
+    if(Math.abs((x+y)-NC*1.28)<NC*.07){R=48;Gc=78;B=206;}
+    if(y>NC*.72){R=120+(x/NC)*90;Gc=110+(x/NC)*60;B=96;}
+    const i=y*NC+x;r[i]=R;g[i]=Gc;b[i]=B;
+  }
+  return {r,g,b};
+}
+function renderChannels(){
+  const P=C.planes,keys=['r','g','b'];
+  paint(document.getElementById('ch-r'),P.r,NC);
+  paint(document.getElementById('ch-g'),P.g,NC);
+  paint(document.getElementById('ch-b'),P.b,NC);
+  const acc=new Float32Array(NC*NC);
+  for(let c=0;c<C.step;c++){
+    const k=keys[c],m=C.slices[k];
+    for(let y=0;y<NC;y++)for(let x=0;x<NC;x++){
+      let s=0,q=0;
+      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){
+        const yy=Math.min(NC-1,Math.max(0,y+i)),xx=Math.min(NC-1,Math.max(0,x+j));
+        s+=P[k][yy*NC+xx]*m[q++];
+      }
+      acc[y*NC+x]+=s;
+    }
+  }
+  const disp=new Float32Array(NC*NC);
+  for(let i=0;i<acc.length;i++)disp[i]=128+acc[i]*.55;
+  paint(document.getElementById('ch-out'),C.step?disp:new Float32Array(NC*NC).fill(128),NC);
+  document.querySelectorAll('#chanrow .chan').forEach(el=>el.classList.toggle('live',+el.dataset.ch<C.step));
+  const names=['nothing yet','red only','red + green','all three channels'];
+  document.getElementById('acc-cap').textContent='Running sum — '+names[C.step];
+  document.getElementById('acc-dim').textContent=`${NC} × ${NC} · one output channel`;
+  document.getElementById('c-counter').textContent=`channel ${C.step} / 3`;
+  document.getElementById('c-prev').disabled=C.step===0;
+  document.getElementById('c-next').disabled=C.step>=3;
+  keys.forEach((k,idx)=>{
+    const el=document.getElementById('kv-'+k);el.innerHTML='';
+    C.slices[k].forEach((v,q)=>{
+      const inp=document.createElement('input');
+      inp.type='number';inp.step='0.1';inp.value=Math.round(v*100)/100;
+      inp.setAttribute('aria-label',`slice ${idx} weight ${q}`);
+      inp.addEventListener('input',()=>{const nv=parseFloat(inp.value);C.slices[k][q]=isFinite(nv)?nv:0;C.preset='custom';buildCPick();renderChannels();});
+      el.appendChild(inp);
+    });
+  });
+  document.querySelectorAll('#eqmath2 .sym').forEach(s=>s.classList.toggle('on',C.step>0));
+  document.getElementById('eqkey2').innerHTML=
+    `<span><b>C</b><sub>in</sub> = 3</span><span><b>c</b><sub>in</sub> = ${C.step?C.step-1:'—'}</span>`+
+    `<span>channels accumulated: <b>${C.step}</b> of 3</span><span>output channels shown: <b>1</b> of many</span>`;
+}
+function buildCPick(){
+  chips('c-pick',Object.entries(C_PRESETS).map(([k,p])=>[k,p.label]),C.preset,
+    k=>{C.preset=k;loadCPreset(k);buildCPick();renderChannels();});
+}
+function cStop(){C.playing=false;clearInterval(C.timer);document.getElementById('c-play').textContent='Play';}
+function cPlay(){
+  if(C.playing){cStop();return;}
+  if(C.step>=3)C.step=0;
+  C.playing=true;document.getElementById('c-play').textContent='Pause';
+  const sp=+document.getElementById('c-speed').value;
+  C.timer=setInterval(()=>{if(C.step>=3){cStop();return;}C.step++;renderChannels();},1500-sp*120);
+}
+document.getElementById('c-next').addEventListener('click',()=>{cStop();if(C.step<3){C.step++;renderChannels();}});
+document.getElementById('c-prev').addEventListener('click',()=>{cStop();if(C.step>0){C.step--;renderChannels();}});
+document.getElementById('c-play').addEventListener('click',cPlay);
+document.getElementById('c-reset').addEventListener('click',()=>{cStop();C.step=0;renderChannels();});
+document.getElementById('c-speed').addEventListener('input',()=>{if(C.playing){cStop();cPlay();}});
+
+const CH=[1,3,16,32,64,128,256,512];
+const PC={ci:1,co:5,k:3,g:1};
+function renderParams(){
+  const Ci=CH[PC.ci],Co=CH[PC.co],k=PC.k,g=PC.g;
+  const valid=(Ci%g===0)&&(Co%g===0);
+  document.getElementById('ci-val').textContent=Ci;
+  document.getElementById('co-val').textContent=Co;
+  document.getElementById('kk-val').textContent=`${k}×${k}`;
+  document.getElementById('gr-val').textContent=g;
+  const p=valid?Co*(Ci*k*k/g+1):null,dense=Co*(Ci*k*k+1);
+  document.getElementById('param-out').innerHTML=
+    `params = C<sub>out</sub> × ( C<sub>in</sub> × k × k / g + 1 )<br>`+
+    `= <b>${Co}</b> × ( <b>${Ci}</b> × <b>${k}</b> × <b>${k}</b> / <b>${g}</b> + 1 )`;
+  document.getElementById('param-big').textContent=valid?p.toLocaleString()+' weights':'groups must divide both';
+  document.getElementById('param-cmp').innerHTML=valid
+    ? `A single ${k}×${k} kernel holds ${k*k} numbers. This layer holds <b>${Math.round(p/(k*k)).toLocaleString()}×</b> that.`+
+      (g>1?`<br>Ungrouped it would be <b>${dense.toLocaleString()}</b> — grouping saves <b>${(100*(1-p/dense)).toFixed(1)}%</b>.`
+          :`<br>Raise groups to ${Ci} for a depthwise convolution and watch this collapse.`)
+    : `Choose a group count that divides both channel counts.`;
+}
+function buildParamCtl(){
+  seg('kk-seg',[1,3,5,7],PC.k,v=>{PC.k=v;buildParamCtl();renderParams();},['1×1','3×3','5×5','7×7']);
+  const Ci=CH[PC.ci],Co=CH[PC.co];
+  const opts=[1,2,4,8,16,32,64,128,256,512].filter(v=>v<=Ci&&Ci%v===0&&Co%v===0);
+  const shown=opts.length>5?[opts[0],opts[1],opts[Math.floor(opts.length/2)],opts[opts.length-2],opts[opts.length-1]]:opts;
+  const uniq=[...new Set(shown)];
+  if(!uniq.includes(PC.g))PC.g=1;
+  seg('gr-seg',uniq,PC.g,v=>{PC.g=v;buildParamCtl();renderParams();});
+}
+document.getElementById('ci').addEventListener('input',e=>{PC.ci=+e.target.value;buildParamCtl();renderParams();});
+document.getElementById('co').addEventListener('input',e=>{PC.co=+e.target.value;buildParamCtl();renderParams();});
+
+/* ════════ 05 — learning the kernel ════════ */
+const NL=64;
+const L={X:null,Y:null,F:null,t:0,hist:[],wHist:[],m:null,v:null,opt:'adam',lr:.2,target:'sx',playing:false,timer:null,seed:7};
+const L_TARGETS={
+  sx:{label:'Sobel X',m:[1,0,-1,2,0,-2,1,0,-1]},
+  lap:{label:'Laplacian',m:[0,1,0,1,-4,1,0,1,0]},
+  blur:{label:'Box blur',m:new Array(9).fill(1/9)},
+  shrp:{label:'Sharpen',m:[0,-1,0,-1,5,-1,0,-1,0]},
+  emb:{label:'Emboss',m:[-2,-1,0,-1,1,1,0,1,2]}
+};
+function makeLX(){
+  const X=new Float32Array(NL*NL);
+  for(let y=0;y<NL;y++)for(let x=0;x<NL;x++){
+    let v=fbm(x/5,y/5,3,5);
+    if(Math.hypot(x-NL*.34,y-NL*.38)<NL*.18)v=.15;
+    if(x>NL*.58&&x<NL*.86&&y>NL*.22&&y<NL*.55)v=.85;
+    X[y*NL+x]=Math.max(0,Math.min(1,v));
+  }
+  let m=0;for(const v of X)m+=v;m/=X.length;
+  for(let i=0;i<X.length;i++)X[i]-=m;
+  return X;
+}
+const lpx=(a,y,x)=>a[Math.min(NL-1,Math.max(0,y))*NL+Math.min(NL-1,Math.max(0,x))];
+function lconv(F){
+  const o=new Float32Array(NL*NL);
+  for(let y=0;y<NL;y++)for(let x=0;x<NL;x++){
+    let s=0,q=0;
+    for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)s+=lpx(L.X,y+i,x+j)*F[q++];
+    o[y*NL+x]=s;
+  }
+  return o;
+}
+function lReset(){
+  L.seed=(L.seed*7+3)%977;
+  L.F=new Float32Array(9);
+  for(let i=0;i<9;i++)L.F[i]=(hash2(i*3.3,7.7,L.seed)-.5)*.6;
+  L.t=0;L.hist=[];L.wHist=[];L.m=new Float64Array(9);L.v=new Float64Array(9);
+  L.Y=lconv(L_TARGETS[L.target].m);
+  lRender();
+}
+function lStepOnce(){
+  const M=NL*NL,P=lconv(L.F),D=new Float32Array(M);
+  let loss=0;
+  for(let i=0;i<M;i++){D[i]=P[i]-L.Y[i];loss+=D[i]*D[i];}
+  loss/=M;
+  L.hist.push(loss);
+  if(L.wHist.length<800)L.wHist.push(Float32Array.from(L.F));
+  const g=new Float64Array(9);
+  for(let y=0;y<NL;y++)for(let x=0;x<NL;x++){
+    const d=D[y*NL+x];let q=0;
+    for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)g[q++]+=d*lpx(L.X,y+i,x+j);
+  }
+  for(let i=0;i<9;i++)g[i]*=2/M;
+  L.t++;
+  if(L.opt==='adam'){
+    for(let i=0;i<9;i++){
+      L.m[i]=.9*L.m[i]+.1*g[i];L.v[i]=.999*L.v[i]+.001*g[i]*g[i];
+      const mh=L.m[i]/(1-Math.pow(.9,L.t)),vh=L.v[i]/(1-Math.pow(.999,L.t));
+      L.F[i]-=L.lr*mh/(Math.sqrt(vh)+1e-8);
+    }
+  }else for(let i=0;i<9;i++)L.F[i]-=L.lr*g[i];
+  for(let i=0;i<9;i++)if(!isFinite(L.F[i])){lStop();L.F[i]=0;}
+}
+function lBack(){
+  if(!L.wHist.length)return;
+  L.F=Float32Array.from(L.wHist.pop());
+  L.hist.pop();L.t=Math.max(0,L.t-1);
+}
+function lRender(){
+  const P=lconv(L.F),M=NL*NL;
+  const toPix=(a,sc)=>{const o=new Float32Array(M);for(let i=0;i<M;i++)o[i]=128+a[i]*sc;return o;};
+  paint(document.getElementById('l-x'),toPix(L.X,255),NL);
+  paint(document.getElementById('l-y'),toPix(L.Y,55),NL);
+  paint(document.getElementById('l-p'),toPix(P,55),NL);
+  const D=new Float32Array(M);
+  let loss=0;
+  for(let i=0;i<M;i++){D[i]=P[i]-L.Y[i];loss+=D[i]*D[i];}
+  loss/=M;
+  paint(document.getElementById('l-d'),toPix(D,110),NL);
+  const T=L_TARGETS[L.target].m;
+  const kv=document.getElementById('l-kern');kv.innerHTML='';
+  Array.from(L.F).forEach((v,i)=>{
+    const d=document.createElement('div');
+    d.style.width=d.style.height='46px';d.textContent=f2(v);
+    d.style.color=Math.abs(v-T[i])<.08?'var(--sage)':'var(--ink)';
+    kv.appendChild(d);
+  });
+  const tv=document.getElementById('l-true');tv.innerHTML='';
+  T.forEach(v=>{const d=document.createElement('div');d.style.width=d.style.height='46px';d.textContent=f2(v);d.style.color='var(--ink-light)';tv.appendChild(d);});
+  const rmse=Math.sqrt(T.reduce((s,v,i)=>s+(v-L.F[i])**2,0)/9);
+  document.getElementById('l-stat').innerHTML=
+    `iteration <b>${L.t}</b> · loss <b>${loss.toExponential(2)}</b> · weight error <b>${rmse.toFixed(4)}</b>`;
+  document.getElementById('l-counter').textContent=`${L.t} iterations · ${L.opt==='adam'?'Adam':'plain gradient descent'}`;
+  document.getElementById('l-prev').disabled=L.t===0;
+  document.getElementById('l-lr-val').textContent=L.lr.toFixed(2);
+  document.querySelectorAll('#eqmath3 .sym').forEach(s=>s.classList.toggle('on',L.t>0));
+  document.getElementById('eqkey3').innerHTML=
+    `<span><b>L</b> = mean squared error</span><span><b>lr</b> = ${L.lr.toFixed(2)}</span>`+
+    `<span>the filter is <b>9</b> numbers</span><span>nothing about the answer is given to the optimiser</span>`;
+  drawCurve();
+}
+function drawCurve(){
+  const c=document.getElementById('l-curve'),ctx=c.getContext('2d'),W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(26,26,26,0.12)';ctx.lineWidth=1;
+  for(let i=0;i<=3;i++){const y=6+(H-20)*i/3;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  if(L.hist.length<2){return;}
+  const ls=L.hist.map(v=>Math.log10(Math.max(v,1e-14)));
+  let mn=Math.min.apply(null,ls),mx=Math.max.apply(null,ls);
+  if(mx-mn<1e-9){mn-=1;mx+=1;}
+  ctx.strokeStyle='#b8412e';ctx.lineWidth=1.6;ctx.beginPath();
+  ls.forEach((v,i)=>{
+    const x=(i/(ls.length-1))*(W-6)+3,y=6+(H-20)*(1-(v-mn)/(mx-mn));
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.stroke();
+  ctx.fillStyle='#6b6b6b';ctx.font='10px Inter, sans-serif';
+  ctx.fillText('log\u2081\u2080 loss   '+mx.toFixed(1)+' \u2192 '+mn.toFixed(1),5,H-4);
+}
+function lStop(){L.playing=false;clearInterval(L.timer);document.getElementById('l-play').textContent='Play';}
+function lPlay(){
+  if(L.playing){lStop();return;}
+  L.playing=true;document.getElementById('l-play').textContent='Pause';
+  const sp=+document.getElementById('l-speed').value;
+  L.timer=setInterval(()=>{
+    if(L.t>=600){lStop();lRender();return;}
+    for(let r=0;r<Math.max(1,sp-4);r++)lStepOnce();
+    lRender();
+  },Math.max(28,150-sp*12));
+}
+document.getElementById('l-next').addEventListener('click',()=>{lStop();lStepOnce();lRender();});
+document.getElementById('l-prev').addEventListener('click',()=>{lStop();lBack();lRender();});
+document.getElementById('l-play').addEventListener('click',lPlay);
+document.getElementById('l-reset').addEventListener('click',()=>{lStop();lReset();});
+document.getElementById('l-speed').addEventListener('input',()=>{if(L.playing){lStop();lPlay();}});
+document.getElementById('l-lr').addEventListener('input',e=>{L.lr=+e.target.value/100;lRender();});
+function buildLearn(){
+  chips('l-pick',Object.entries(L_TARGETS).map(([k,p])=>[k,p.label]),L.target,
+    k=>{lStop();L.target=k;buildLearn();lReset();});
+  seg('l-opt',['adam','sgd'],L.opt,v=>{
+    lStop();L.opt=v;L.lr=v==='adam'?.2:.3;
+    document.getElementById('l-lr').value=Math.round(L.lr*100);
+    buildLearn();lReset();
+  },['Adam','Plain descent']);
+}
+
+/* ════════ static equations ════════ */
+document.getElementById('eqmath2').innerHTML=
+  `<i>O</i>(<i>c</i><sub>out</sub>, <i>x</i>, <i>y</i>) = <i>b</i> + `+
+  sigma('<span class="sym" data-s="cin"><i>c</i><sub>in</sub></span>','C−1')+
+  sigma('<i>i</i>','k−1')+sigma('<i>j</i>','k−1')+
+  `&nbsp;<i>I</i>(<span class="sym" data-s="cin"><i>c</i><sub>in</sub></span>, <i>x</i>+<i>i</i>, <i>y</i>+<i>j</i>) · `+
+  `<i>F</i>(<i>c</i><sub>out</sub>, <span class="sym" data-s="cin"><i>c</i><sub>in</sub></span>, <i>i</i>, <i>j</i>)`;
+document.getElementById('eqmath3').innerHTML=
+  `<span class="sym" data-s="g">∂<i>L</i> / ∂<i>F</i>(<i>i</i>, <i>j</i>)</span> = `+
+  sigma('<i>x</i>,&thinsp;<i>y</i>','')+
+  `&nbsp;<span class="sym" data-s="g"><i>δ</i>(<i>x</i>, <i>y</i>)</span> · <i>I</i>(<i>x</i>+<i>i</i>, <i>y</i>+<i>j</i>)`+
+  `<span style="margin-left:1.6rem"><i>F</i> ← <i>F</i> − <i>lr</i> · ∂<i>L</i>/∂<i>F</i></span>`;
+
+/* ════════ scroll reveal ════════ */
+(function(){
+  const els=document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver'in window)||window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    els.forEach(el=>el.classList.add('visible'));return;
+  }
+  const io=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}});
+  },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
+  els.forEach(el=>io.observe(el));
+})();
+
+/* ════════ boot ════════ */
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(rebuild,180);});
+buildEq();G.input=mine5();G.kernel=makeKernel(3,'vedge');rebuild();
+SRC=makeImage('shapes');buildMaps();buildImagePickers();buildPoolSeg();renderImage();renderPool();
+C.planes=makeRGB();loadCPreset('edge');buildCPick();renderChannels();
+buildParamCtl();renderParams();
+L.X=makeLX();buildLearn();lReset();
+</script>
+</body>
+</html>

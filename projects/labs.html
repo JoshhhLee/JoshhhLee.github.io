@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Lab Series — Joshu Leonardy</title>
+<meta name="description" content="A series of interactive labs for learning convolutional networks from the sliding window up to camouflaged object detection — built for students to play with, not read." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+  .series{display:flex;flex-direction:column;gap:0;margin-top:1rem}
+
+  .lab-row{display:grid;grid-template-columns:5.5rem 1fr auto;gap:0 2rem;align-items:start;
+    padding:2.4rem 0;border-top:1px solid var(--line);text-decoration:none;color:inherit;
+    position:relative;transition:padding-left .45s var(--ease-out)}
+  .lab-row:last-child{border-bottom:1px solid var(--line)}
+  /* a vermillion rule grows from the left on hover — the page's only flourish */
+  .lab-row::before{content:"";position:absolute;left:0;top:-1px;height:1px;width:0;
+    background:var(--vermillion);transition:width .5s var(--ease-out)}
+  .lab-row.live:hover{padding-left:1rem}
+  .lab-row.live:hover::before{width:100%}
+  .lab-row.live:hover .lab-row-title{color:var(--vermillion)}
+  .lab-row.live:hover .go{transform:translateX(6px);color:var(--vermillion)}
+
+  .lab-num{font-family:'Cormorant Garamond',serif;font-size:2.4rem;color:var(--ink-light);
+    line-height:1;font-weight:300}
+  .lab-row.live .lab-num{color:var(--vermillion)}
+  .lab-num small{display:block;font-family:'Noto Serif JP',serif;font-size:.7rem;
+    letter-spacing:.3em;color:var(--ink-light);margin-top:.5rem}
+
+  .lab-row-title{font-family:'Cormorant Garamond',serif;font-size:1.75rem;font-weight:400;
+    margin:0 0 .5rem;line-height:1.2;transition:color .35s var(--ease-soft)}
+  .lab-row-title em{font-style:italic;color:var(--vermillion)}
+  .lab-row-desc{color:var(--ink-soft);margin:0 0 1rem;max-width:60ch;line-height:1.75}
+  .topics{display:flex;flex-wrap:wrap;gap:.4rem}
+  .topic{font-family:'Inter',sans-serif;font-size:.62rem;letter-spacing:.1em;color:var(--ink-light);
+    border:1px solid var(--line);padding:.28em .7em}
+
+  .go{font-family:'Inter',sans-serif;font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-soft);white-space:nowrap;display:flex;align-items:center;gap:.5rem;
+    transition:transform .4s var(--ease-out),color .35s var(--ease-soft);padding-top:.5rem}
+  .soon{font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-light);border:1px dashed var(--line);padding:.4em .8em;white-space:nowrap}
+
+  .lab-row.planned{opacity:.58;cursor:default}
+
+  .path-note{border-left:2px solid var(--sage);padding:.4rem 0 .4rem 1.2rem;margin:3rem 0 0;
+    color:var(--ink-soft);max-width:64ch}
+
+  @media(max-width:760px){
+    .lab-row{grid-template-columns:3.4rem 1fr;gap:0 1.2rem}
+    .lab-num{font-size:1.7rem}
+    .go,.soon{grid-column:2;margin-top:.9rem;padding-top:0}
+  }
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="labs.html" class="here">The Series</a>
+    <a href="convolution-lab.html">Convolution</a>
+    <a href="segmentation-lab.html">Segmentation</a>
+    <a href="encoder-decoder-lab.html">Encoder&ndash;Decoder</a>
+    <a href="../index.html#teaching">Teaching</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+  <section class="hero">
+    <div class="hero-kanji">実 · 験 · 室</div>
+    <h1>The Lab <em>Series</em></h1>
+    <div class="hero-divider"></div>
+    <p>
+      Five labs that build a convolutional network from the sliding window up to the problem
+      I actually work on — finding animals that do not want to be found. Each one is a single
+      page you open and play with. No install, no notebook, no account.
+    </p>
+  </section>
+
+  <section>
+    <div class="section-heading reveal">
+      <div class="section-heading-kanji">順 · 路</div>
+      <h2 class="section-heading-text">The path</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <div class="series">
+
+      <a href="convolution-lab.html" class="lab-row live reveal">
+        <div class="lab-num">01<small>畳み込み</small></div>
+        <div>
+          <h3 class="lab-row-title">Convolution <em>Lab</em></h3>
+          <p class="lab-row-desc">
+            What a convolutional layer actually does. Step the window across the input by hand,
+            watch the arithmetic as it happens, then run the same kernel over a real image.
+          </p>
+          <div class="topics">
+            <span class="topic">Sliding window</span><span class="topic">Padding &amp; stride</span>
+            <span class="topic">Dilation</span><span class="topic">Channels &amp; groups</span>
+            <span class="topic">Parameter counting</span><span class="topic">Pooling</span>
+            <span class="topic">Gradient descent</span>
+          </div>
+        </div>
+        <span class="go">Open<span>→</span></span>
+      </a>
+
+      <a href="segmentation-lab.html" class="lab-row live reveal d1">
+        <div class="lab-num">02<small>領 域</small></div>
+        <div>
+          <h3 class="lab-row-title">Segmentation <em>Lab</em></h3>
+          <p class="lab-row-desc">
+            Classifying every pixel instead of the whole image. Drag two masks apart and watch IoU
+            and Dice disagree, switch U-Net's skip connections off to find out what they were
+            doing, then train a real two-layer network in the page and measure which loss actually
+            finds a camouflaged shape.
+          </p>
+          <div class="topics">
+            <span class="topic">IoU &amp; Dice</span><span class="topic">Cross-entropy</span>
+            <span class="topic">Dice &amp; focal loss</span><span class="topic">Class imbalance</span>
+            <span class="topic">Upsampling</span><span class="topic">Transposed convolution</span>
+            <span class="topic">U-Net skips</span><span class="topic">Training a segmenter</span>
+            <span class="topic">Box IoU &amp; NMS</span>
+          </div>
+        </div>
+        <span class="go">Open<span>→</span></span>
+      </a>
+
+      <a href="encoder-decoder-lab.html" class="lab-row live reveal d2">
+        <div class="lab-num">03<small>符 号</small></div>
+        <div>
+          <h3 class="lab-row-title">Encoder&ndash;Decoder <em>Lab</em></h3>
+          <p class="lab-row-desc">
+            Walk up a backbone one stage at a time and watch resolution trade against context.
+            Measure what a pretrained encoder really buys &mdash; the answer is not what you were
+            told. Then widen the receptive field with dilation instead of downsampling, and gate a
+            skip connection so it stops forwarding the whole background.
+          </p>
+          <div class="topics">
+            <span class="topic">Feature pyramids</span><span class="topic">Receptive field</span>
+            <span class="topic">Pretrained vs scratch</span><span class="topic">Freezing &amp; differential LR</span>
+            <span class="topic">Dilated convolution</span><span class="topic">Gridding artifact</span>
+            <span class="topic">ASPP</span><span class="topic">SE &amp; CBAM</span>
+            <span class="topic">Attention gates</span>
+          </div>
+        </div>
+        <span class="go">Open<span>&rarr;</span></span>
+      </a>
+
+      <div class="lab-row planned reveal d3">
+        <div class="lab-num">04<small>注 意</small></div>
+        <div>
+          <h3 class="lab-row-title">Attention Lab</h3>
+          <p class="lab-row-desc">
+            Self-attention worked through by hand on a handful of patches, then the jump to
+            vision transformers and what changes when a model can look anywhere at once.
+          </p>
+          <div class="topics">
+            <span class="topic">Self-attention</span><span class="topic">ViT</span>
+            <span class="topic">Transformer segmentation</span><span class="topic">DETR &amp; SAM</span>
+          </div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+
+      <div class="lab-row planned reveal d4">
+        <div class="lab-num">05<small>擬 態</small></div>
+        <div>
+          <h3 class="lab-row-title">Camouflage Lab</h3>
+          <p class="lab-row-desc">
+            The problem this whole series was built to reach. Why a boundary that barely exists
+            breaks the metrics from lab 02, what SINet's search-and-identify split is for, and
+            where the field currently stands.
+          </p>
+          <div class="topics">
+            <span class="topic">COD task &amp; metrics</span><span class="topic">S-measure &amp; E-measure</span>
+            <span class="topic">SINet architecture</span><span class="topic">Research landscape</span>
+          </div>
+        </div>
+        <span class="soon">Planned</span>
+      </div>
+
+    </div>
+
+    <p class="path-note reveal">
+      The labs are meant to be walked in order — each one assumes the last. If you only have an
+      hour, lab 01 on its own is still the thing most people are missing.
+    </p>
+  </section>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+</body>
+</html>
