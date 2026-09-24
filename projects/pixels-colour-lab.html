@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pixels &amp; Colour Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive image processing lab following Gonzalez & Woods chapters 2 and 6: sampling and quantization, interpolation, neighbours and distance measures, RGB, CMY(K) and HSI colour models, pseudocolour, colour slicing and colour histogram equalization — on sample images or your own photograph." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+section{scroll-margin-top:64px}
+.fd-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem 1.2rem;margin-top:1rem;align-items:start}
+.fd-cell{min-width:0}
+.fd-cell canvas{display:block;width:100%;border:1px solid var(--line);background:var(--paper-dark)}
+.fd-cell .cap{font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-light);display:block;margin-bottom:.4rem}
+.fd-cell .cap em{font-style:normal;color:var(--vermillion);text-transform:none;letter-spacing:.04em}
+.big-cell{grid-column:span 2}
+@media(max-width:560px){.big-cell{grid-column:auto}}
+.cm-read{font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink-soft);line-height:1.85;border:1px solid var(--line);background:var(--card);padding:1rem 1.1rem;margin-top:1.2rem}
+.cm-read b{color:var(--vermillion);font-weight:500}
+.cm-read i{font-family:'Cormorant Garamond',serif;font-size:1.05rem}
+.cm-read .sw{display:inline-block;width:.9rem;height:.9rem;border:1px solid rgba(26,26,26,.25);vertical-align:-.12rem;margin-right:.3rem}
+
+/* neighbourhood grid */
+.nb-row{display:flex;flex-wrap:wrap;gap:1.4rem 2rem;align-items:flex-start}
+.nb{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);flex:1 1 320px;max-width:460px;touch-action:none;user-select:none}
+.nb div{aspect-ratio:1/1;background:#f8f3ea;position:relative;font-family:'Inter',sans-serif;font-size:.5rem;display:flex;align-items:center;justify-content:center;color:var(--ink-light)}
+.nb div.on{background:var(--ink);color:var(--paper)}
+.nb div.p{box-shadow:inset 0 0 0 3px var(--vermillion)}
+.nb div.n4{box-shadow:inset 0 0 0 2px var(--sage)}
+.nb div.nd{box-shadow:inset 0 0 0 2px var(--gold)}
+.nb-read{font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink-soft);line-height:1.85;flex:1 1 220px;max-width:340px}
+.nb-read b{color:var(--vermillion);font-weight:500}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#sampling">Sampling</a><a href="#interp">Interpolation</a><a href="#neighbours">Neighbours</a>
+    <a href="#models">Colour models</a><a href="#colour">Colour processing</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">画 · 素 · と · 色</div>
+  <h1>Pixels &amp; <em>Colour</em> Lab</h1>
+  <div class="hero-divider"></div>
+  <p>Before any processing, a continuous scene has to become numbers. It is sampled onto a grid of positions, and each sample is quantized to a limited set of values. This first lab looks at what that costs, how to estimate values between the grid points, and what it means for two pixels to be neighbours. It then adds colour: the models used to describe it, and what changes when you process three channels instead of one. It follows Chapters 2 and 6 of Gonzalez &amp; Woods.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="sampling">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">標 · 本 · 化 · と · 量 · 子 · 化</div>
+    <h2 class="section-heading-text">Sampling and quantization</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §2.4: Basic Concepts in Sampling and Quantization (p. 63), Representing Digital Images (p. 65), Spatial and Intensity Resolution (p. 71), eqs. 2-11 to 2-13</p>
+  <p class="lede reveal d1">Two separate decisions turn a scene into an image. <em>Sampling</em> decides how many positions you measure. <em>Quantization</em> decides how many values each measurement can take. Lower either one and watch what breaks. Too few samples and fine patterns turn into false, coarser patterns, which is called aliasing. Too few levels and smooth shading splits into visible bands, called false contours.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>L</i>&nbsp;=&nbsp;2<sup><i>k</i></sup>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>b</i>&nbsp;=&nbsp;<i>M</i>&nbsp;×&nbsp;<i>N</i>&nbsp;×&nbsp;<i>k</i></div>
+    <div class="eqkey" id="s-key"></div>
+    <p class="eqgloss">A <i>k</i>-bit image has <i>L</i> = 2<sup><i>k</i></sup> intensity levels (eq. 2-11), and storing it takes <i>b</i> = <i>MNk</i> bits (eq. 2-12). Here the image is sampled at every <i>s</i>-th pixel in each direction, then enlarged back by pixel replication so you can compare it at the same size. The row profile below shows both steps at once: sampling turns the curve into steps along the <i>x</i> axis, and quantization turns it into steps along the value axis.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Sample every s pixels</span><div class="seg" id="s-s"></div></div>
+    <div style="grid-column:span 2"><span class="label">Bits per pixel k <span class="mono" id="s-k-v"></span></span><input type="range" id="s-k" min="1" max="8" value="3" aria-label="Bits per pixel"></div>
+  </div>
+  <div id="pick1"></div>
+  <div id="st1" style="margin-top:1rem"></div>
+  <div class="ip-charts"><div class="ip-chart"><span class="cap">Row profile <em id="s-row-cap"></em></span><canvas id="s-p"></canvas></div></div>
+  <div class="scoreboard" id="sb1"></div>
+  <div id="t1"></div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="interp">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">補 · 間</div>
+    <h2 class="section-heading-text">Interpolation: values between the samples</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §2.4: Image Interpolation (p. 77), eqs. 2-17 and 2-18</p>
+  <p class="lede reveal d1">Enlarging an image, rotating it or correcting its geometry all need values at positions between the original samples. Here the image is shrunk by a factor, then enlarged back to full size, and compared with the original. Nearest neighbour copies the closest sample. Bilinear blends the four nearest samples. Bicubic fits a smooth surface through the nearest sixteen.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="i-eq"></div>
+    <div class="eqkey" id="i-key"><span>Point at the image to see the neighbours and their weights.</span></div>
+    <p class="eqgloss">The book writes bilinear as <i>v</i>(<i>x</i>, <i>y</i>) = <i>ax</i> + <i>by</i> + <i>cxy</i> + <i>d</i> (eq. 2-17), with the four coefficients fixed by the four neighbours. That is the same as blending the neighbours with weights (1 − Δ<i>x</i>)(1 − Δ<i>y</i>) and so on. Bicubic (eq. 2-18) uses sixteen coefficients from sixteen neighbours. It is computed here with the standard cubic-convolution kernel (<i>a</i> = −0.5), one common way to set those coefficients.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Shrink by</span><div class="seg" id="i-f"></div></div>
+    <div style="grid-column:span 2"><span class="label">Enlarge back with</span><div class="seg" id="i-m"></div></div>
+  </div>
+  <div id="pick2"></div>
+  <div id="st2" style="margin-top:1rem"></div>
+  <div class="ip-charts"><div class="ip-chart"><span class="cap">PSNR against the original <em>· higher is closer</em></span><div class="bars" id="i-bars" style="margin-top:.4rem"></div></div></div>
+  <div id="t2"></div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="neighbours">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">近 · 傍 · と · 距 · 離</div>
+    <h2 class="section-heading-text">Neighbours, adjacency and distance</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §2.5: Neighbors of a Pixel (p. 79), Adjacency, Connectivity, Regions, and Boundaries (p. 79), Distance Measures (p. 82), eqs. 2-19 to 2-21</p>
+  <p class="lede reveal d1">A pixel <i>p</i> has four horizontal and vertical neighbours, <i>N</i><sub>4</sub>(<i>p</i>), and four diagonal ones, <i>N<sub>D</sub></i>(<i>p</i>). Together they make <i>N</i><sub>8</sub>(<i>p</i>). Choosing between 4- and 8-adjacency decides how many objects an image contains, and every labelling, flood fill and region-growing step in labs 06 and 07 depended on that choice. Paint on the grid, then choose <i>Pick p</i> and click a cell.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>D<sub>e</sub></i>&nbsp;=&nbsp;√((<i>x</i> − <i>u</i>)² + (<i>y</i> − <i>v</i>)²)&nbsp;&nbsp;&nbsp;<i>D</i><sub>4</sub>&nbsp;=&nbsp;|<i>x</i> − <i>u</i>| + |<i>y</i> − <i>v</i>|&nbsp;&nbsp;&nbsp;<i>D</i><sub>8</sub>&nbsp;=&nbsp;max(|<i>x</i> − <i>u</i>|, |<i>y</i> − <i>v</i>|)</div>
+    <div class="eqkey" id="n-key"></div>
+    <p class="eqgloss">These are the Euclidean, city-block and chessboard distances (eqs. 2-19 to 2-21). The cells are shaded by their distance from <i>p</i>, so each metric draws its own shape: a circle for <i>D<sub>e</sub></i>, a diamond for <i>D</i><sub>4</sub>, a square for <i>D</i><sub>8</sub>. <i>D</i><sub>4</sub> counts the steps of a 4-connected path and <i>D</i><sub>8</sub> the steps of an 8-connected one.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Tool</span><div class="seg" id="n-tool"></div></div>
+    <div style="grid-column:span 2"><span class="label">Distance</span><div class="seg" id="n-metric"></div></div>
+    <div><span class="label">Adjacency for objects</span><div class="seg" id="n-adj"></div></div>
+    <div><span class="label">Grid</span><div class="chiprow" id="n-pre"></div></div>
+  </div>
+  <div class="nb-row" style="margin-top:1rem">
+    <div class="nb" id="nb"></div>
+    <div class="nb-read" id="nb-read"></div>
+  </div>
+  <div id="t3"></div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="models">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">色 · 彩 · モ · デ · ル</div>
+    <h2 class="section-heading-text">Colour models: RGB, CMY(K), HSI</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §6.2: The RGB Color Model (p. 407), The CMY and CMYK Color Models (p. 408), The HSI Color Model (p. 411), eqs. 6-5 to 6-30</p>
+  <p class="lede reveal d1">The same colour can be described in several ways. RGB describes how a screen mixes light, and CMY(K) how a printer mixes ink. HSI separates what a person would call the colour (hue), how vivid it is (saturation) and how bright it is (intensity). That separation is why HSI suits image processing: you can change brightness without touching the hue. Each component is shown below as a grayscale image. Point at the colour image to see every conversion worked out.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="m-eq"></div>
+    <div class="eqkey" id="m-key"></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:span 2"><span class="label">Model</span><div class="seg" id="m-model"></div></div>
+  </div>
+  <div id="pick4"></div>
+  <div class="fd-row">
+    <div class="fd-cell big-cell"><span class="cap">Colour image <em>· point at it</em></span><canvas id="m-img" style="cursor:crosshair"></canvas></div>
+    <div class="fd-cell"><span class="cap" id="m-c0l"></span><canvas id="m-c0"></canvas></div>
+    <div class="fd-cell"><span class="cap" id="m-c1l"></span><canvas id="m-c1"></canvas></div>
+    <div class="fd-cell"><span class="cap" id="m-c2l"></span><canvas id="m-c2"></canvas></div>
+    <div class="fd-cell" id="m-c3w"><span class="cap" id="m-c3l"></span><canvas id="m-c3"></canvas></div>
+  </div>
+  <div class="cm-read" id="m-read">Point at the colour image.</div>
+  <div id="t4"></div>
+</section>
+
+<!-- ══════ 05 ══════ -->
+<section id="colour">
+  <div class="section-heading reveal">
+    <span class="section-num">— 05 —</span>
+    <div class="section-heading-kanji">色 · 彩 · 処 · 理</div>
+    <h2 class="section-heading-text">Pseudocolour, colour slicing, colour histograms</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §6.3: Intensity Slicing and Color Coding (p. 420); §6.5: Color Slicing (p. 436), Histogram Processing of Color Images (p. 439), eqs. 6-43, 6-44; §6.7: Segmentation in RGB Space (p. 446), eq. 6-48</p>
+  <p class="lede reveal d1">Three ways colour changes processing. <em>Pseudocolour</em> gives a grayscale image false colours, because the eye can tell apart far more colours than grey levels. <em>Colour slicing</em> keeps only the pixels close to a chosen colour. Click the image to choose it. <em>Histogram equalization</em> of a colour image shows why the colour model matters: equalizing R, G and B separately changes the hues, while equalizing only the intensity I does not.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="c-eq"></div>
+    <div class="eqkey" id="c-key"></div>
+    <p class="eqgloss" id="c-gloss"></p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Operation</span><div class="chiprow" id="c-op"></div></div>
+    <div id="c-n-w"><span class="label">Slices <span class="mono" id="c-n-v"></span></span><input type="range" id="c-n" min="2" max="12" value="6" aria-label="Number of intensity slices"></div>
+    <div id="c-sh-w"><span class="label">Region</span><div class="seg" id="c-sh"></div></div>
+    <div id="c-d-w"><span class="label">Radius D₀ / width W <span class="mono" id="c-d-v"></span></span><input type="range" id="c-d" min="0.02" max="0.6" step="0.01" value="0.15" aria-label="Colour slicing radius"></div>
+  </div>
+  <div id="pick5"></div>
+  <div id="st5" style="margin-top:1rem"></div>
+  <div class="scoreboard" id="sb5"></div>
+  <div id="t5"></div>
+</section>
+
+<nav class="lab-pager">
+  <a href="labs.html" class="prev">
+    <span class="pager-dir">← The series</span>
+    <span class="pager-title">All labs</span>
+  </a>
+  <a href="histogram-lab.html" class="next">
+    <span class="pager-dir">Next →</span>
+    <span class="pager-title">02 · Intensity &amp; Histograms</span>
+  </a>
+</nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+    <p style="margin-top:.6rem">Your images never leave the browser. Everything runs on your own machine.</p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script src="../assets/imgproc.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Pixels & Colour Lab — Gonzalez & Woods, 4th ed., chapters 2 and 6
+   ═══════════════════════════════════════════════════════════════════ */
+
+let IMG = null;
+const $ = id => document.getElementById(id);
+const f1 = v => v.toFixed(1).replace('-', '−');
+const n3 = v => v.toFixed(3).replace('-', '−');
+const db = v => isFinite(v) ? v.toFixed(1) + ' dB' : '∞ dB';
+/** A colour image object that the stage can draw: gray in data, colour in rgb. */
+function colourImg(w, h, rgb) {
+  const g = IP.make(w, h);
+  for (let i = 0; i < w * h; i++) g.data[i] = Math.round(0.299 * rgb[i * 3] + 0.587 * rgb[i * 3 + 1] + 0.114 * rgb[i * 3 + 2]);
+  g.rgb = rgb; return g;
+}
+
+/* ═════ 01 — sampling and quantization ═════ */
+
+const S1 = { s: 1, k: 3, row: null, col: null, seen: new Set() };
+function buildS1() { seg('s-s', [1, 2, 4, 8, 16], S1.s, v => { S1.s = v; buildS1(); render1(); }, ['1', '2', '4', '8', '16']); }
+$('s-k').addEventListener('input', e => { S1.k = +e.target.value; render1(); });
+const quant = (v, k) => { const L = 1 << k; return Math.round(Math.min(L - 1, Math.floor(v * L / 256)) * 255 / (L - 1)); };
+function digitize(img, s, k) {
+  const { w, h, data } = img, out = IP.make(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const sx = Math.floor(x / s) * s, sy = Math.floor(y / s) * s;          // sample at the block's corner, replicate across the block
+    out.data[y * w + x] = quant(data[sy * w + sx], k);
+  }
+  return out;
+}
+const st1 = IP.stage('st1', { afterLabel: 'Digitized',
+  explain: (r, s, x, y) => {
+    const L = 1 << S1.k, sx = Math.floor(x / S1.s) * S1.s, sy = Math.floor(y / S1.s) * S1.s, v = IMG.data[sy * IMG.w + sx], q = Math.min(L - 1, Math.floor(v * L / 256));
+    return 'This pixel copies the sample at (' + sx + ', ' + sy + '), value ' + v + '.<br>' + v + ' falls in level <b>' + q + '</b> of ' + L + ' (width 256/' + L + ' = ' + (256 / L).toFixed(0) + '), shown as ' + s + '.';
+  } });
+st1.onProbe = (r, s, x, y) => { S1.row = y; S1.col = x; drawS1(); };
+function render1() {
+  if (!IMG) return;
+  const out = digitize(IMG, S1.s, S1.k); S1.out = out;
+  st1.set(IMG, out);
+  const M = Math.ceil(IMG.w / S1.s), N = Math.ceil(IMG.h / S1.s), L = 1 << S1.k, b = M * N * S1.k, full = IMG.w * IMG.h * 8;
+  $('s-k-v').textContent = '= ' + S1.k + ' → L = ' + L + ' levels';
+  $('s-key').innerHTML = '<span><i>M</i> × <i>N</i> = ' + M + ' × ' + N + '</span><span><i>k</i> = ' + S1.k + ', <i>L</i> = ' + L + '</span><span><i>b</i> = ' + M + ' × ' + N + ' × ' + S1.k + ' = <b>' + b.toLocaleString() + '</b> bits</span>';
+  $('sb1').innerHTML =
+    score('Storage', (b / 8 / 1024).toFixed(1) + ' KB', 'b = MNk bits', true) +
+    score('Compared with', (b / full * 100).toFixed(1) + '%', 'of the original at 8 bits') +
+    score('PSNR', db(IP.psnr(IMG, out)), 'against the original');
+  S1.seen.add(IP.key + ':' + S1.s + ':' + S1.k);
+  drawS1();
+  tries1.check();
+}
+function drawS1() {
+  if (!S1.out) return;
+  const y = S1.row != null ? S1.row : IMG.h >> 1;
+  $('s-row-cap').textContent = '· row ' + y;
+  IP.drawProfile($('s-p'), [
+    { data: IP.row(IMG, y), color: 'rgba(26,26,26,.45)', label: 'original' },
+    { data: IP.row(S1.out, y), color: IP.col('vermillion'), width: 1.8, label: 'sampled + quantized' }
+  ], { marker: S1.col });
+}
+const tries1 = IP.tries('t1', [
+  { text: '<i>Foggy hills</i>: lower <i>k</i> until the sky splits into bands (false contours). Does it happen at the same <i>k</i> on the test chart\'s ramp?',
+    test: () => [...S1.seen].some(t => t.startsWith('fog:1:') && +t.split(':')[2] <= 4) },
+  { text: '<i>Test chart</i>: sample every 8 pixels and look at the line gratings. Why do the finest gratings turn into coarser stripes, or vanish, instead of just blurring?',
+    test: () => S1.seen.has('chart:8:' + S1.k) || [...S1.seen].some(t => t.startsWith('chart:8:')) },
+  { text: 'Find a setting that needs less than 5% of the original storage but still looks acceptable to you. Which did you give up first: samples or levels?',
+    test: () => { const M = Math.ceil(IMG.w / S1.s), N = Math.ceil(IMG.h / S1.s); return M * N * S1.k < 0.05 * IMG.w * IMG.h * 8; } }
+]);
+
+/* ═════ 02 — interpolation ═════ */
+
+const I2 = { f: 4, m: 'bilinear', seen: new Set() };
+const IM = [['nearest', 'Nearest'], ['bilinear', 'Bilinear'], ['bicubic', 'Bicubic']];
+function buildI2() {
+  seg('i-f', [2, 4, 8], I2.f, v => { I2.f = v; buildI2(); render2(); }, ['2×', '4×', '8×']);
+  seg('i-m', IM.map(m => m[0]), I2.m, v => { I2.m = v; buildI2(); render2(); }, IM.map(m => m[1]));
+}
+function shrink(img, f) {
+  const w = Math.floor(img.w / f), h = Math.floor(img.h / f), out = { w, h, d: new Float32Array(w * h) };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let s = 0; for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) s += img.data[(y * f + j) * img.w + x * f + i];
+    out.d[y * w + x] = s / (f * f);
+  }
+  return out;
+}
+const keys = t => { t = Math.abs(t); const a = -0.5; return t <= 1 ? (a + 2) * t ** 3 - (a + 3) * t * t + 1 : t < 2 ? a * t ** 3 - 5 * a * t * t + 8 * a * t - 4 * a : 0; };
+/** Enlarge a small float image back by f with the chosen method. Sample centres sit at (i + ½)·f. */
+function enlarge(sm, f, m) {
+  const W = sm.w * f, H = sm.h * f, out = IP.make(W, H), px = (x, y) => sm.d[clamp(y, 0, sm.h - 1) * sm.w + clamp(x, 0, sm.w - 1)];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const sx = (x + 0.5) / f - 0.5, sy = (y + 0.5) / f - 0.5;
+    let v;
+    if (m === 'nearest') v = px(Math.round(sx), Math.round(sy));
+    else if (m === 'bilinear') {
+      const x0 = Math.floor(sx), y0 = Math.floor(sy), dx = sx - x0, dy = sy - y0;
+      v = px(x0, y0) * (1 - dx) * (1 - dy) + px(x0 + 1, y0) * dx * (1 - dy) + px(x0, y0 + 1) * (1 - dx) * dy + px(x0 + 1, y0 + 1) * dx * dy;
+    } else {
+      const x0 = Math.floor(sx), y0 = Math.floor(sy); v = 0;
+      for (let j = -1; j <= 2; j++) for (let i = -1; i <= 2; i++) v += px(x0 + i, y0 + j) * keys(sx - (x0 + i)) * keys(sy - (y0 + j));
+    }
+    out.data[y * W + x] = v;
+  }
+  return out;
+}
+const crop = (img, W, H) => { const o = IP.make(W, H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o.data[y * W + x] = img.data[y * img.w + x]; return o; };
+const st2 = IP.stage('st2', { afterLabel: 'Enlarged back',
+  explain: (r, s, x, y) => {
+    const f = I2.f, sx = (x + 0.5) / f - 0.5, sy = (y + 0.5) / f - 0.5, sm = I2.sm;
+    const px = (a, b) => sm.d[clamp(b, 0, sm.h - 1) * sm.w + clamp(a, 0, sm.w - 1)];
+    if (I2.m === 'nearest') return 'Source position (' + sx.toFixed(2) + ', ' + sy.toFixed(2) + ') → nearest sample (' + Math.round(sx) + ', ' + Math.round(sy) + ') = <b>' + s + '</b>';
+    if (I2.m === 'bilinear') {
+      const x0 = Math.floor(sx), y0 = Math.floor(sy), dx = sx - x0, dy = sy - y0;
+      const t = [[px(x0, y0), (1 - dx) * (1 - dy)], [px(x0 + 1, y0), dx * (1 - dy)], [px(x0, y0 + 1), (1 - dx) * dy], [px(x0 + 1, y0 + 1), dx * dy]];
+      return 'Δ<i>x</i> = ' + dx.toFixed(2) + ', Δ<i>y</i> = ' + dy.toFixed(2) + '<br>' + t.map(([v, w]) => f1(v) + '×' + w.toFixed(2)).join(' + ') + ' = <b>' + s + '</b>';
+    }
+    return '16 samples around (' + sx.toFixed(2) + ', ' + sy.toFixed(2) + '), each weighted by the cubic kernel in x and y → <b>' + s + '</b>. Weights can go negative, which is why bicubic can overshoot at edges.';
+  } });
+function render2() {
+  if (!IMG) return;
+  const f = I2.f, sm = shrink(IMG, f); I2.sm = sm;
+  const W = sm.w * f, H = sm.h * f, ref = crop(IMG, W, H);
+  const outs = Object.fromEntries(IM.map(([m]) => [m, enlarge(sm, f, m)]));
+  st2.set(ref, outs[I2.m]);
+  const ps = IM.map(([m, l]) => [l, IP.psnr(ref, outs[m]), m]), top = Math.max(...ps.map(p => p[1]));
+  $('i-bars').innerHTML = ps.map(([l, v, m]) => bar(l + (m === I2.m ? ' ◂' : ''), v.toFixed(1), top)).join('');
+  I2.ps = Object.fromEntries(ps.map(p => [p[2], p[1]]));
+  $('i-eq').innerHTML = {
+    nearest: '<i>v</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;<i>f</i>(round <i>x</i>′, round <i>y</i>′)',
+    bilinear: '<i>v</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;<i>ax</i> + <i>by</i> + <i>cxy</i> + <i>d</i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(2-17) · 4 neighbours</span>',
+    bicubic: '<i>v</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;<span class="sigma"><small>3</small><span class="big">Σ</span><small>i=0</small></span><span class="sigma"><small>3</small><span class="big">Σ</span><small>j=0</small></span><i>a<sub>ij</sub></i>&nbsp;<i>x<sup>i</sup></i><i>y<sup>j</sup></i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(2-18) · 16 neighbours</span>'
+  }[I2.m];
+  I2.seen.add(I2.m + ':' + f + ':' + IP.key);
+  tries2.check();
+}
+const tries2 = IP.tries('t2', [
+  { text: 'At 4× on the test chart, try all three methods. Which scores best, and does the highest PSNR also look the sharpest to you?',
+    test: () => ['nearest', 'bilinear', 'bicubic'].every(m => I2.seen.has(m + ':4:chart')) },
+  { text: 'Point at an edge with bicubic. Find a pixel whose value is outside the range of the samples around it. Where did the overshoot come from?',
+    test: () => I2.seen.has('bicubic:' + I2.f + ':' + IP.key) && I2.m === 'bicubic' }
+]);
+
+/* ═════ 03 — neighbours, adjacency, distance ═════ */
+
+const GW = 21, GH = 15;
+const NB = { A: new Uint8Array(GW * GH), p: 10 + 7 * GW, tool: 'paint', metric: 'e', adj: 8, hover: -1, counts: {}, seenMetric: new Set() };
+function nbPreset(k) {
+  NB.A.fill(0);
+  const set = (x, y) => { if (x >= 0 && y >= 0 && x < GW && y < GH) NB.A[y * GW + x] = 1; };
+  if (k === 'diag') { for (let i = 0; i < 12; i++) set(3 + i, 2 + i); for (let i = 0; i < 6; i++) set(16 - i, 3 + i); }
+  else if (k === 'blobs') {
+    for (let y = 2; y <= 5; y++) for (let x = 2; x <= 6; x++) set(x, y);
+    set(7, 6); for (let y = 7; y <= 10; y++) for (let x = 8; x <= 11; x++) set(x, y);
+    for (let y = 3; y <= 12; y++) set(16, y); set(17, 13); set(18, 12);
+  }
+  renderNB();
+}
+function buildNB() {
+  const el = $('nb'); el.style.gridTemplateColumns = 'repeat(' + GW + ',minmax(0,1fr))'; el.innerHTML = '';
+  for (let i = 0; i < GW * GH; i++) el.appendChild(document.createElement('div'));
+  let paint = null;
+  const cellOf = e => { const t = document.elementFromPoint(e.clientX, e.clientY); return t && t.parentElement === el ? Array.prototype.indexOf.call(el.children, t) : -1; };
+  el.addEventListener('pointerdown', e => {
+    const i = cellOf(e); if (i < 0) return;
+    if (NB.tool === 'pick') { NB.p = i; renderNB(); return; }
+    paint = NB.A[i] ? 0 : 1; NB.A[i] = paint; el.setPointerCapture(e.pointerId); renderNB();
+  });
+  el.addEventListener('pointermove', e => {
+    const i = cellOf(e);
+    if (paint != null) { if (i >= 0 && NB.A[i] !== paint) { NB.A[i] = paint; renderNB(); } return; }
+    if (i !== NB.hover) { NB.hover = i; renderNB(); }
+  });
+  const end = () => { paint = null; };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('pointerleave', () => { NB.hover = -1; renderNB(); });
+}
+function buildNBctl() {
+  seg('n-tool', ['paint', 'pick'], NB.tool, v => { NB.tool = v; buildNBctl(); }, ['Paint', 'Pick p']);
+  seg('n-metric', ['e', '4', '8'], NB.metric, v => { NB.metric = v; NB.seenMetric.add(v); buildNBctl(); renderNB(); }, ['Euclidean Dₑ', 'City-block D₄', 'Chessboard D₈']);
+  seg('n-adj', [4, 8], NB.adj, v => { NB.adj = v; buildNBctl(); renderNB(); }, ['4', '8']);
+  chips('n-pre', [['diag', 'Diagonal lines'], ['blobs', 'Touching blobs'], ['clear', 'Clear']], null, nbPreset);
+}
+const dist = (i, j, m) => { const dx = Math.abs(i % GW - j % GW), dy = Math.abs(((i / GW) | 0) - ((j / GW) | 0)); return m === 'e' ? Math.hypot(dx, dy) : m === '4' ? dx + dy : Math.max(dx, dy); };
+function labelNB(adj) {
+  const lab = new Int32Array(GW * GH); let n = 0;
+  const nb = adj === 4 ? [[1, 0], [-1, 0], [0, 1], [0, -1]] : [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  for (let i = 0; i < GW * GH; i++) if (NB.A[i] && !lab[i]) {
+    n++; const st = [i]; lab[i] = n;
+    while (st.length) { const q = st.pop(), x = q % GW, y = (q / GW) | 0; for (const [dx, dy] of nb) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= GW || yy >= GH) continue; const j = yy * GW + xx; if (NB.A[j] && !lab[j]) { lab[j] = n; st.push(j); } } }
+  }
+  return { lab, n };
+}
+const HUES = ['#b8412e', '#6b7a5a', '#a88848', '#3d6b8a', '#8a3d6b', '#4a8a7a', '#8a6b3d', '#5a4a8a'];
+function renderNB() {
+  const cells = $('nb').children, L = labelNB(NB.adj), c4 = labelNB(4).n, c8 = labelNB(8).n;
+  NB.counts = { c4, c8 };
+  let maxd = 0; for (let i = 0; i < GW * GH; i++) maxd = Math.max(maxd, dist(i, NB.p, NB.metric));
+  const px = NB.p % GW, py = (NB.p / GW) | 0;
+  for (let i = 0; i < GW * GH; i++) {
+    const x = i % GW, y = (i / GW) | 0, dx = Math.abs(x - px), dy = Math.abs(y - py);
+    const c = cells[i], d = dist(i, NB.p, NB.metric);
+    let cls = '';
+    if (i === NB.p) cls = 'p';
+    else if (dx + dy === 1) cls = 'n4';
+    else if (dx === 1 && dy === 1) cls = 'nd';
+    c.className = (NB.A[i] ? 'on ' : '') + cls;
+    if (NB.A[i]) c.style.background = HUES[(L.lab[i] - 1) % HUES.length];
+    else c.style.background = 'rgba(184,65,46,' + (0.04 + 0.34 * (1 - d / maxd)).toFixed(3) + ')';
+    c.textContent = NB.A[i] ? '' : (NB.metric === 'e' ? (d % 1 ? '' : d) : d);
+  }
+  let hov = '';
+  if (NB.hover >= 0) {
+    const h = NB.hover, hx = h % GW, hy = (h / GW) | 0;
+    hov = '<br>Pointer at (' + hx + ', ' + hy + '): <i>D<sub>e</sub></i> = <b>' + dist(h, NB.p, 'e').toFixed(2) + '</b>, <i>D</i><sub>4</sub> = <b>' + dist(h, NB.p, '4') + '</b>, <i>D</i><sub>8</sub> = <b>' + dist(h, NB.p, '8') + '</b>' +
+      (hx === px || hy === py ? ' — on the same row or column, so all three agree.' : '');
+    if ((hx === px || hy === py) && h !== NB.p) NB.axisSeen = true;
+  }
+  $('nb-read').innerHTML = '<b>p</b> = (' + px + ', ' + py + ') · green outline = <i>N</i><sub>4</sub>(<i>p</i>), gold = <i>N<sub>D</sub></i>(<i>p</i>)' +
+    '<br>Objects with 4-adjacency: <b>' + c4 + '</b> · with 8-adjacency: <b>' + c8 + '</b>' +
+    '<br>Foreground coloured by ' + NB.adj + '-connected component.' + hov;
+  $('n-key').innerHTML = '<span>showing ' + { e: 'Euclidean', 4: 'city-block', 8: 'chessboard' }[NB.metric] + ' distance from <i>p</i></span><span>' + (NB.metric === 'e' ? 'integer values printed only' : 'every value is an integer') + '</span>';
+  tries3.check();
+}
+const tries3 = IP.tries('t3', [
+  { text: 'Load <i>Diagonal lines</i>. Why does one line count as one object with 8-adjacency but as many with 4-adjacency?',
+    test: () => NB.counts.c4 > NB.counts.c8 && NB.counts.c8 >= 1 },
+  { text: 'Switch between the three distances and compare the shapes they draw around <i>p</i>. Which is a diamond, and which is a square?',
+    test: () => NB.seenMetric.has('4') && NB.seenMetric.has('8') },
+  { text: 'Point at a cell in the same row as <i>p</i>. Why do all three distances agree there, and nowhere off the axes?',
+    test: () => NB.axisSeen }
+]);
+
+/* ═════ 04 — colour models ═════ */
+
+const M4 = { model: 'hsi', probes: new Set() };
+/** RGB in [0,1] → HSI, eqs. 6-16 to 6-19. H in degrees, undefined (NaN) when S = 0. */
+function rgb2hsi(R, G, B) {
+  const num = 0.5 * ((R - G) + (R - B)), den = Math.sqrt((R - G) ** 2 + (R - B) * (G - B));
+  const th = den > 1e-9 ? Math.acos(clamp(num / den, -1, 1)) * 180 / Math.PI : NaN;
+  const H = isNaN(th) ? NaN : B <= G ? th : 360 - th, sum = R + G + B;
+  const S = sum > 1e-9 ? 1 - 3 * Math.min(R, G, B) / sum : 0, I = sum / 3;
+  return { H, S, I, th };
+}
+/** HSI → RGB by sector, eqs. 6-20 to 6-30. */
+function hsi2rgb(H, S, I) {
+  if (isNaN(H) || S <= 0) return [I, I, I];
+  const r = d => d * Math.PI / 180, one = h => I * (1 + S * Math.cos(r(h)) / Math.cos(r(60 - h)));
+  H = ((H % 360) + 360) % 360;
+  if (H < 120) { const B = I * (1 - S), R = one(H); return [R, 3 * I - (R + B), B]; }
+  if (H < 240) { const h = H - 120, R = I * (1 - S), G = one(h); return [R, G, 3 * I - (R + G)]; }
+  const h = H - 240, G = I * (1 - S), B = one(h); return [3 * I - (G + B), G, B];
+}
+const MODELS = {
+  rgb: { label: 'RGB', parts: ['R', 'G', 'B'] },
+  cmy: { label: 'CMY', parts: ['C', 'M', 'Y'] },
+  cmyk: { label: 'CMYK', parts: ['C', 'M', 'Y', 'K'] },
+  hsi: { label: 'HSI', parts: ['H (0–360° → 0–255)', 'S', 'I'] }
+};
+function buildM4() { seg('m-model', Object.keys(MODELS), M4.model, v => { M4.model = v; buildM4(); render4(); }, Object.values(MODELS).map(m => m.label)); }
+function components(rgb, n, model) {
+  const parts = MODELS[model].parts.map(() => IP.make(IMG.w, IMG.h));
+  for (let i = 0; i < n; i++) {
+    const R = rgb[i * 3] / 255, G = rgb[i * 3 + 1] / 255, B = rgb[i * 3 + 2] / 255;
+    let v;
+    if (model === 'rgb') v = [R, G, B];
+    else if (model === 'cmy') v = [1 - R, 1 - G, 1 - B];
+    else if (model === 'cmyk') { const C = 1 - R, M = 1 - G, Y = 1 - B, K = Math.min(C, M, Y); v = K >= 1 ? [0, 0, 0, 1] : [(C - K) / (1 - K), (M - K) / (1 - K), (Y - K) / (1 - K), K]; }
+    else { const h = rgb2hsi(R, G, B); v = [isNaN(h.H) ? 0 : h.H / 360, h.S, h.I]; }
+    v.forEach((c, k) => { parts[k].data[i] = c * 255; });
+  }
+  return parts;
+}
+function render4() {
+  if (!IMG) return;
+  const rgb = IP.rgbOf(IMG), n = IMG.w * IMG.h, model = M4.model, parts = components(rgb, n, model);
+  const ci = $('m-img'); IP.drawColor(ci, IMG.rgb ? IMG : colourImg(IMG.w, IMG.h, rgb));
+  [0, 1, 2, 3].forEach(k => {
+    const has = k < parts.length;
+    if (k === 3) $('m-c3w').style.display = has ? '' : 'none';
+    if (!has) return;
+    IP.drawGray($('m-c' + k), parts[k]);
+    $('m-c' + k + 'l').innerHTML = MODELS[model].parts[k];
+  });
+  $('m-eq').innerHTML = {
+    rgb: '<i>c</i>&nbsp;=&nbsp;(<i>R</i>, <i>G</i>, <i>B</i>) ∈ [0, 1]³&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">one axis per primary, a cube with black at the origin</span>',
+    cmy: '[<i>C</i>, <i>M</i>, <i>Y</i>]<sup>T</sup>&nbsp;=&nbsp;[1, 1, 1]<sup>T</sup> − [<i>R</i>, <i>G</i>, <i>B</i>]<sup>T</sup>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(6-5)</span>',
+    cmyk: '<i>K</i>&nbsp;=&nbsp;min(<i>C</i>, <i>M</i>, <i>Y</i>),&nbsp;&nbsp;<i>C</i>′&nbsp;=&nbsp;(<i>C</i> − <i>K</i>) / (1 − <i>K</i>),&nbsp;…&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(6-6, 6-10 to 6-12)</span>',
+    hsi: '<i>H</i>&nbsp;=&nbsp;<i>θ</i> if <i>B</i> ≤ <i>G</i>, else 360° − <i>θ</i>;&nbsp;&nbsp;<i>S</i>&nbsp;=&nbsp;1 − 3&nbsp;min(<i>R</i>,<i>G</i>,<i>B</i>)/(<i>R</i>+<i>G</i>+<i>B</i>);&nbsp;&nbsp;<i>I</i>&nbsp;=&nbsp;(<i>R</i>+<i>G</i>+<i>B</i>)/3&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(6-16 to 6-19)</span>'
+  }[model];
+  $('m-key').innerHTML = model === 'hsi'
+    ? '<span><i>θ</i> = cos<sup>−1</sup>{ ½[(<i>R</i>−<i>G</i>)+(<i>R</i>−<i>B</i>)] / [(<i>R</i>−<i>G</i>)² + (<i>R</i>−<i>B</i>)(<i>G</i>−<i>B</i>)]<sup>½</sup> } (6-17)</span><span>the H image is gray where <i>S</i> = 0: hue is undefined there</span>'
+    : '<span>' + MODELS[model].parts.length + ' components, each shown as a grayscale image (0 = black, 1 = white)</span>';
+  tries4.check();
+}
+$('m-img').addEventListener('pointermove', e => {
+  if (!IMG) return;
+  const c = $('m-img'), r = c.getBoundingClientRect();
+  const x = clamp(Math.floor((e.clientX - r.left - c.clientLeft) / c.clientWidth * IMG.w), 0, IMG.w - 1), y = clamp(Math.floor((e.clientY - r.top - c.clientTop) / c.clientHeight * IMG.h), 0, IMG.h - 1);
+  const rgb = IP.rgbOf(IMG), i = y * IMG.w + x, R8 = rgb[i * 3], G8 = rgb[i * 3 + 1], B8 = rgb[i * 3 + 2], R = R8 / 255, G = G8 / 255, B = B8 / 255;
+  const C = 1 - R, M = 1 - G, Y = 1 - B, K = Math.min(C, M, Y), h = rgb2hsi(R, G, B), back = hsi2rgb(h.H, h.S, h.I);
+  const err = Math.max(Math.abs(back[0] - R), Math.abs(back[1] - G), Math.abs(back[2] - B)) * 255;
+  $('m-read').innerHTML = '<span class="sw" style="background:rgb(' + R8 + ',' + G8 + ',' + B8 + ')"></span>Pixel (' + x + ', ' + y + ')' +
+    '<br><b>RGB</b> = (' + R8 + ', ' + G8 + ', ' + B8 + ') → normalized (' + n3(R) + ', ' + n3(G) + ', ' + n3(B) + ')' +
+    '<br><b>CMY</b> = 1 − RGB = (' + n3(C) + ', ' + n3(M) + ', ' + n3(Y) + ')' +
+    '<br><b>CMYK</b>: <i>K</i> = min = ' + n3(K) + (K >= 1 ? ', pure black so <i>C</i> = <i>M</i> = <i>Y</i> = 0' : ', <i>C</i>′ = (' + n3(C) + ' − ' + n3(K) + ')/(1 − ' + n3(K) + ') = ' + n3((C - K) / (1 - K)) + ', <i>M</i>′ = ' + n3((M - K) / (1 - K)) + ', <i>Y</i>′ = ' + n3((Y - K) / (1 - K))) +
+    '<br><b>HSI</b>: <i>θ</i> = ' + (isNaN(h.th) ? 'undefined' : f1(h.th) + '°') + ', <i>B</i> ' + (B <= G ? '≤' : '&gt;') + ' <i>G</i> so <i>H</i> = <b>' + (isNaN(h.H) ? 'undefined (no hue: R = G = B)' : f1(h.H) + '°') + '</b>, <i>S</i> = 1 − 3 × ' + n3(Math.min(R, G, B)) + ' / ' + n3(R + G + B) + ' = <b>' + n3(h.S) + '</b>, <i>I</i> = <b>' + n3(h.I) + '</b>' +
+    '<br><b>HSI → RGB</b> (sector ' + (isNaN(h.H) ? '—' : h.H < 120 ? 'RG, 0°–120°' : h.H < 240 ? 'GB, 120°–240°' : 'BR, 240°–360°') + '): (' + back.map(v => Math.round(v * 255)).join(', ') + '), round-trip error ' + err.toFixed(2) + ' levels';
+  if (h.S > 0.9 && Math.abs(h.H - 120) < 6) M4.probes.add('green');
+  if (h.S > 0.9 && (h.H < 6 || h.H > 354)) M4.probes.add('red');
+  if (h.S < 0.02) M4.probes.add('gray');
+  tries4.check();
+});
+const tries4 = IP.tries('t4', [
+  { text: '<i>Colour chart</i>, HSI: point at the pure red and pure green patches. Which hue angles do you read, and where would blue be?',
+    test: () => M4.probes.has('red') && M4.probes.has('green') },
+  { text: 'Point at a gray patch. Why is <i>H</i> undefined there, and what does the H image show in those places?',
+    test: () => M4.probes.has('gray') },
+  { text: 'In CMYK, which component takes over in the dark parts of <i>Sunset</i>? Why do printers use a separate black ink?',
+    test: () => M4.model === 'cmyk' && IP.key === 'sunset' }
+]);
+
+/* ═════ 05 — colour processing ═════ */
+
+const C5 = { op: 'slice', n: 6, shape: 'sphere', D: 0.15, proto: null, seen: new Set() };
+const COPS = [['pseudo', 'Pseudocolour (intensity slicing)'], ['slice', 'Colour slicing'], ['eq', 'Equalize: RGB vs intensity']];
+const SLICE_COLS = [[20, 30, 90], [40, 70, 170], [30, 140, 160], [60, 160, 80], [170, 190, 50], [240, 170, 40], [230, 90, 40], [190, 40, 50], [150, 40, 120], [110, 60, 170], [220, 220, 220], [250, 240, 200]];
+function buildC5() {
+  chips('c-op', COPS, C5.op, v => { C5.op = v; buildC5(); render5(); });
+  seg('c-sh', ['sphere', 'cube'], C5.shape, v => { C5.shape = v; buildC5(); render5(); }, ['Sphere (6-44)', 'Cube (6-43)']);
+  $('c-n-w').style.display = C5.op === 'pseudo' ? '' : 'none';
+  $('c-sh-w').style.display = $('c-d-w').style.display = C5.op === 'slice' ? '' : 'none';
+}
+$('c-n').addEventListener('input', e => { C5.n = +e.target.value; render5(); });
+$('c-d').addEventListener('input', e => { C5.D = +e.target.value; render5(); });
+document.querySelector('#st5').addEventListener('pointerdown', e => {
+  if (C5.op !== 'slice') return;
+  const f = e.target.closest('.ip-frame'); if (!f || e.target.closest('.ip-divider')) return;
+  const r = f.getBoundingClientRect(), x = clamp(Math.floor((e.clientX - r.left) / r.width * IMG.w), 0, IMG.w - 1), y = clamp(Math.floor((e.clientY - r.top) / r.height * IMG.h), 0, IMG.h - 1);
+  const rgb = IP.rgbOf(IMG), i = y * IMG.w + x; C5.proto = [rgb[i * 3] / 255, rgb[i * 3 + 1] / 255, rgb[i * 3 + 2] / 255];
+  render5();
+});
+function equalizeRGB(rgb, n) {
+  const out = new Uint8ClampedArray(rgb.length);
+  for (let c = 0; c < 3; c++) {
+    const h = new Float64Array(256); for (let i = 0; i < n; i++) h[rgb[i * 3 + c]]++;
+    let acc = 0; const lut = new Uint8ClampedArray(256); for (let k = 0; k < 256; k++) { acc += h[k]; lut[k] = Math.round(255 * acc / n); }
+    for (let i = 0; i < n; i++) out[i * 3 + c] = lut[rgb[i * 3 + c]];
+  }
+  return out;
+}
+function equalizeI(rgb, n) {
+  const H = new Float32Array(n), S = new Float32Array(n), I = new Float32Array(n), h = new Float64Array(256);
+  for (let i = 0; i < n; i++) { const c = rgb2hsi(rgb[i * 3] / 255, rgb[i * 3 + 1] / 255, rgb[i * 3 + 2] / 255); H[i] = c.H; S[i] = c.S; I[i] = c.I; h[Math.round(c.I * 255)]++; }
+  let acc = 0; const lut = new Float64Array(256); for (let k = 0; k < 256; k++) { acc += h[k]; lut[k] = acc / n; }
+  const out = new Uint8ClampedArray(rgb.length);
+  for (let i = 0; i < n; i++) { const [R, G, B] = hsi2rgb(H[i], S[i], lut[Math.round(I[i] * 255)]); out[i * 3] = R * 255; out[i * 3 + 1] = G * 255; out[i * 3 + 2] = B * 255; }
+  return out;
+}
+/** Mean hue change (degrees, circular) over pixels that have a hue worth measuring. */
+function hueShift(a, b, n) {
+  let s = 0, c = 0;
+  for (let i = 0; i < n; i += 3) {
+    const p = rgb2hsi(a[i * 3] / 255, a[i * 3 + 1] / 255, a[i * 3 + 2] / 255), q = rgb2hsi(b[i * 3] / 255, b[i * 3 + 1] / 255, b[i * 3 + 2] / 255);
+    if (p.S < 0.15 || q.S < 0.05 || isNaN(p.H) || isNaN(q.H)) continue;
+    let d = Math.abs(p.H - q.H); if (d > 180) d = 360 - d; s += d; c++;
+  }
+  return c ? s / c : 0;
+}
+const st5 = IP.stage('st5', { color: true,
+  explain: (r, s, x, y) => {
+    const rgb = IP.rgbOf(IMG), i = y * IMG.w + x, v = [rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]];
+    if (C5.op === 'pseudo') { const k = Math.min(C5.n - 1, Math.floor(IMG.data[i] * C5.n / 256)); return 'Intensity ' + IMG.data[i] + ' → slice <b>' + (k + 1) + '</b> of ' + C5.n + ' (' + Math.round(k * 256 / C5.n) + '–' + (Math.round((k + 1) * 256 / C5.n) - 1) + ')'; }
+    if (C5.op === 'slice') {
+      if (!C5.proto) return 'Click the image to choose the colour <i>a</i>.';
+      const z = v.map(t => t / 255), d = Math.hypot(z[0] - C5.proto[0], z[1] - C5.proto[1], z[2] - C5.proto[2]), dm = Math.max(...z.map((t, k) => Math.abs(t - C5.proto[k])));
+      return 'RGB (' + v.join(', ') + '): ' + (C5.shape === 'sphere' ? '<i>D</i>(<i>z</i>, <i>a</i>) = <b>' + n3(d) + '</b> ' + (d <= C5.D ? '≤' : '&gt;') + ' <i>D</i>₀' : 'largest |<i>z<sub>j</sub></i> − <i>a<sub>j</sub></i>| = <b>' + n3(dm) + '</b> ' + (dm <= C5.D / 2 ? '≤' : '&gt;') + ' <i>W</i>/2') + ' → ' + ((C5.shape === 'sphere' ? d <= C5.D : dm <= C5.D / 2) ? '<b>kept</b>' : 'set to neutral gray');
+    }
+    return 'Left: each of R, G, B equalized separately. Right: only <i>I</i> equalized in HSI, with <i>H</i> and <i>S</i> kept.';
+  } });
+function render5() {
+  if (!IMG) return;
+  const { w, h } = IMG, n = w * h, rgb = IP.rgbOf(IMG), base = IMG.rgb ? IMG : colourImg(w, h, rgb);
+  let before = base, after, fr = 0;
+  if (C5.op === 'pseudo') {
+    const out = new Uint8ClampedArray(n * 3);
+    for (let i = 0; i < n; i++) { const k = Math.min(C5.n - 1, Math.floor(IMG.data[i] * C5.n / 256)), c = SLICE_COLS[Math.round(k * (SLICE_COLS.length - 1) / Math.max(1, C5.n - 1))]; out[i * 3] = c[0]; out[i * 3 + 1] = c[1]; out[i * 3 + 2] = c[2]; }
+    before = IMG; after = colourImg(w, h, out);
+    $('c-eq').innerHTML = '<i>f</i>(<i>x</i>, <i>y</i>) ∈ slice <i>k</i> &nbsp;⇒&nbsp; colour <i>c<sub>k</sub></i>, &nbsp;<i>k</i> = 1 … ' + C5.n;
+    $('c-key').innerHTML = '<span>' + C5.n + ' slices of width ' + (256 / C5.n).toFixed(1) + '</span>';
+    $('c-gloss').innerHTML = 'Split the intensity range into bands and paint each band a different colour. The gray image contains no colour information, so the colours carry no new data. They simply make small differences in intensity easier for the eye to see.';
+    $('sb5').innerHTML = score('Slices', C5.n, 'one colour each', true);
+  } else if (C5.op === 'slice') {
+    const out = new Uint8ClampedArray(rgb);
+    if (C5.proto) {
+      const a = C5.proto;
+      for (let i = 0; i < n; i++) {
+        const z0 = rgb[i * 3] / 255 - a[0], z1 = rgb[i * 3 + 1] / 255 - a[1], z2 = rgb[i * 3 + 2] / 255 - a[2];
+        const keep = C5.shape === 'sphere' ? z0 * z0 + z1 * z1 + z2 * z2 <= C5.D * C5.D : Math.max(Math.abs(z0), Math.abs(z1), Math.abs(z2)) <= C5.D / 2;
+        if (keep) fr++; else out[i * 3] = out[i * 3 + 1] = out[i * 3 + 2] = 128;
+      }
+    }
+    after = colourImg(w, h, out);
+    $('c-eq').innerHTML = C5.shape === 'sphere'
+      ? '<i>s<sub>i</sub></i>&nbsp;=&nbsp;0.5 if Σ(<i>r<sub>j</sub></i> − <i>a<sub>j</sub></i>)² &gt; <i>R</i>₀², else <i>r<sub>i</sub></i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(6-44) · the same test as <i>D</i>(<i>z</i>, <i>a</i>) ≤ <i>D</i>₀ in eq. 6-48</span>'
+      : '<i>s<sub>i</sub></i>&nbsp;=&nbsp;0.5 if any |<i>r<sub>j</sub></i> − <i>a<sub>j</sub></i>| &gt; <i>W</i>/2, else <i>r<sub>i</sub></i>&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(6-43)</span>';
+    $('c-key').innerHTML = C5.proto ? '<span><i>a</i> = (' + C5.proto.map(v => Math.round(v * 255)).join(', ') + ')</span><span>' + (C5.shape === 'sphere' ? '<i>R</i>₀ = <i>D</i>₀ = ' : '<i>W</i> = ') + C5.D.toFixed(2) + '</span>' : '<span>Click the image to choose the colour <i>a</i>.</span>';
+    $('c-gloss').innerHTML = 'Pixels close enough to the chosen colour <i>a</i> keep their colour, and everything else becomes neutral gray. A sphere treats all directions away from <i>a</i> equally. A cube is cheaper to test but reaches further along its diagonals. Colour segmentation in RGB (§6.7) is the same sphere test, with a binary output instead.';
+    $('sb5').innerHTML = score('Selected', C5.proto ? (fr / n * 100).toFixed(2) + '%' : '—', 'of pixels within range', true) + score('Shape', C5.shape === 'sphere' ? 'Sphere' : 'Cube', C5.shape === 'sphere' ? 'Euclidean' : 'per-channel');
+    C5.frac = fr / n;
+  } else {
+    const eRGB = equalizeRGB(rgb, n), eI = equalizeI(rgb, n);
+    before = colourImg(w, h, eRGB); after = colourImg(w, h, eI);
+    C5.shiftRGB = hueShift(rgb, eRGB, n); C5.shiftI = hueShift(rgb, eI, n);
+    $('c-eq').innerHTML = 'RGB:&nbsp;<i>s<sub>i</sub></i>&nbsp;=&nbsp;<i>T<sub>i</sub></i>(<i>r<sub>i</sub></i>), <i>i</i> = 1, 2, 3&nbsp;&nbsp;&nbsp;vs&nbsp;&nbsp;&nbsp;HSI:&nbsp;<i>s</i><sub>3</sub>&nbsp;=&nbsp;<i>T</i>(<i>r</i><sub>3</sub>), <i>H</i> and <i>S</i> unchanged&nbsp;&nbsp;<span style="font-size:.6em;color:var(--ink-light)">(6-38)</span>';
+    $('c-key').innerHTML = '<span>mean hue change, R, G, B each equalized: <b>' + f1(C5.shiftRGB) + '°</b></span><span>intensity only: <b>' + f1(C5.shiftI) + '°</b></span>';
+    $('c-gloss').innerHTML = 'Equalizing each channel with its own histogram gives each channel a different curve, which changes the ratios between R, G and B. Those ratios are what define hue, so the colours shift. The book recommends equalizing only the intensity component of HSI instead. This sets <i>before</i> = the RGB version and <i>after</i> = the intensity version. Drag the divider to compare them.';
+    $('sb5').innerHTML = score('Hue shift, RGB', f1(C5.shiftRGB) + '°', 'each channel equalized') + score('Hue shift, I only', f1(C5.shiftI) + '°', 'HSI intensity equalized', true);
+  }
+  st5.set(before, after);
+  C5.seen.add(C5.op + ':' + IP.key);
+  tries5.check();
+}
+const tries5 = IP.tries('t5', [
+  { text: '<i>Sunset</i>: click the red boat and adjust <i>D</i>₀ until the boat is kept (at least 0.2% of pixels) but the orange sky and sun are not (under 3% in total).',
+    test: () => C5.op === 'slice' && IP.key === 'sunset' && C5.frac >= 0.002 && C5.frac < 0.03 },
+  { text: 'Equalize <i>Sunset</i> both ways and compare the hue shift in the scoreboard. Which result would you trust for skin tones?',
+    test: () => C5.seen.has('eq:sunset') },
+  { text: '<i>Night street</i>, pseudocolour with 8 or more slices: which details that were invisible in gray can you see now?',
+    test: () => C5.op === 'pseudo' && IP.key === 'night' && C5.n >= 8 }
+]);
+
+/* ═════ wiring ═════ */
+
+['pick1', 'pick2', 'pick4', 'pick5'].forEach(id => IP.picker(id));
+IP.onImage(img => { IMG = img; C5.proto = null; S1.row = S1.col = null; render1(); render2(); render4(); render5(); });
+IP.onResize(() => drawS1());
+
+buildS1(); buildI2(); buildNB(); buildNBctl(); nbPreset('blobs'); buildM4(); buildC5();
+IP.useSample('sunset');
+</script>
+</body>
+</html>

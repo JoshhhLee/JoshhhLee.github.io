@@ -5,7 +5,9 @@
    paste), the before/after view with its pixel inspector, and the
    histogram / curve plots. Lab-specific operations stay in each lab.
 
-   Images are plain grayscale objects: { w, h, data: Uint8ClampedArray }.
+   Images are grayscale objects: { w, h, data: Uint8ClampedArray }. Uploads and
+   the colour samples also carry img.rgb (3 bytes per pixel); every lab works on
+   data unless it asks for colour explicitly.
    ═══════════════════════════════════════════════════════════════════ */
 
 const IP = (() => {
@@ -174,6 +176,55 @@ const IP = (() => {
         return build((u, v, px, py) => d[(py * SW + px) * 4] + grain(px, py, 5) * 3);
       }
     },
+    // saturated hues on a warm-to-cool sky — for the colour sections of lab 01
+    sunset: {
+      label: 'Sunset (colour)',
+      make: () => {
+        const c = document.createElement('canvas'); c.width = SW; c.height = SH;
+        const x = c.getContext('2d');
+        const sky = x.createLinearGradient(0, 0, 0, SH * 0.62);
+        sky.addColorStop(0, '#1d2f6f'); sky.addColorStop(0.45, '#8a3f8f'); sky.addColorStop(0.8, '#f0763a'); sky.addColorStop(1, '#ffc65c');
+        x.fillStyle = sky; x.fillRect(0, 0, SW, SH * 0.62);
+        const sun = x.createRadialGradient(250, 150, 4, 250, 150, 60);
+        sun.addColorStop(0, '#fff6c8'); sun.addColorStop(0.35, '#ffd25a'); sun.addColorStop(1, 'rgba(255,160,60,0)');
+        x.fillStyle = sun; x.fillRect(180, 80, 140, 140);
+        x.fillStyle = '#2f6b3a';
+        x.beginPath(); x.moveTo(0, 150); x.quadraticCurveTo(70, 115, 150, 160); x.lineTo(150, 170); x.lineTo(0, 170); x.fill();
+        const sea = x.createLinearGradient(0, SH * 0.62, 0, SH);
+        sea.addColorStop(0, '#1f5f8b'); sea.addColorStop(1, '#0b2440');
+        x.fillStyle = sea; x.fillRect(0, SH * 0.62, SW, SH);
+        x.fillStyle = 'rgba(255,200,90,.55)';
+        for (let i = 0; i < 9; i++) x.fillRect(214 + (i % 3) * 8, 172 + i * 9, 60 - i * 5, 3);
+        x.fillStyle = '#c8252c'; x.beginPath(); x.moveTo(60, 205); x.lineTo(128, 205); x.lineTo(118, 222); x.lineTo(70, 222); x.fill();
+        x.fillStyle = '#f2efe6'; x.beginPath(); x.moveTo(94, 203); x.lineTo(94, 160); x.lineTo(122, 200); x.fill();
+        x.fillStyle = '#f3c318'; x.fillRect(300, 196, 22, 14);
+        const d = x.getImageData(0, 0, SW, SH).data;
+        for (let i = 0, k = 0; i < SW * SH; i++, k += 4) { const g = grain(i % SW, (i / SW) | 0, 6) * 5; d[k] += g; d[k + 1] += g; d[k + 2] += g; }
+        return fromRGBA(d, SW, SH);
+      }
+    },
+    // a hue × saturation chart with a gray ramp — every colour model has something to show here
+    palette: {
+      label: 'Colour chart',
+      make: () => {
+        const c = document.createElement('canvas'); c.width = SW; c.height = SH;
+        const x = c.getContext('2d');
+        x.fillStyle = '#808080'; x.fillRect(0, 0, SW, SH);
+        for (let j = 0; j < 4; j++) for (let i = 0; i < 12; i++) {
+          x.fillStyle = 'hsl(' + i * 30 + ',' + (100 - j * 25) + '%,50%)';
+          x.fillRect(12 + i * 28, 12 + j * 34, 26, 32);
+        }
+        for (let i = 0; i < 12; i++) { const v = Math.round(i * 255 / 11); x.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')'; x.fillRect(12 + i * 28, 156, 26, 26); }
+        const g = x.createLinearGradient(12, 0, 348, 0);
+        ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff', '#ff0000'].forEach((col, i) => g.addColorStop(i / 6, col));
+        x.fillStyle = g; x.fillRect(12, 192, 336, 30);
+        x.globalCompositeOperation = 'lighter';
+        [['#ff0000', 150, 244], ['#00ff00', 180, 244], ['#0000ff', 165, 258]].forEach(([col, cx, cy]) => { x.fillStyle = col; x.beginPath(); x.arc(cx, cy, 20, 0, Math.PI * 2); x.fill(); });
+        x.globalCompositeOperation = 'source-over';
+        const d = x.getImageData(0, 0, SW, SH).data;
+        return fromRGBA(d, SW, SH);
+      }
+    },
     // text under a strong lighting gradient — defeats any single global threshold
     page: {
       label: 'Uneven page',
@@ -208,10 +259,24 @@ const IP = (() => {
     c.width = w; c.height = h;
     const ctx = c.getContext('2d');
     ctx.drawImage(el, 0, 0, w, h);
-    const d = ctx.getImageData(0, 0, w, h).data, img = make(w, h);
-    for (let i = 0; i < w * h; i++)
+    return fromRGBA(ctx.getImageData(0, 0, w, h).data, w, h);
+  }
+  /** RGBA pixels → gray image that also carries its colour as img.rgb (3 bytes per pixel). */
+  function fromRGBA(d, w, h) {
+    const img = make(w, h), rgb = new Uint8ClampedArray(w * h * 3);
+    for (let i = 0; i < w * h; i++) {
+      rgb[i * 3] = d[i * 4]; rgb[i * 3 + 1] = d[i * 4 + 1]; rgb[i * 3 + 2] = d[i * 4 + 2];
       img.data[i] = Math.round(0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]);
+    }
+    img.rgb = rgb;
     return img;
+  }
+  /** The colour of any image: its own rgb, or its gray value repeated in all three channels. */
+  function rgbOf(img) {
+    if (img.rgb) return img.rgb;
+    const rgb = new Uint8ClampedArray(img.data.length * 3);
+    for (let i = 0; i < img.data.length; i++) rgb[i * 3] = rgb[i * 3 + 1] = rgb[i * 3 + 2] = img.data[i];
+    return rgb;
   }
 
   function loadFile(file) {
@@ -303,6 +368,15 @@ const IP = (() => {
   });
 
   /* ═════ drawing ═════ */
+
+  /** Draw in colour if the image carries rgb, otherwise in gray. */
+  function drawColor(canvas, img) {
+    if (!img.rgb) { drawGray(canvas, img); return; }
+    canvas.width = img.w; canvas.height = img.h;
+    const ctx = canvas.getContext('2d'), id = ctx.createImageData(img.w, img.h), d = id.data, c = img.rgb;
+    for (let i = 0; i < img.w * img.h; i++) { d[i * 4] = c[i * 3]; d[i * 4 + 1] = c[i * 3 + 1]; d[i * 4 + 2] = c[i * 3 + 2]; d[i * 4 + 3] = 255; }
+    ctx.putImageData(id, 0, 0);
+  }
 
   function drawGray(canvas, img) {
     canvas.width = img.w; canvas.height = img.h;
@@ -624,8 +698,9 @@ const IP = (() => {
     api.set = (before, after) => {
       const sizeChanged = !api.before || api.before.w !== before.w || api.before.h !== before.h;
       api.before = before; api.after = after || null;
-      if (compare) { drawGray(cB, before); drawGray(cA, after || before); }
-      else drawGray(cA, after || before);
+      const draw = opts.color ? drawColor : drawGray;       // colour only when a lab asks for it
+      if (compare) { draw(cB, before); draw(cA, after || before); }
+      else draw(cA, after || before);
       frame.style.aspectRatio = before.w + ' / ' + before.h;
       dim.textContent = before.w + ' × ' + before.h + ' px · ' + (before.w * before.h).toLocaleString() + ' pixels';
       if (sizeChanged) { api.probe = null; mark.hidden = true; }
@@ -953,7 +1028,7 @@ const IP = (() => {
     SAMPLES, make, makeF, clone, applyLUT, histogram, cdf, stats,
     useSample, setImage, onImage: fn => bus.subs.push(fn),
     get image() { return bus.img; }, get key() { return bus.key; },
-    picker, stage, tries, drawGray, drawHist, drawCurve, drawSeries, drawProfile, onResize, col,
+    picker, stage, tries, drawGray, drawColor, rgbOf, fromRGBA, drawHist, drawCurve, drawSeries, drawProfile, onResize, col,
     rng, correlate, flip, separable, gauss1d, rank, noise, psnr, toDisplay, row,
     square, fft2, dft, idft, shiftIndex, freqOf, spectrumImage
   };
