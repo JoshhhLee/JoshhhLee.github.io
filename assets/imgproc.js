@@ -848,6 +848,104 @@ const IP = (() => {
     if (o.marker != null) vline(ctx, X(o.marker), T, B, col('vermillion'), [2, 3]);
   }
 
+  /* ═════ frequency domain ═════
+     A radix-2 FFT on n×n images, n a power of two. Spectra are kept
+     un-centred (DC at [0]); centring is a display concern — see shiftIndex. */
+
+  /** Centre-crop to a square and resample to n×n, so the DFT is exact and fast. */
+  function square(img, n) {
+    const s = Math.min(img.w, img.h), x0 = (img.w - s) >> 1, y0 = (img.h - s) >> 1;
+    const src = document.createElement('canvas'); src.width = img.w; src.height = img.h;
+    drawGray(src, img);
+    const c = document.createElement('canvas'); c.width = c.height = n;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, x0, y0, s, s, 0, 0, n, n);
+    const d = ctx.getImageData(0, 0, n, n).data, out = make(n, n);
+    for (let i = 0; i < n * n; i++) out.data[i] = d[i * 4];
+    return out;
+  }
+
+  const twiddles = {};
+  function fft1(re, im, inverse) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {                      // bit-reversal permutation
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    let tw = twiddles[n];
+    if (!tw) {
+      tw = twiddles[n] = { c: new Float64Array(n / 2), s: new Float64Array(n / 2) };
+      for (let k = 0; k < n / 2; k++) { tw.c[k] = Math.cos(2 * Math.PI * k / n); tw.s[k] = Math.sin(2 * Math.PI * k / n); }
+    }
+    const sg = inverse ? 1 : -1;
+    for (let len = 2; len <= n; len <<= 1) {
+      const half = len >> 1, step = n / len;
+      for (let i = 0; i < n; i += len)
+        for (let k = 0; k < half; k++) {
+          const wr = tw.c[k * step], wi = sg * tw.s[k * step];
+          const a = i + k, b = a + half;
+          const xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
+          re[b] = re[a] - xr; im[b] = im[a] - xi;
+          re[a] += xr; im[a] += xi;
+        }
+    }
+  }
+  /** In-place 2-D FFT of n×n real/imag arrays. The inverse includes the 1/n² factor. */
+  function fft2(re, im, n, inverse) {
+    const r = new Float64Array(n), i = new Float64Array(n);
+    for (let y = 0; y < n; y++) {
+      const o = y * n;
+      for (let x = 0; x < n; x++) { r[x] = re[o + x]; i[x] = im[o + x]; }
+      fft1(r, i, inverse);
+      for (let x = 0; x < n; x++) { re[o + x] = r[x]; im[o + x] = i[x]; }
+    }
+    for (let x = 0; x < n; x++) {
+      for (let y = 0; y < n; y++) { r[y] = re[y * n + x]; i[y] = im[y * n + x]; }
+      fft1(r, i, inverse);
+      for (let y = 0; y < n; y++) { re[y * n + x] = r[y]; im[y * n + x] = i[y]; }
+    }
+    if (inverse) { const s = 1 / (n * n); for (let k = 0; k < n * n; k++) { re[k] *= s; im[k] *= s; } }
+  }
+  /** DFT of an n×n image → { n, re, im }. */
+  function dft(img) {
+    const n = img.w, re = new Float64Array(n * n), im = new Float64Array(n * n);
+    for (let k = 0; k < n * n; k++) re[k] = img.data[k];
+    fft2(re, im, n, false);
+    return { n, re, im };
+  }
+  /** Inverse DFT → float image (real part; the imaginary part is rounding noise for a real input). */
+  function idft(F) {
+    const n = F.n, re = Float64Array.from(F.re), im = Float64Array.from(F.im);
+    fft2(re, im, n, true);
+    const out = makeF(n, n);
+    for (let k = 0; k < n * n; k++) out.data[k] = re[k];
+    return out;
+  }
+  /** Map display pixel (x, y) to spectrum index, optionally centred (DC in the middle). */
+  const shiftIndex = (x, y, n, centred) => centred ? ((y + n / 2) % n) * n + (x + n / 2) % n : y * n + x;
+  /** Frequency (u, v) of a spectrum index, in cycles per image, −n/2 … n/2−1. */
+  const freqOf = (k, n) => { const x = k % n, y = (k / n) | 0; return { u: x < n / 2 ? x : x - n, v: y < n / 2 ? y : y - n }; };
+
+  /** Spectrum → displayable image. how: 'log' | 'linear' | 'phase'. */
+  function spectrumImage(F, how, centred) {
+    const n = F.n, out = make(n, n), val = new Float64Array(n * n);
+    let max = 0;
+    for (let k = 0; k < n * n; k++) {
+      const m = Math.hypot(F.re[k], F.im[k]);
+      val[k] = how === 'phase' ? Math.atan2(F.im[k], F.re[k]) : how === 'log' ? Math.log(1 + m) : m;
+      if (how !== 'phase' && val[k] > max) max = val[k];
+    }
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const v = val[shiftIndex(x, y, n, centred)];
+        out.data[y * n + x] = how === 'phase' ? (v + Math.PI) / (2 * Math.PI) * 255 : max ? v / max * 255 : 0;
+      }
+    return out;
+  }
+
   /** One row of an image (8-bit or float) as a plain array, for drawProfile. */
   const row = (img, y) => Array.from(img.data.subarray(y * img.w, (y + 1) * img.w));
 
@@ -856,6 +954,7 @@ const IP = (() => {
     useSample, setImage, onImage: fn => bus.subs.push(fn),
     get image() { return bus.img; }, get key() { return bus.key; },
     picker, stage, tries, drawGray, drawHist, drawCurve, drawSeries, drawProfile, onResize, col,
-    rng, correlate, flip, separable, gauss1d, rank, noise, psnr, toDisplay, row
+    rng, correlate, flip, separable, gauss1d, rank, noise, psnr, toDisplay, row,
+    square, fft2, dft, idft, shiftIndex, freqOf, spectrumImage
   };
 })();
