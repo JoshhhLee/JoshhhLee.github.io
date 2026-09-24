@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Segmentation Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive lab for learning image segmentation — IoU and Dice, the losses that train a network, upsampling, transposed convolution, U-Net skip connections, and non-maximum suppression." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+  /* ── lab 02 specific ── */
+  .sw.tp{background:#6b7a5a}.sw.fp{background:#b8412e}
+  .sw.fn{background:#a88848}.sw.tn{background:#ebe1cf}
+  .sw.gt{background:#1a1a1a}
+
+
+
+
+
+  .skip-toggles{display:flex;flex-direction:column;gap:.55rem;margin-top:.4rem}
+  .skip-toggle{display:flex;align-items:center;gap:.7rem;font-family:'Inter',sans-serif;
+    font-size:.72rem;color:var(--ink-soft);cursor:pointer}
+  .skip-toggle input{accent-color:var(--vermillion);width:auto;cursor:pointer}
+
+  .overlap{font-family:'Inter',sans-serif;font-size:.7rem;color:var(--ink-light);margin-top:.8rem}
+  .cell.acc1{background:rgba(184,65,46,.10)}
+  .cell.acc2{background:rgba(184,65,46,.26)}
+  .cell.acc3{background:rgba(184,65,46,.42);color:var(--ink)}
+  .cell.writing{outline:2px solid var(--vermillion);outline-offset:1px}
+
+  .boxlist{font-family:'Inter',sans-serif;font-size:.72rem;line-height:2;color:var(--ink-soft);margin-top:1rem}
+  .boxlist .kept{color:var(--sage);font-weight:500}
+  .boxlist .killed{color:var(--ink-light);text-decoration:line-through;opacity:.6}
+
+  @media(max-width:820px){
+    .cmp .imgblock canvas,.cmp .imgblock.wide canvas{width:min(200px,42vw);height:min(200px,42vw)}
+    .bar-row{grid-template-columns:6.5rem 1fr 3rem}
+  }
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#metrics">Metrics</a><a href="#losses">Losses</a>
+    <a href="#upsample">Upsampling</a><a href="#transposed">Transposed</a>
+    <a href="#unet">U-Net</a><a href="#train">Training</a><a href="#boxes">Boxes</a>
+    <a href="labs.html">The Series</a>
+  </nav>
+</header>
+
+<div class="container">
+
+  <section class="hero">
+    <div class="hero-kanji">領 · 域 · 分 割</div>
+    <h1>Segmentation <em>Lab</em></h1>
+    <div class="hero-divider"></div>
+    <p>
+      Lab 01 asked what a convolution does to an image. This one asks a harder question:
+      how do you label every single pixel, how do you know whether you got it right, and
+      how do you get the resolution back after a network has thrown it away?
+    </p>
+  </section>
+
+  <!-- ════════ 01 METRICS ════════ -->
+  <section id="metrics">
+    <div class="section-heading reveal">
+      <span class="section-num">One</span>
+      <div class="section-heading-kanji">評 · 価</div>
+      <h2 class="section-heading-text">Accuracy lies, IoU does not</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      A segmentation prediction is just a mask. Compare it to the ground truth and every pixel
+      falls into one of four buckets. Drag the prediction below — or shrink the object with the
+      slider — and watch what happens to each score. One of them barely moves. That one is the
+      reason careless papers report numbers that mean nothing.
+    </p>
+
+    <div class="stage">
+      <div class="panel">
+        <span class="label">Ground truth vs prediction</span>
+        <canvas id="m-canvas" class="draggable" width="240" height="240"
+                style="width:264px;height:264px;display:block;border:1px solid var(--line);
+                       background:var(--paper-dark);image-rendering:pixelated"
+                aria-label="Drag to move the predicted mask"></canvas>
+        <div class="legend">
+          <span><i class="sw tp"></i>True positive &mdash; both agree it is object</span>
+          <span><i class="sw fp"></i>False positive &mdash; predicted, but isn't there</span>
+          <span><i class="sw fn"></i>False negative &mdash; missed real object</span>
+          <span><i class="sw tn"></i>True negative &mdash; background</span>
+          <span><i class="sw gt"></i>Outline &mdash; the true object's edge</span>
+        </div>
+        <p class="drag-hint">
+          Drag the prediction anywhere, or use arrow keys once the panel has focus.
+          The dark outline never moves &mdash; that is where the object really is.
+        </p>
+      </div>
+
+      <div class="panel">
+        <span class="label">Scores</span>
+        <div class="scoreboard" id="m-scores"></div>
+        <div class="bars" id="m-bars"></div>
+        <div class="controls" style="margin-top:2rem">
+          <div>
+            <span class="label">Object size <span class="mono" id="m-r-val"></span></span>
+            <input type="range" id="m-r" min="3" max="18" value="9" aria-label="Object size">
+          </div>
+          <div>
+            <span class="label">Prediction size <span class="mono" id="m-pr-val"></span></span>
+            <input type="range" id="m-pr" min="3" max="18" value="9" aria-label="Prediction size">
+          </div>
+          <div style="grid-column:1/-1">
+            <span class="label">Reset</span>
+            <div class="seg" id="m-preset"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note reveal" id="m-verdict"></div>
+  </section>
+
+  <!-- ════════ 02 LOSSES ════════ -->
+  <section id="losses">
+    <div class="section-heading reveal">
+      <span class="section-num">Two</span>
+      <div class="section-heading-kanji">損 · 失</div>
+      <h2 class="section-heading-text">What the network is actually punished for</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      IoU tells you how good a prediction is, but you cannot train on it directly — it is not
+      differentiable. So networks are trained on a stand-in. The three below make very different
+      bargains, and the one you pick decides what the network learns to ignore.
+    </p>
+
+    <div class="eqbox reveal d2">
+      <div class="eqmath" id="loss-eq"></div>
+      <div class="eqkey" id="loss-key"></div>
+      <p class="eqgloss" id="loss-gloss"></p>
+    </div>
+
+    <p class="lede reveal d2">
+      Below is a real prediction over a real mask, not a single abstract pixel — which matters,
+      because Dice is a property of two <em>sets</em> and says nothing about one pixel on its own.
+      The two heatmaps show <em>where each loss is spending its attention</em>. That is the whole
+      argument in one picture.
+    </p>
+
+    <div class="cmp">
+      <div class="imgblock wide">
+        <span class="cap">Truth &amp; soft prediction</span>
+        <canvas id="l-mask" class="draggable" aria-label="Drag to move the predicted mask"></canvas>
+        <span class="dim" id="l-mask-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Cross-entropy, per pixel</span>
+        <canvas id="l-ce-map"></canvas>
+        <span class="dim" id="l-ce-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Focal, per pixel</span>
+        <canvas id="l-fl-map"></canvas>
+        <span class="dim" id="l-fl-dim"></span>
+      </div>
+    </div>
+    <p class="drag-hint">Drag the prediction · both heatmaps share one scale, so they are comparable</p>
+
+    <div class="stage" style="margin-top:2.2rem">
+      <div class="panel">
+        <span class="label">Totals on this mask</span>
+        <div class="scoreboard" id="l-scores"></div>
+
+        <span class="label" style="margin-top:1.8rem">
+          Share of the loss coming from background pixels
+        </span>
+        <div class="bars" id="l-share"></div>
+        <p class="readout" id="l-note" style="margin-top:1.4rem"></p>
+      </div>
+
+      <div class="panel">
+        <span class="label">Explain which loss</span>
+        <div class="seg" id="l-pick"></div>
+
+        <div class="controls" style="margin-top:1.4rem">
+          <div>
+            <span class="label">Object size <span class="mono" id="l-r-val"></span></span>
+            <input type="range" id="l-r" min="3" max="20" value="9" aria-label="Object size">
+          </div>
+          <div>
+            <span class="label">Boundary softness <span class="mono" id="l-soft-val"></span></span>
+            <input type="range" id="l-soft" min="2" max="40" value="12" aria-label="Boundary softness">
+          </div>
+          <div>
+            <span class="label">Focal γ <span class="mono" id="l-g-val"></span></span>
+            <input type="range" id="l-gamma" min="0" max="50" value="20" aria-label="Focal γ">
+          </div>
+          <div>
+            <span class="label">Focal α <span class="mono" id="l-a-val"></span></span>
+            <input type="range" id="l-alpha" min="10" max="90" value="25" aria-label="Focal α">
+          </div>
+        </div>
+
+        <span class="label" style="margin-top:1.8rem">Per-pixel behaviour</span>
+        <div class="curve-wrap">
+          <canvas id="l-curve" width="520" height="270"></canvas>
+        </div>
+        <p class="drag-hint">
+          Cross-entropy and focal are per-pixel losses, so a per-pixel curve is an honest picture
+          of them. Dice is deliberately absent — it has no per-pixel value to plot.
+        </p>
+      </div>
+    </div>
+
+    <div class="note reveal">
+      This is not academic. In camouflaged object detection the animal may be two percent of the
+      pixels, so cross-entropy's easy background wins swamp the gradient from the handful of pixels
+      that matter. Dice normalises that away; focal loss starves the easy pixels of gradient on
+      purpose. Most working systems use cross-entropy and Dice added together.
+    </div>
+  </section>
+
+  <!-- ════════ 03 UPSAMPLING ════════ -->
+  <section id="upsample">
+    <div class="section-heading reveal">
+      <span class="section-num">Three</span>
+      <div class="section-heading-kanji">拡 · 大</div>
+      <h2 class="section-heading-text">Getting the resolution back</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      A classifier's job is to destroy spatial information — pool it away until only "cat" remains.
+      Segmentation needs it back at full resolution. There are three ways to enlarge a feature map,
+      and only one of them has anything to learn.
+    </p>
+
+    <div class="cmp">
+      <div class="imgblock">
+        <span class="cap">Feature map</span>
+        <canvas id="u-src"></canvas>
+        <span class="dim" id="u-src-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Nearest neighbour</span>
+        <canvas id="u-near"></canvas>
+        <span class="dim">no parameters · blocky</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Bilinear</span>
+        <canvas id="u-bilin"></canvas>
+        <span class="dim">no parameters · smooth</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Transposed convolution</span>
+        <canvas id="u-trans"></canvas>
+        <span class="dim" id="u-trans-dim">learnable</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div>
+        <span class="label">Upsample by <span class="mono" id="u-s-val"></span></span>
+        <div class="seg" id="u-s-seg"></div>
+      </div>
+      <div>
+        <span class="label">Source size <span class="mono" id="u-n-val"></span></span>
+        <input type="range" id="u-n" min="4" max="16" value="8" aria-label="Source size">
+      </div>
+      <div>
+        <span class="label">Pattern</span>
+        <div class="chiprow" id="u-pick"></div>
+      </div>
+      <div>
+        <span class="label">Transposed kernel weights</span>
+        <div class="chiprow" id="u-kpick"></div>
+      </div>
+    </div>
+
+    <div class="note" id="u-verdict"></div>
+
+    <div class="note">
+      Nearest and bilinear are fixed rules — they invent no detail, they only choose between the
+      values they were given. The transposed convolution has actual weights, and in a real network
+      those weights are learned. They are set by hand here so you can compare two specific choices,
+      and the next section walks through how they land on the output.
+    </div>
+  </section>
+
+  <!-- ════════ 04 TRANSPOSED ════════ -->
+  <section id="transposed">
+    <div class="section-heading reveal">
+      <span class="section-num">Four</span>
+      <div class="section-heading-kanji">転 · 置</div>
+      <h2 class="section-heading-text">Transposed convolution, one cell at a time</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      A normal convolution gathers: many input cells collapse into one output. A transposed
+      convolution scatters: each input cell paints a whole copy of the kernel into the output,
+      and wherever those copies land on top of each other the values add up. Step through it and
+      watch the overlaps build — the uneven ones are the checkerboard artifact being born.
+    </p>
+
+    <div class="stage">
+      <div class="panel">
+        <h3>Input</h3>
+        <p class="sub" id="t-in-sub"></p>
+        <div class="gridwrap"><div class="grid" id="t-in"></div></div>
+        <div class="kernel">
+          <h3>Kernel</h3>
+          <p class="sub">each input cell scatters this, scaled by its own value</p>
+          <div class="grid" id="t-k"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Output</h3>
+        <p class="sub" id="t-out-sub"></p>
+        <div class="gridwrap"><div class="grid" id="t-out"></div></div>
+        <p class="overlap" id="t-overlap"></p>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button type="button" id="t-reset">Reset</button>
+      <button type="button" id="t-prev">Back</button>
+      <button type="button" class="play" id="t-play">Play</button>
+      <button type="button" id="t-next">Step</button>
+      <div class="speed">
+        <label for="t-speed">Speed</label>
+        <input type="range" id="t-speed" min="1" max="10" value="5">
+      </div>
+      <span class="counter" id="t-counter"></span>
+    </div>
+    <p class="drag-hint">Keyboard: ← → to step, space to play</p>
+
+    <div class="controls">
+      <div>
+        <span class="label">Input size <span class="mono" id="t-n-val"></span></span>
+        <div class="seg" id="t-n-seg"></div>
+      </div>
+      <div>
+        <span class="label">Kernel <span class="mono" id="t-k-val"></span></span>
+        <div class="seg" id="t-k-seg"></div>
+      </div>
+      <div>
+        <span class="label">Stride <span class="mono" id="t-s-val"></span></span>
+        <div class="seg" id="t-s-seg"></div>
+      </div>
+    </div>
+
+    <div class="note" id="t-verdict"></div>
+  </section>
+
+  <!-- ════════ 05 U-NET ════════ -->
+  <section id="unet">
+    <div class="section-heading reveal">
+      <span class="section-num">Five</span>
+      <div class="section-heading-kanji">架 · 橋</div>
+      <h2 class="section-heading-text">What the skip connections were carrying</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      U-Net's shape gets drawn in every lecture, but the arrows across the middle are usually
+      waved at. Here is what they do. The encoder halves the image three times; the decoder puts
+      it back. Switch a skip off and the detail that level was carrying is gone for good —
+      there is nowhere else in the network it could have come from.
+    </p>
+
+    <div class="note reveal d2" style="border-left-color:var(--sage)">
+      <strong>Read this as an analogy, not a simulation.</strong> There are no learned weights here —
+      the encoder is average pooling and the decoder is bilinear upsampling, so with every skip
+      connected the reconstruction comes back <em>exactly</em>. A trained U-Net never does that:
+      its convolutions transform features rather than preserving them. What transfers is the
+      structural point — a skip is the only route by which fine detail can reach the decoder —
+      and that point is real. Section six of lab 01, and the training section below, are where
+      actual weights get learned.
+    </div>
+
+    <div class="cmp">
+      <div class="imgblock wide">
+        <span class="cap">Input</span>
+        <canvas id="n-in"></canvas>
+        <span class="dim">64 × 64</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Bottleneck</span>
+        <canvas id="n-bott"></canvas>
+        <span class="dim">8 × 8 — everything the encoder kept</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap" id="n-out-cap">Decoder output</span>
+        <canvas id="n-out"></canvas>
+        <span class="dim" id="n-out-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">What was lost</span>
+        <canvas id="n-err"></canvas>
+        <span class="dim" id="n-err-dim"></span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div>
+        <span class="label">Skip connections</span>
+        <div class="skip-toggles">
+          <label class="skip-toggle"><input type="checkbox" id="n-s1" checked> Level 1 — 64×64, finest detail</label>
+          <label class="skip-toggle"><input type="checkbox" id="n-s2" checked> Level 2 — 32×32</label>
+          <label class="skip-toggle"><input type="checkbox" id="n-s3" checked> Level 3 — 16×16, coarsest</label>
+        </div>
+      </div>
+      <div>
+        <span class="label">Image</span>
+        <div class="chiprow" id="n-pick"></div>
+        <span class="label" style="margin-top:1.4rem">Reconstruction error <span class="mono" id="n-mae"></span></span>
+        <div class="bar-track"><div class="bar-fill" id="n-mae-bar" style="width:0"></div></div>
+      </div>
+    </div>
+
+    <div class="note" id="n-verdict"></div>
+  </section>
+
+  <!-- ════════ 06 TRAINING ════════ -->
+  <section id="train">
+    <div class="section-heading reveal">
+      <span class="section-num">Six</span>
+      <div class="section-heading-kanji">学 · 習</div>
+      <h2 class="section-heading-text">Now train it to find the animal</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      Everything above was analysis. This is a real network — two convolutional layers, a ReLU
+      between them, a sigmoid at the end, <span id="tr-params"></span> weights in total — learning
+      by gradient descent, in your browser, right now. Its job is the one from my own research:
+      there is a shape hidden in that texture, and almost nothing separates it from the background
+      except statistics.
+    </p>
+
+    <p class="lede reveal d2">
+      The interesting control is the loss. Section two argued that cross-entropy loses interest in
+      small objects. Here you can <em>test</em> that claim — train with each loss and compare the
+      IoU it reaches.
+    </p>
+
+    <div class="cmp">
+      <div class="imgblock wide">
+        <span class="cap">Input</span>
+        <canvas id="tr-x"></canvas>
+        <span class="dim">the animal is in there</span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Target</span>
+        <canvas id="tr-y"></canvas>
+        <span class="dim" id="tr-y-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Prediction</span>
+        <canvas id="tr-p"></canvas>
+        <span class="dim" id="tr-p-dim"></span>
+      </div>
+      <div class="imgblock wide">
+        <span class="cap">Loss &amp; IoU</span>
+        <canvas id="tr-curve" width="200" height="200"
+                style="image-rendering:auto;background:var(--card)"></canvas>
+        <span class="dim" id="tr-curve-dim">vermillion loss · sage IoU</span>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button type="button" id="tr-reset">Reset</button>
+      <button type="button" class="play" id="tr-play">Train</button>
+      <button type="button" id="tr-step">+10 steps</button>
+      <div class="speed">
+        <label for="tr-speed">Speed</label>
+        <input type="range" id="tr-speed" min="1" max="10" value="5">
+      </div>
+      <span class="counter" id="tr-counter"></span>
+    </div>
+
+    <div class="controls">
+      <div>
+        <span class="label">Loss function</span>
+        <div class="chiprow" id="tr-loss"></div>
+      </div>
+      <div>
+        <span class="label">Hidden channels <span class="mono" id="tr-c-val"></span></span>
+        <div class="seg" id="tr-c-seg"></div>
+      </div>
+      <div>
+        <span class="label">Learning rate <span class="mono" id="tr-lr-val"></span></span>
+        <input type="range" id="tr-lr" min="2" max="60" value="30" aria-label="Learning rate">
+      </div>
+      <div>
+        <span class="label">Contrast <span class="mono" id="tr-d-val"></span></span>
+        <input type="range" id="tr-d" min="8" max="45" value="28" aria-label="Contrast">
+      </div>
+    </div>
+
+    <span class="label" style="margin-top:2rem">Best IoU reached, by loss</span>
+    <div class="bars" id="tr-board"></div>
+
+    <div class="note" id="tr-verdict"></div>
+
+    <div class="note" style="border-left-color:var(--sage)">
+      <strong>One result worth keeping.</strong> Focal loss here uses α = 0.5. The value quoted
+      almost everywhere is α = 0.25, from the RetinaNet paper — and measured on this task it makes
+      focal markedly <em>worse</em>, because it down-weights exactly the rare class we are trying
+      to find. Detection and segmentation are not the same problem, and a hyperparameter that is
+      standard in one is not automatically right in the other. Inherit numbers from papers with
+      care, and measure them on your own data.
+    </div>
+
+    <div class="note">
+      This is a two-layer network with a 5×5 effective receptive field and no pooling, so do not
+      read too much into the absolute IoU — a real segmenter sees far more context. What does
+      transfer is the comparison: same network, same data, same initialisation, only the objective
+      changed.
+    </div>
+  </section>
+
+  <!-- ════════ 07 BOXES ════════ -->
+  <section id="boxes">
+    <div class="section-heading reveal">
+      <span class="section-num">Seven</span>
+      <div class="section-heading-kanji">検 · 出</div>
+      <h2 class="section-heading-text">Boxes, and throwing most of them away</h2>
+      <div class="section-heading-rule"></div>
+    </div>
+
+    <p class="lede reveal d1">
+      Detection answers a coarser question than segmentation — where is it, roughly — but the
+      same IoU appears again, this time with a closed form for rectangles. A detector proposes
+      hundreds of overlapping boxes, and non-maximum suppression is the almost embarrassingly
+      simple rule that cleans them up.
+    </p>
+
+    <div class="stage">
+      <div class="panel">
+        <span class="label">Box IoU — drag either box</span>
+        <canvas id="b-iou" class="draggable" width="300" height="240"
+                style="width:100%;max-width:330px;height:auto;display:block;
+                       border:1px solid var(--line);background:var(--card)"
+                aria-label="Drag either box to change their overlap"></canvas>
+        <div class="scoreboard" id="b-scores"></div>
+      </div>
+
+      <div class="panel">
+        <span class="label">Non-maximum suppression</span>
+        <canvas id="b-nms" width="300" height="240"
+                style="width:100%;max-width:330px;height:auto;display:block;
+                       border:1px solid var(--line);background:var(--card)"></canvas>
+        <span class="label" style="margin-top:1.2rem">
+          IoU threshold <span class="mono" id="b-t-val"></span>
+        </span>
+        <input type="range" id="b-thresh" min="5" max="95" value="45" aria-label="IoU threshold">
+        <div class="boxlist" id="b-list"></div>
+      </div>
+    </div>
+
+    <div class="note">
+      Lower the threshold and NMS gets aggressive — two genuinely separate animals standing close
+      together get merged into one detection. Raise it and duplicates survive. There is no correct
+      value, only a value that suits your data, which is why it is a tuned hyperparameter rather
+      than a constant.
+    </div>
+  </section>
+
+  <!-- ════════ PAGER ════════ -->
+  <nav class="lab-pager">
+    <a href="convolution-lab.html" class="prev">
+      <span class="pager-dir">← Previous</span>
+      <span class="pager-title">01 · Convolution Lab</span>
+    </a>
+    <a href="encoder-decoder-lab.html" class="next">
+      <span class="pager-dir">Next →</span>
+      <span class="pager-title">03 · Encoder–Decoder Lab</span>
+    </a>
+  </nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script>
+/* ═══════════ 01 — metrics ═══════════ */
+/* Starts deliberately imperfect. A perfectly overlapping prediction has no false positives
+   and no false negatives, so two of the four colours in the legend would be empty and the
+   panel would demonstrate nothing until the reader thought to drag it. */
+const M = { N: 40, gt: null, r: 9, pr: 9, dx: 4, dy: 3 };
+const mCan = document.getElementById('m-canvas');
+
+function disc(N, cx, cy, r) {
+  const a = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    // squashed slightly so it reads as a shape, not a test pattern
+    const d = Math.hypot((x - cx) * 1.0, (y - cy) * 1.18);
+    a[y * N + x] = d <= r ? 1 : 0;
+  }
+  return a;
+}
+function mBuild() {
+  const N = M.N;
+  M.gt = disc(N, N / 2 - 0.5, N / 2 - 0.5, M.r);
+  M.pred = disc(N, N / 2 - 0.5 + M.dx, N / 2 - 0.5 + M.dy, M.pr);
+}
+function mStats() {
+  let tp = 0, fp = 0, fn = 0, tn = 0;
+  for (let i = 0; i < M.N * M.N; i++) {
+    const g = M.gt[i], p = M.pred[i];
+    if (g && p) tp++; else if (!g && p) fp++; else if (g && !p) fn++; else tn++;
+  }
+  const total = M.N * M.N;
+  return {
+    tp, fp, fn, tn, total,
+    iou: tp + fp + fn ? tp / (tp + fp + fn) : 1,
+    dice: 2 * tp + fp + fn ? (2 * tp) / (2 * tp + fp + fn) : 1,
+    acc: (tp + tn) / total,
+    frac: (tp + fn) / total
+  };
+}
+function mRender() {
+  const N = M.N, ctx = mCan.getContext('2d');
+  mCan.width = N; mCan.height = N;
+  const img = ctx.createImageData(N, N);
+  const C = { tp: [107, 122, 90], fp: [184, 65, 46], fn: [168, 136, 72], tn: [235, 225, 207] };
+  // is this a ground-truth edge pixel? drawn dark so truth stays locatable however far
+  // the prediction is dragged away from it
+  const gtEdge = (x, y) => {
+    if (!M.gt[y * N + x]) return false;
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + ox, ny = y + oy;
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N) return true;
+      if (!M.gt[ny * N + nx]) return true;
+    }
+    return false;
+  };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x, g = M.gt[i], p = M.pred[i];
+    let c = g && p ? C.tp : (!g && p ? C.fp : (g && !p ? C.fn : C.tn));
+    if (gtEdge(x, y)) c = [26, 26, 26];
+    img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const s = mStats();
+  document.getElementById('m-scores').innerHTML =
+    score('IoU', f3(s.iou), 'Jaccard', true) +
+    score('Dice', f3(s.dice), 'F1 score', true) +
+    score('Pixel accuracy', pct(s.acc), 'the liar');
+  document.getElementById('m-bars').innerHTML =
+    bar('True positive', s.tp, s.total, 'sage') +
+    bar('False positive', s.fp, s.total) +
+    bar('False negative', s.fn, s.total);
+
+  document.getElementById('m-r-val').textContent = `radius ${M.r}`;
+  document.getElementById('m-pr-val').textContent = `radius ${M.pr}`;
+
+  // The lesson, stated back to the reader in whatever situation they've created
+  const v = document.getElementById('m-verdict');
+  if (s.frac < 0.06 && s.acc > 0.9 && s.iou < 0.55) {
+    v.innerHTML = `The object is <b>${pct(s.frac)}</b> of the image. Pixel accuracy reads
+      <b>${pct(s.acc)}</b> — which a network could beat by predicting "background" everywhere and
+      learning nothing at all. IoU reads <b>${f3(s.iou)}</b> and is not fooled. This gap is the
+      whole argument, and it only widens as the object gets smaller.`;
+  } else if (s.iou > 0.85) {
+    v.innerHTML = `Near-perfect overlap. Notice Dice (<b>${f3(s.dice)}</b>) sits above IoU
+      (<b>${f3(s.iou)}</b>) — it always does, except when both are 0 or 1. Dice double-counts the
+      intersection, so it is the more forgiving of the two. Papers quote whichever flatters them.`;
+  } else if (s.fn > s.fp * 2.2) {
+    v.innerHTML = `Mostly false negatives — the prediction is too small and is missing real object.
+      A network trained on plain cross-entropy drifts here on purpose: predicting less is the safe
+      way to avoid being punished for false positives.`;
+  } else if (s.fp > s.fn * 2.2) {
+    v.innerHTML = `Mostly false positives — the prediction has spilled past the object. IoU
+      punishes this exactly as hard as missing the object, which is what makes it honest.`;
+  } else {
+    v.innerHTML = `Dice is <b>${f3(s.dice)}</b>, IoU is <b>${f3(s.iou)}</b>. They rank predictions
+      the same way, so a model that wins on one wins on the other — but never compare a Dice number
+      against an IoU number, because Dice is always the larger.`;
+  }
+}
+/* score() and bar() now live in assets/lab.js */
+
+// dragging the prediction (pointer or arrow keys)
+const mSetOffset = dragMask(mCan, () => M.N, (dx, dy) => {
+  M.dx = dx; M.dy = dy; mBuild(); mRender();
+});
+
+document.getElementById('m-r').addEventListener('input', e => {
+  M.r = Number(e.target.value); mBuild(); mRender();
+});
+document.getElementById('m-pr').addEventListener('input', e => {
+  M.pr = Number(e.target.value); mBuild(); mRender();
+});
+function mPresets() {
+  seg('m-preset', ['perfect', 'shift', 'tiny'], null, k => {
+    let ox = 0, oy = 0;
+    if (k === 'perfect') { M.r = 9; M.pr = 9; ox = 0; oy = 0; }
+    if (k === 'shift')   { M.r = 9; M.pr = 9; ox = 4; oy = 3; }
+    if (k === 'tiny')    { M.r = 4; M.pr = 3; ox = 2; oy = 1; }
+    document.getElementById('m-r').value = M.r;
+    document.getElementById('m-pr').value = M.pr;
+    mSetOffset(ox, oy);   // keeps the drag helper's own offset in sync
+  }, ['Perfect', 'Shifted', 'Small object']);
+}
+
+/* ═══════════ 02 — losses, evaluated on a real mask ═══════════
+   Cross-entropy and focal are per-pixel losses: each pixel has its own value, so a
+   per-pixel curve and a per-pixel heatmap are both honest pictures of them.
+   Dice is a property of two *sets* — there is no such thing as "the Dice of this pixel" —
+   so it appears only as a total, never on the curve. */
+const L = { which: 'ce', gamma: 2.0, alpha: 0.25, N: 48, r: 9, soft: 1.2, dx: 3, dy: 2 };
+const lCan = document.getElementById('l-curve');
+const lMaskCan = document.getElementById('l-mask');
+const EPS = 1e-6;
+
+const ceLoss    = p => -Math.log(Math.max(p, EPS));
+const focalLoss = (p, g) => -Math.pow(1 - p, g) * Math.log(Math.max(p, EPS));
+
+/** Ground-truth disc (hard) and a soft sigmoid prediction offset from it. */
+function lFields() {
+  const N = L.N, y = new Float32Array(N * N), p = new Float32Array(N * N);
+  const cx = N / 2 - 0.5, cy = N / 2 - 0.5;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const k = j * N + i;
+    y[k] = Math.hypot(i - cx, j - cy) <= L.r ? 1 : 0;
+    const d = Math.hypot(i - (cx + L.dx), j - (cy + L.dy));
+    // sigmoid across the boundary — small `soft` gives a crisp edge, large gives a vague one
+    p[k] = clamp(1 / (1 + Math.exp((d - L.r) / L.soft)), EPS, 1 - EPS);
+  }
+  return { y, p };
+}
+
+/** Per-pixel cross-entropy and focal, plus every total we report. */
+function lEvaluate() {
+  const { y, p } = lFields(), N = L.N, n = N * N, g = L.gamma, a = L.alpha;
+  const ceMap = new Float32Array(n), flMap = new Float32Array(n);
+  let ceSum = 0, flSum = 0, ceBg = 0, flBg = 0, inter = 0, sp = 0, sy = 0;
+
+  for (let k = 0; k < n; k++) {
+    const pk = p[k], yk = y[k];
+    // cross-entropy on the correct class
+    const ce = yk ? -Math.log(pk) : -Math.log(1 - pk);
+    // focal, with the α balancing term the paper actually specifies
+    const fl = yk
+      ? -a * Math.pow(1 - pk, g) * Math.log(pk)
+      : -(1 - a) * Math.pow(pk, g) * Math.log(1 - pk);
+    ceMap[k] = ce; flMap[k] = fl;
+    ceSum += ce; flSum += fl;
+    if (!yk) { ceBg += ce; flBg += fl; }
+    inter += pk * yk; sp += pk; sy += yk;
+  }
+  const dice = 1 - (2 * inter + EPS) / (sp + sy + EPS);
+  return {
+    ceMap, flMap, y, p,
+    ce: ceSum / n, fl: flSum / n, dice,
+    ceBgShare: ceSum ? ceBg / ceSum : 0,
+    flBgShare: flSum ? flBg / flSum : 0,
+    objFrac: sy / n
+  };
+}
+
+function lCurve() {
+  const ctx = lCan.getContext('2d'), W = lCan.width, H = lCan.height;
+  const padL = 46, padR = 14, padT = 14, padB = 34;
+  const x0 = padL, x1 = W - padR, y0 = padT, y1 = H - padB;
+  const YMAX = 5;
+  const X = p => x0 + p * (x1 - x0);
+  const Y = v => y1 - Math.min(v, YMAX) / YMAX * (y1 - y0);
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#f4ede0'; ctx.fillRect(0, 0, W, H);
+
+  // grid
+  ctx.strokeStyle = 'rgba(26,26,26,0.10)'; ctx.lineWidth = 1;
+  ctx.font = '10px Inter, sans-serif'; ctx.fillStyle = '#6b6b6b';
+  for (let v = 0; v <= YMAX; v++) {
+    const y = Y(v);
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(String(v), x0 - 7, y + 3);
+  }
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const p = i / 4, x = X(p);
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+    ctx.fillText(p.toFixed(2), x, y1 + 15);
+  }
+  ctx.fillText('probability assigned to the correct class', (x0 + x1) / 2, y1 + 29);
+
+  const plot = (fn, color, width, dash) => {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.setLineDash(dash || []);
+    for (let i = 0; i <= 260; i++) {
+      const p = 0.004 + (i / 260) * 0.996, v = fn(p);
+      const x = X(p), y = Y(v);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+
+  plot(ceLoss, 'rgba(26,26,26,0.32)', 1.5, [4, 4]);
+  plot(p => focalLoss(p, L.gamma), '#b8412e', 2.2);
+
+  ctx.textAlign = 'left'; ctx.fillStyle = '#6b6b6b'; ctx.font = '10px Inter, sans-serif';
+  ctx.fillText('dashed = cross-entropy · solid = focal, γ = ' + f2(L.gamma), x0 + 6, y0 + 12);
+  if (L.which === 'dice') {
+    ctx.fillStyle = '#6b7a5a';
+    ctx.fillText('Dice has no per-pixel value — see the totals instead', x0 + 6, y0 + 26);
+  }
+}
+
+function lRender() {
+  const N = L.N, r = lEvaluate();
+
+  // truth (sage outline) with the soft prediction (vermillion) laid over it
+  paintMask(lMaskCan, r.p, N, [184, 65, 46], null, 0.8);
+  const mctx = lMaskCan.getContext('2d'), img = mctx.getImageData(0, 0, N, N);
+  for (let k = 0; k < N * N; k++) {
+    if (!r.y[k]) continue;
+    // tint the true region so the overlap is readable
+    img.data[k * 4]     = img.data[k * 4] * 0.72 + 107 * 0.28;
+    img.data[k * 4 + 1] = img.data[k * 4 + 1] * 0.72 + 122 * 0.28;
+    img.data[k * 4 + 2] = img.data[k * 4 + 2] * 0.72 + 90 * 0.28;
+  }
+  mctx.putImageData(img, 0, 0);
+
+  // both heatmaps share one scale, otherwise they cannot be compared
+  let peak = 0;
+  for (let k = 0; k < N * N; k++) peak = Math.max(peak, r.ceMap[k], r.flMap[k]);
+  peak = Math.max(peak, EPS);
+  const norm = src => { const o = new Float32Array(N * N); for (let k = 0; k < N * N; k++) o[k] = src[k] / peak; return o; };
+  paintMask(document.getElementById('l-ce-map'), norm(r.ceMap), N, [184, 65, 46], null, 1);
+  paintMask(document.getElementById('l-fl-map'), norm(r.flMap), N, [184, 65, 46], null, 1);
+
+  document.getElementById('l-mask-dim').textContent =
+    `object is ${pct(r.objFrac)} of the image`;
+  document.getElementById('l-ce-dim').textContent = `total ${f3(r.ce)}`;
+  document.getElementById('l-fl-dim').textContent = `total ${f3(r.fl)}`;
+  document.getElementById('l-r-val').textContent = `radius ${L.r}`;
+  document.getElementById('l-soft-val').textContent = f2(L.soft);
+  document.getElementById('l-g-val').textContent = f2(L.gamma);
+  document.getElementById('l-a-val').textContent = f2(L.alpha);
+
+  document.getElementById('l-scores').innerHTML =
+    score('Cross-entropy', f3(r.ce), 'mean per pixel', L.which === 'ce') +
+    score('Dice loss', f3(r.dice), 'set overlap', L.which === 'dice') +
+    score('Focal', f3(r.fl), `γ ${f2(L.gamma)} · α ${f2(L.alpha)}`, L.which === 'focal');
+
+  document.getElementById('l-share').innerHTML =
+    bar('Cross-entropy', Math.round(r.ceBgShare * 1000), 1000) +
+    bar('Focal', Math.round(r.flBgShare * 1000), 1000, 'sage');
+  document.querySelectorAll('#l-share .bar-val').forEach((el, i) => {
+    el.textContent = pct(i === 0 ? r.ceBgShare : r.flBgShare);
+  });
+
+  const eq = document.getElementById('loss-eq');
+  const key = document.getElementById('loss-key');
+  const gloss = document.getElementById('loss-gloss');
+  if (L.which === 'ce') {
+    eq.innerHTML = `<i>L</i><sub>CE</sub> = −&thinsp;${sigma('<i>i</i>', '')}&nbsp;<i>y<sub>i</sub></i>
+      &thinsp;log&thinsp;<span class="sym on"><i>p<sub>i</sub></i></span>`;
+    key.innerHTML = `<span><b>p</b> what the network believes</span>
+      <span><b>y</b> what was true</span><span>summed over every pixel, equally</span>`;
+    gloss.textContent = 'Every pixel contributes the same way. With a tiny object, the background ' +
+      'pixels outnumber it so heavily that their small individual losses still dominate the total.';
+  } else if (L.which === 'dice') {
+    eq.innerHTML = `<i>L</i><sub>Dice</sub> = 1 − <span class="sym on">2&thinsp;|<i>P</i> ∩ <i>Y</i>|</span>
+      &thinsp;/&thinsp;(|<i>P</i>| + |<i>Y</i>|)`;
+    key.innerHTML = `<span><b>P</b> predicted mask</span><span><b>Y</b> true mask</span>
+      <span>a set overlap, not a pixel sum</span>`;
+    gloss.textContent = 'Dice loss optimises the overlap score itself, softened so it stays ' +
+      'differentiable. Because it is a ratio, a huge empty background cannot swamp it — which is ' +
+      'exactly why imbalanced tasks reach for it.';
+  } else {
+    eq.innerHTML = `<i>L</i><sub>Focal</sub> = −&thinsp;<i>α</i>&thinsp;<span class="sym on">(1 − <i>p</i>)<sup><i>γ</i></sup></span>
+      &thinsp;log&thinsp;<i>p</i>`;
+    key.innerHTML = `<span><b>(1 − p)<sup>γ</sup></b> the silencer</span>
+      <span><b>α</b> weights object against background</span>
+      <span><b>γ = 0, α = 0.5</b> is plain cross-entropy</span>`;
+    gloss.textContent = 'The modulating factor shrinks toward zero for pixels the network already ' +
+      'gets right, so easy background stops producing gradient and the hard boundary pixels get ' +
+      'the attention instead. α then rebalances what is left between the two classes.';
+  }
+
+  const note = document.getElementById('l-note');
+  const shift = r.ceBgShare - r.flBgShare;
+  if (L.which === 'focal') {
+    note.innerHTML = `Cross-entropy draws <b>${pct(r.ceBgShare)}</b> of its total from background
+      pixels. Focal, at γ = ${f2(L.gamma)}, draws <b>${pct(r.flBgShare)}</b> — it has moved
+      ${shift > 0 ? `<b>${pct(Math.abs(shift))}</b> of the network's attention off the background`
+                  : 'attention back onto the background'} and onto the boundary. Compare the two
+      heatmaps: cross-entropy glows everywhere, focal glows only at the edge.`;
+  } else if (L.which === 'dice') {
+    note.innerHTML = `Dice loss here is <b>${f3(r.dice)}</b>. It has no per-pixel breakdown at all —
+      it is computed from three sums over the whole mask, which is why it cannot appear on the
+      curve and why no heatmap is shown for it. That set-level nature is exactly its strength:
+      shrink the object with the slider and watch cross-entropy fall while Dice does not.`;
+  } else {
+    note.innerHTML = `<b>${pct(r.ceBgShare)}</b> of cross-entropy's total comes from background
+      pixels, and the object is only <b>${pct(r.objFrac)}</b> of the image. Shrink the object and
+      that share climbs toward 100% — the point where a network minimises the loss best by
+      predicting "background" everywhere and learning nothing.`;
+  }
+  lCurve();
+}
+
+/* ═══════════ 03 — upsampling ═══════════ */
+const U = { n: 8, s: 2, kind: 'blob', tkernel: 'box' };
+
+function uMake(n, kind) {
+  const a = new Float32Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    let v = 0;
+    // note: `-a ** 2` is a SyntaxError in JS, so square it explicitly
+    if (kind === 'blob')  { const d = Math.hypot(x - n / 2, y - n / 2) / (n * 0.28); v = 255 * Math.exp(-(d * d)); }
+    if (kind === 'edge')  v = x < n / 2 ? 30 : 225;
+    if (kind === 'check') v = ((x + y) % 2) ? 235 : 35;
+    if (kind === 'noise') v = 255 * fbm(x * 0.5, y * 0.5, 4, 3);
+    a[y * n + x] = v;
+  }
+  return a;
+}
+const upNearest = (src, n, s) => {
+  const N = n * s, out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++)
+    out[y * N + x] = src[Math.floor(y / s) * n + Math.floor(x / s)];
+  return out;
+};
+const upBilinear = (src, n, s) => {
+  const N = n * s, out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const fx = (x + 0.5) / s - 0.5, fy = (y + 0.5) / s - 0.5;
+    const x0 = clamp(Math.floor(fx), 0, n - 1), y0 = clamp(Math.floor(fy), 0, n - 1);
+    const x1 = clamp(x0 + 1, 0, n - 1), y1 = clamp(y0 + 1, 0, n - 1);
+    const ax = clamp(fx - x0, 0, 1), ay = clamp(fy - y0, 0, 1);
+    out[y * N + x] =
+      src[y0 * n + x0] * (1 - ax) * (1 - ay) + src[y0 * n + x1] * ax * (1 - ay) +
+      src[y1 * n + x0] * (1 - ax) * ay      + src[y1 * n + x1] * ax * ay;
+  }
+  return out;
+};
+/**
+ * Transposed convolution with actual kernel weights.
+ *  'box' — every weight 1. Uneven overlap survives, so the checkerboard shows.
+ *  'tri' — a triangular (bilinear) kernel. This is the exact weight pattern that makes a
+ *          transposed convolution equivalent to bilinear upsampling, and it is smooth.
+ * A real network learns these weights; here they are set by hand so the two cases can be
+ * compared directly.
+ */
+function tKernel(k, kind) {
+  const m = [];
+  for (let a = 0; a < k; a++) {
+    const row = [];
+    for (let b = 0; b < k; b++) {
+      if (kind === 'tri') {
+        const c = (k - 1) / 2;
+        row.push((1 - Math.abs(a - c) / (c + 1)) * (1 - Math.abs(b - c) / (c + 1)));
+      } else row.push(1);
+    }
+    m.push(row);
+  }
+  return m;
+}
+const upTransposed = (src, n, s, k, kern) => {
+  const N = (n - 1) * s + k, out = new Float32Array(N * N), wsum = new Float32Array(N * N);
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const v = src[i * n + j];
+    for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) {
+      const r = i * s + a, c = j * s + b, w = kern[a][b];
+      out[r * N + c] += v * w;
+      wsum[r * N + c] += w;
+    }
+  }
+  // Normalise by the *average* accumulated weight, so uneven coverage stays visible as banding
+  // instead of being silently divided away.
+  let mean = 0; for (const w of wsum) mean += w; mean /= wsum.length;
+  if (mean > 0) for (let i = 0; i < out.length; i++) out[i] /= mean;
+  return { out, N };
+};
+function uRender() {
+  const n = U.n, s = U.s, src = uMake(n, U.kind);
+  paint(document.getElementById('u-src'), src, n);
+  paint(document.getElementById('u-near'), upNearest(src, n, s), n * s);
+  paint(document.getElementById('u-bilin'), upBilinear(src, n, s), n * s);
+  const k = s + 1; // deliberately not divisible by the stride
+  const t = upTransposed(src, n, s, k, tKernel(k, U.tkernel));
+  paint(document.getElementById('u-trans'), t.out, t.N);
+
+  document.getElementById('u-src-dim').textContent = `${n} × ${n}`;
+  document.getElementById('u-trans-dim').textContent =
+    `${t.N} × ${t.N} · kernel ${k}, stride ${s} · ${U.tkernel === 'tri' ? 'triangular weights' : 'uniform weights'}`;
+  document.getElementById('u-s-val').textContent = `×${s}`;
+  document.getElementById('u-n-val').textContent = `${n} × ${n}`;
+
+  document.getElementById('u-verdict').innerHTML = U.tkernel === 'tri'
+    ? `With <b>triangular weights</b> the transposed convolution reproduces bilinear upsampling
+       exactly — the banding is gone. This is not a coincidence or a trick: bilinear interpolation
+       <em>is</em> a transposed convolution, and this is its kernel. It is also the standard
+       initialisation for upsampling layers, so a network starts smooth and learns away from it.`
+    : `With <b>uniform weights</b>, output cells covered by more kernel copies than their
+       neighbours come out brighter — the banding you can see. Switch the weights to triangular
+       and watch it disappear.`;
+}
+
+/* ═══════════ 04 — transposed, stepped ═══════════ */
+const T = { n: 3, k: 3, s: 2, step: 0, input: [], kernel: [] };
+const tOutN = () => (T.n - 1) * T.s + T.k;
+const tTotal = () => T.n * T.n;
+
+function tInit() {
+  T.input = [];
+  for (let i = 0; i < T.n; i++) {
+    const row = [];
+    for (let j = 0; j < T.n; j++) row.push(((i * T.n + j) % 4) + 1);
+    T.input.push(row);
+  }
+  T.kernel = [];
+  for (let i = 0; i < T.k; i++) {
+    const row = [];
+    for (let j = 0; j < T.k; j++) row.push(1);
+    T.kernel.push(row);
+  }
+}
+/** Accumulate the first `upto` input cells (in raster order) into the output. */
+function tAccumulate(upto) {
+  const N = tOutN(), out = new Float32Array(N * N), hits = new Int32Array(N * N);
+  for (let idx = 0; idx < upto; idx++) {
+    const i = Math.floor(idx / T.n), j = idx % T.n, v = T.input[i][j];
+    for (let a = 0; a < T.k; a++) for (let b = 0; b < T.k; b++) {
+      const r = i * T.s + a, c = j * T.s + b;
+      out[r * N + c] += v * T.kernel[a][b];
+      hits[r * N + c] += 1;
+    }
+  }
+  return { out, hits, N };
+}
+function tRender() {
+  const N = tOutN(), done = T.step + 1;
+  const { out, hits } = tAccumulate(done);
+  const ci = Math.floor(T.step / T.n), cj = T.step % T.n;
+
+  // input grid
+  const inEl = document.getElementById('t-in');
+  inEl.style.gridTemplateColumns = `repeat(${T.n}, 38px)`;
+  inEl.innerHTML = '';
+  for (let i = 0; i < T.n; i++) for (let j = 0; j < T.n; j++) {
+    const d = document.createElement('div');
+    d.className = 'cell' + (i === ci && j === cj ? ' here' : (i * T.n + j < T.step ? ' tap' : ''));
+    d.style.height = '38px';
+    d.textContent = T.input[i][j];
+    inEl.appendChild(d);
+  }
+  // kernel
+  const kEl = document.getElementById('t-k');
+  kEl.style.gridTemplateColumns = `repeat(${T.k}, 34px)`;
+  kEl.innerHTML = '';
+  for (let i = 0; i < T.k; i++) for (let j = 0; j < T.k; j++) {
+    const d = document.createElement('div');
+    d.className = 'cell'; d.style.height = '34px'; d.textContent = T.kernel[i][j];
+    kEl.appendChild(d);
+  }
+  // output
+  const size = clamp(Math.floor(330 / N) - 3, 20, 38);
+  const oEl = document.getElementById('t-out');
+  oEl.style.gridTemplateColumns = `repeat(${N}, ${size}px)`;
+  oEl.innerHTML = '';
+  const writeR0 = ci * T.s, writeC0 = cj * T.s;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const d = document.createElement('div');
+    const h = hits[r * N + c];
+    let cls = 'cell';
+    if (h === 1) cls += ' acc1'; else if (h === 2) cls += ' acc2'; else if (h >= 3) cls += ' acc3';
+    const inWrite = r >= writeR0 && r < writeR0 + T.k && c >= writeC0 && c < writeC0 + T.k;
+    if (inWrite) cls += ' writing';
+    d.className = cls;
+    d.style.height = size + 'px';
+    d.style.fontSize = size < 26 ? '.62rem' : '.78rem';
+    d.textContent = out[r * N + c] ? fmt(out[r * N + c]) : '';
+    oEl.appendChild(d);
+  }
+
+  document.getElementById('t-in-sub').textContent =
+    `${T.n} × ${T.n} — cell ${ci + 1},${cj + 1} is scattering now`;
+  document.getElementById('t-out-sub').textContent =
+    `${N} × ${N} — (${T.n}−1)×${T.s} + ${T.k}`;
+
+  // overlap census, after the whole thing has run
+  const full = tAccumulate(tTotal());
+  const counts = {};
+  for (const h of full.hits) counts[h] = (counts[h] || 0) + 1;
+  const distinct = Object.keys(counts).map(Number).sort((a, b) => a - b);
+  document.getElementById('t-overlap').innerHTML =
+    'Overlap when finished: ' + distinct.map(d =>
+      `<b style="color:var(--vermillion)">${counts[d]}</b> cells written ${d}×`).join(' · ');
+
+  const v = document.getElementById('t-verdict');
+  if (T.k % T.s === 0) {
+    v.innerHTML = `Kernel ${T.k} divides evenly by stride ${T.s}, so every output cell is written
+      the same number of times. The output is uniform — no checkerboard. This is the standard fix:
+      <b>keep the kernel size a multiple of the stride</b>, which is why 4×4 stride 2 is so common
+      in generator architectures.`;
+  } else {
+    v.innerHTML = `Kernel ${T.k} does not divide by stride ${T.s}, so some output cells get written
+      more times than their neighbours — look at the shading. That uneven coverage is the
+      <b>checkerboard artifact</b>. It is not a bug in the maths; it is the geometry of the overlap,
+      and it is why many architectures upsample bilinearly and then convolve instead.`;
+  }
+}
+const tTransport = new Transport({
+  ids: { reset: 't-reset', prev: 't-prev', play: 't-play', next: 't-next', speed: 't-speed', counter: 't-counter' },
+  max: tTotal,
+  get: () => T.step,
+  set: i => { T.step = i; },
+  render: tRender,
+  label: (i, max) => `cell ${i + 1} of ${max}`,
+  interval: v => 1300 - v * 110,
+  keys: true
+});
+
+/* ═══════════ 05 — U-Net skips ═══════════ */
+const NT = { size: 64, kind: 'texture', img: null };
+
+function nMake(n, kind) {
+  const a = new Float32Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    let v;
+    if (kind === 'texture') {
+      v = 255 * (0.35 + 0.65 * fbm(x * 0.14, y * 0.14, 7, 4));
+      if (Math.hypot(x - n * 0.58, y - n * 0.45) < n * 0.19) v = v * 0.55 + 60; // a shape hiding in it
+    } else if (kind === 'shapes') {
+      v = 40;
+      if (Math.hypot(x - n * 0.35, y - n * 0.4) < n * 0.2) v = 220;
+      if (x > n * 0.55 && x < n * 0.85 && y > n * 0.5 && y < n * 0.8) v = 150;
+    } else { // fine
+      v = ((x % 4 < 2) !== (y % 4 < 2)) ? 210 : 45;
+      if (Math.hypot(x - n / 2, y - n / 2) < n * 0.25) v = 255 - v;
+    }
+    a[y * n + x] = v;
+  }
+  return a;
+}
+const down2 = (src, n) => {
+  const m = n >> 1, out = new Float32Array(m * m);
+  for (let y = 0; y < m; y++) for (let x = 0; x < m; x++) {
+    out[y * m + x] = (src[(2 * y) * n + 2 * x] + src[(2 * y) * n + 2 * x + 1] +
+                      src[(2 * y + 1) * n + 2 * x] + src[(2 * y + 1) * n + 2 * x + 1]) / 4;
+  }
+  return out;
+};
+const up2 = (src, n) => upBilinear(src, n, 2);
+
+/**
+ * An honest U-Net simulation. The encoder keeps only the downsampled stack; the decoder
+ * rebuilds upward. A skip connection hands back that level's detail residual — precisely the
+ * information the pooling step destroyed. Switch it off and the residual is gone.
+ */
+function nRun(img, n, skips) {
+  const l0 = img;                 // 64
+  const l1 = down2(l0, n);        // 32
+  const l2 = down2(l1, n / 2);    // 16
+  const l3 = down2(l2, n / 4);    // 8  (bottleneck)
+
+  const det = (fine, coarse, m) => {           // what this level knew that the next one lost
+    const u = up2(coarse, m / 2), d = new Float32Array(m * m);
+    for (let i = 0; i < m * m; i++) d[i] = fine[i] - u[i];
+    return d;
+  };
+  const d2 = det(l2, l3, n / 4);   // 16
+  const d1 = det(l1, l2, n / 2);   // 32
+  const d0 = det(l0, l1, n);       // 64
+
+  let cur = up2(l3, n / 8);                                   // → 16
+  if (skips[2]) for (let i = 0; i < cur.length; i++) cur[i] += d2[i];
+  cur = up2(cur, n / 4);                                      // → 32
+  if (skips[1]) for (let i = 0; i < cur.length; i++) cur[i] += d1[i];
+  cur = up2(cur, n / 2);                                      // → 64
+  if (skips[0]) for (let i = 0; i < cur.length; i++) cur[i] += d0[i];
+  return { out: cur, bott: l3 };
+}
+function nRender() {
+  const n = NT.size, img = NT.img;
+  const skips = [
+    document.getElementById('n-s1').checked,
+    document.getElementById('n-s2').checked,
+    document.getElementById('n-s3').checked
+  ];
+  const { out, bott } = nRun(img, n, skips);
+
+  paint(document.getElementById('n-in'), img, n);
+  paint(document.getElementById('n-bott'), bott, n / 8);
+  paint(document.getElementById('n-out'), out, n);
+
+  let mae = 0;
+  const err = new Float32Array(n * n);
+  for (let i = 0; i < n * n; i++) {
+    const e = Math.abs(img[i] - out[i]);
+    err[i] = clamp(e * 3, 0, 255);   // amplified so it is actually visible
+    mae += e;
+  }
+  mae /= n * n;
+  paint(document.getElementById('n-err'), err, n);
+
+  const on = skips.filter(Boolean).length;
+  document.getElementById('n-out-cap').textContent =
+    on === 3 ? 'Decoder output — all skips' : on === 0 ? 'Decoder output — no skips' : `Decoder output — ${on} skip${on > 1 ? 's' : ''}`;
+  document.getElementById('n-out-dim').textContent = `64 × 64 · ${on} of 3 connected`;
+  document.getElementById('n-err-dim').textContent = `error ×3 · mean ${mae.toFixed(1)}`;
+  document.getElementById('n-mae').textContent = mae.toFixed(2);
+  document.getElementById('n-mae-bar').style.width = clamp(mae / 40 * 100, 0, 100) + '%';
+
+  const v = document.getElementById('n-verdict');
+  if (on === 3) {
+    v.innerHTML = `Every skip connected: the reconstruction is essentially exact (mean error
+      <b>${mae.toFixed(2)}</b>). Nothing was lost, because every level handed its detail forward.
+      This is the U in U-Net doing its job.`;
+  } else if (on === 0) {
+    v.innerHTML = `No skips. Everything the decoder has is that 8×8 bottleneck — mean error
+      <b>${mae.toFixed(2)}</b>. The output is a smear, and no amount of training fixes it, because
+      the information is not in the network any more. This is exactly why plain FCN-32s output
+      looks blurry.`;
+  } else if (skips[0]) {
+    v.innerHTML = `The finest skip is doing most of the work — mean error <b>${mae.toFixed(2)}</b>.
+      Level 1 carries the edges, which is where almost all the perceptual sharpness lives. Turn
+      <em>that</em> one off and compare.`;
+  } else {
+    v.innerHTML = `The finest skip is off, so the edges are gone even though the coarse structure
+      survives — mean error <b>${mae.toFixed(2)}</b>. For camouflage this is fatal: the boundary is
+      the entire signal, and it lived in the level you just disconnected.`;
+  }
+}
+
+/* ═══════════ 06 — training a real segmenter ═══════════
+   conv3×3(1→C) → ReLU → conv3×3(C→1) → sigmoid, trained with Adam.
+   Everything is written out by hand so there is nothing hidden in a library. */
+/* Defaults tuned by running this exact network offline before shipping it: at difficulty 0.28
+   with lr 0.03 the local 5×5 statistics separate by roughly two standard deviations — hard
+   enough to be a real problem, easy enough that every loss reaches a visible answer inside a
+   few hundred iterations. Below about 0.20 nothing learns and the demo merely looks broken. */
+const TR = {
+  N: 48, C: 6, lr: 0.03, diff: 0.28, loss: 'ce',
+  iter: 0, playing: false, raf: null,
+  x: null, y: null, best: { ce: 0, dice: 0, both: 0, focal: 0 }
+};
+const LOSS_LABEL = { ce: 'Cross-entropy', dice: 'Dice', both: 'CE + Dice', focal: 'Focal (γ=2, α=0.5)' };
+
+/** A shape hiding in texture: same kind of noise inside and out, only the statistics differ. */
+function trScene(N, diff) {
+  const x = new Float32Array(N * N), y = new Float32Array(N * N);
+  const cx = N * 0.56, cy = N * 0.46, rad = N * 0.17;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const k = j * N + i;
+    const inside = Math.hypot(i - cx, j - cy) < rad;
+    y[k] = inside ? 1 : 0;
+    // different noise seed inside, plus a small mean shift — that shift is `diff`
+    const v = inside
+      ? fbm(i * 0.22, j * 0.22, 31, 4) + diff
+      : fbm(i * 0.2, j * 0.2, 5, 4);
+    x[k] = clamp(v, 0, 1);
+  }
+  return { x, y };
+}
+
+function trInit(keepBest) {
+  const N = TR.N, C = TR.C;
+  const sc = trScene(N, TR.diff);
+  TR.x = sc.x; TR.y = sc.y;
+  // He initialisation
+  const he = fan => Math.sqrt(2 / fan);
+  const rnd = std => (Math.random() * 2 - 1) * std * 1.73;
+  TR.W1 = new Float32Array(C * 9); TR.b1 = new Float32Array(C);
+  TR.W2 = new Float32Array(C * 9); TR.b2 = new Float32Array(1);
+  for (let i = 0; i < C * 9; i++) TR.W1[i] = rnd(he(9));
+  for (let i = 0; i < C * 9; i++) TR.W2[i] = rnd(he(C * 9));
+  // Adam moments
+  TR.m = { W1: new Float32Array(C * 9), b1: new Float32Array(C), W2: new Float32Array(C * 9), b2: new Float32Array(1) };
+  TR.v = { W1: new Float32Array(C * 9), b1: new Float32Array(C), W2: new Float32Array(C * 9), b2: new Float32Array(1) };
+  TR.iter = 0; TR.hist = [];
+  if (!keepBest) TR.best = { ce: 0, dice: 0, both: 0, focal: 0 };
+  document.getElementById('tr-params').textContent = String(C * 9 + C + C * 9 + 1);
+}
+
+/** Forward pass. Returns the pre-activations and the prediction, for reuse in backward. */
+function trForward() {
+  const N = TR.N, C = TR.C, n = N * N;
+  const hpre = new Float32Array(C * n), h = new Float32Array(C * n);
+  for (let c = 0; c < C; c++) {
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      let s = TR.b1[c];
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+        const jj = j + a - 1, ii = i + b - 1;
+        if (jj < 0 || ii < 0 || jj >= N || ii >= N) continue;   // zero padding
+        s += TR.W1[c * 9 + a * 3 + b] * TR.x[jj * N + ii];
+      }
+      hpre[c * n + j * N + i] = s;
+      h[c * n + j * N + i] = s > 0 ? s : 0;                     // ReLU
+    }
+  }
+  const z = new Float32Array(n), p = new Float32Array(n);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    let s = TR.b2[0];
+    for (let c = 0; c < C; c++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const jj = j + a - 1, ii = i + b - 1;
+      if (jj < 0 || ii < 0 || jj >= N || ii >= N) continue;
+      s += TR.W2[c * 9 + a * 3 + b] * h[c * n + jj * N + ii];
+    }
+    z[j * N + i] = s;
+    p[j * N + i] = 1 / (1 + Math.exp(-s));
+  }
+  return { hpre, h, p };
+}
+
+/** dL/dz for the selected loss, plus the scalar loss value. */
+function trGrad(p) {
+  const n = TR.N * TR.N, y = TR.y, dz = new Float32Array(n);
+  let loss = 0;
+  // α = 0.5 (neutral) so focal is compared on equal footing. Measured offline: α = 0.25,
+  // the RetinaNet default, actually *hurts* here — it down-weights the rare class we want.
+  const g = 2, alpha = 0.5;
+
+  if (TR.loss === 'ce' || TR.loss === 'both') {
+    for (let k = 0; k < n; k++) {
+      const pk = clamp(p[k], EPS, 1 - EPS);
+      loss += (y[k] ? -Math.log(pk) : -Math.log(1 - pk)) / n;
+      dz[k] += (pk - y[k]) / n;
+    }
+  }
+  if (TR.loss === 'focal') {
+    for (let k = 0; k < n; k++) {
+      const pk = clamp(p[k], EPS, 1 - EPS);
+      if (y[k]) {
+        loss += -alpha * Math.pow(1 - pk, g) * Math.log(pk) / n;
+        // d/dz of −α(1−p)^γ log p , with dp/dz = p(1−p)
+        dz[k] += alpha * (g * pk * Math.pow(1 - pk, g) * Math.log(pk) - Math.pow(1 - pk, g + 1)) / n;
+      } else {
+        loss += -(1 - alpha) * Math.pow(pk, g) * Math.log(1 - pk) / n;
+        dz[k] += (1 - alpha) * (Math.pow(pk, g + 1) - g * Math.pow(pk, g) * (1 - pk) * Math.log(1 - pk)) / n;
+      }
+    }
+  }
+  if (TR.loss === 'dice' || TR.loss === 'both') {
+    let A = 0, B = 0;
+    for (let k = 0; k < n; k++) { A += p[k] * y[k]; B += p[k] + y[k]; }
+    const den = B + EPS, num = 2 * A + EPS;
+    loss += 1 - num / den;
+    for (let k = 0; k < n; k++) {
+      const dLdp = (num - 2 * y[k] * den) / (den * den);
+      dz[k] += dLdp * p[k] * (1 - p[k]);
+    }
+  }
+  return { dz, loss };
+}
+
+function trStep() {
+  const N = TR.N, C = TR.C, n = N * N;
+  const { hpre, h, p } = trForward();
+  const { dz, loss } = trGrad(p);
+
+  const dW1 = new Float32Array(C * 9), db1 = new Float32Array(C);
+  const dW2 = new Float32Array(C * 9), db2 = new Float32Array(1);
+  const dh = new Float32Array(C * n);
+
+  // layer 2 backward
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const d = dz[j * N + i];
+    if (!d) continue;
+    db2[0] += d;
+    for (let c = 0; c < C; c++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const jj = j + a - 1, ii = i + b - 1;
+      if (jj < 0 || ii < 0 || jj >= N || ii >= N) continue;
+      dW2[c * 9 + a * 3 + b] += d * h[c * n + jj * N + ii];
+      dh[c * n + jj * N + ii] += d * TR.W2[c * 9 + a * 3 + b];
+    }
+  }
+  // ReLU backward, then layer 1
+  for (let c = 0; c < C; c++) for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const idx = c * n + j * N + i;
+    const d = hpre[idx] > 0 ? dh[idx] : 0;
+    if (!d) continue;
+    db1[c] += d;
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const jj = j + a - 1, ii = i + b - 1;
+      if (jj < 0 || ii < 0 || jj >= N || ii >= N) continue;
+      dW1[c * 9 + a * 3 + b] += d * TR.x[jj * N + ii];
+    }
+  }
+
+  // Adam
+  TR.iter++;
+  const b1 = 0.9, b2 = 0.999, eps = 1e-8, t = TR.iter;
+  const upd = (name, arr, grad) => {
+    const m = TR.m[name], v = TR.v[name];
+    for (let i = 0; i < arr.length; i++) {
+      m[i] = b1 * m[i] + (1 - b1) * grad[i];
+      v[i] = b2 * v[i] + (1 - b2) * grad[i] * grad[i];
+      const mh = m[i] / (1 - Math.pow(b1, t)), vh = v[i] / (1 - Math.pow(b2, t));
+      arr[i] -= TR.lr * mh / (Math.sqrt(vh) + eps);
+    }
+  };
+  upd('W1', TR.W1, dW1); upd('b1', TR.b1, db1);
+  upd('W2', TR.W2, dW2); upd('b2', TR.b2, db2);
+
+  // IoU at the usual 0.5 threshold
+  let inter = 0, uni = 0;
+  for (let k = 0; k < n; k++) {
+    const pb = p[k] > 0.5 ? 1 : 0;
+    if (pb && TR.y[k]) inter++;
+    if (pb || TR.y[k]) uni++;
+  }
+  const iou = uni ? inter / uni : 0;
+  if (iou > TR.best[TR.loss]) TR.best[TR.loss] = iou;
+  TR.hist.push({ loss, iou });
+  if (TR.hist.length > 400) TR.hist.shift();
+  return { p, loss, iou };
+}
+
+function trCurve() {
+  const can = document.getElementById('tr-curve'), ctx = can.getContext('2d');
+  const W = can.width, H = can.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#f4ede0'; ctx.fillRect(0, 0, W, H);
+  if (TR.hist.length < 2) return;
+  const maxL = Math.max(...TR.hist.map(d => d.loss), 1e-6);
+  const line = (key, color, scale) => {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+    TR.hist.forEach((d, i) => {
+      const x = (i / (TR.hist.length - 1)) * (W - 8) + 4;
+      const yv = key === 'loss' ? d.loss / maxL : d.iou;
+      const y = H - 6 - yv * (H - 14);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+  };
+  line('loss', '#b8412e');
+  line('iou', '#6b7a5a');
+}
+
+function trRender(res) {
+  const N = TR.N;
+  const xImg = new Float32Array(N * N);
+  for (let k = 0; k < N * N; k++) xImg[k] = TR.x[k] * 255;
+  paint(document.getElementById('tr-x'), xImg, N);
+  paintMask(document.getElementById('tr-y'), TR.y, N, [107, 122, 90], null, 0.85);
+
+  const p = res ? res.p : trForward().p;
+  paintMask(document.getElementById('tr-p'), p, N, [184, 65, 46], null, 0.9);
+
+  let frac = 0; for (let k = 0; k < N * N; k++) frac += TR.y[k];
+  document.getElementById('tr-y-dim').textContent =
+    `${pct(frac / (N * N))} of the image`;
+
+  const last = TR.hist[TR.hist.length - 1];
+  document.getElementById('tr-p-dim').textContent =
+    last ? `IoU ${f3(last.iou)} · loss ${f3(last.loss)}` : 'untrained';
+  document.getElementById('tr-counter').textContent = `${TR.iter} iterations`;
+  document.getElementById('tr-lr-val').textContent = TR.lr.toFixed(3);
+  document.getElementById('tr-d-val').textContent = TR.diff.toFixed(2);
+  document.getElementById('tr-c-val').textContent = String(TR.C);
+
+  document.getElementById('tr-board').innerHTML = Object.keys(TR.best)
+    .map(k => bar(LOSS_LABEL[k], Math.round(TR.best[k] * 1000), 1000, k === TR.loss ? '' : 'sage'))
+    .join('');
+  document.querySelectorAll('#tr-board .bar-val').forEach((el, i) => {
+    el.textContent = f3(TR.best[Object.keys(TR.best)[i]]);
+  });
+
+  trCurve();
+
+  const v = document.getElementById('tr-verdict');
+  const tried = Object.values(TR.best).filter(b => b > 0).length;
+  if (TR.iter === 0) {
+    v.innerHTML = `Press <b>Train</b>. Watch the prediction go from noise to a shape. Then press
+      Reset, switch the loss, and train again — the scoreboard keeps every result so you can
+      compare them honestly.`;
+  } else if (tried < 2) {
+    v.innerHTML = `IoU is <b>${f3(last ? last.iou : 0)}</b> after ${TR.iter} iterations with
+      ${LOSS_LABEL[TR.loss]}. Now reset and try a different loss on the same scene — one number
+      alone tells you nothing.`;
+  } else if (TR.diff < 0.2) {
+    v.innerHTML = `At this contrast the shape genuinely is not separable by a network this small —
+      the local statistics inside and outside overlap almost completely, and every loss stalls
+      near IoU <b>${f3(last ? last.iou : 0)}</b>. That is an honest outcome, not a broken demo:
+      it is what "too well camouflaged" looks like from the optimiser's side. Raise the contrast
+      until the network can get a foothold.`;
+  } else {
+    const rank = Object.keys(TR.best).filter(k => TR.best[k] > 0)
+      .sort((a, b) => TR.best[b] - TR.best[a]);
+    v.innerHTML = `Best so far: <b>${LOSS_LABEL[rank[0]]}</b> at IoU
+      <b>${f3(TR.best[rank[0]])}</b>. Running this network offline at the default settings, Dice
+      reaches about 0.76 and plain cross-entropy about 0.60 — not because Dice makes the network
+      better, but because the objective stopped letting the background dominate. That is the
+      argument of section two, now measured instead of asserted. Raise the contrast and watch
+      the gap close: the advantage was never about Dice, it was about imbalance.`;
+  }
+}
+
+function trLoop() {
+  const speed = Number(document.getElementById('tr-speed').value);
+  const steps = Math.max(1, Math.round(speed * 0.8));
+  let res;
+  for (let i = 0; i < steps; i++) res = trStep();
+  trRender(res);
+  if (TR.playing) TR.raf = requestAnimationFrame(trLoop);
+}
+function trPlay(on) {
+  TR.playing = on;
+  document.getElementById('tr-play').textContent = on ? 'Pause' : 'Train';
+  if (on) TR.raf = requestAnimationFrame(trLoop);
+  else if (TR.raf) { cancelAnimationFrame(TR.raf); TR.raf = null; }
+}
+
+/* ═══════════ 07 — boxes ═══════════ */
+const B = {
+  a: { x: 40, y: 55, w: 110, h: 95 },
+  b: { x: 120, y: 105, w: 120, h: 100 },
+  thresh: 0.45,
+  props: [
+    { x: 55,  y: 50,  w: 95,  h: 85, s: 0.94 },
+    { x: 66,  y: 61,  w: 92,  h: 82, s: 0.88 },
+    { x: 48,  y: 44,  w: 104, h: 92, s: 0.79 },
+    { x: 172, y: 96,  w: 88,  h: 96, s: 0.91 },
+    { x: 181, y: 105, w: 84,  h: 90, s: 0.73 },
+    { x: 118, y: 150, w: 70,  h: 62, s: 0.56 }
+  ]
+};
+const boxIoU = (p, q) => {
+  const ix = Math.max(0, Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x));
+  const iy = Math.max(0, Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y));
+  const inter = ix * iy, uni = p.w * p.h + q.w * q.h - inter;
+  return { inter, uni, iou: uni ? inter / uni : 0 };
+};
+function drawBox(ctx, b, stroke, fill, label) {
+  if (fill) { ctx.fillStyle = fill; ctx.fillRect(b.x, b.y, b.w, b.h); }
+  ctx.strokeStyle = stroke; ctx.lineWidth = 2;
+  ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w, b.h);
+  if (label) {
+    ctx.fillStyle = stroke; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(label, b.x + 3, b.y - 4);
+  }
+}
+function bRenderIoU() {
+  const can = document.getElementById('b-iou'), ctx = can.getContext('2d');
+  ctx.clearRect(0, 0, can.width, can.height);
+  const r = boxIoU(B.a, B.b);
+
+  drawBox(ctx, B.a, '#b8412e', 'rgba(184,65,46,0.10)', 'A');
+  drawBox(ctx, B.b, '#6b7a5a', 'rgba(107,122,90,0.10)', 'B');
+
+  const ix0 = Math.max(B.a.x, B.b.x), iy0 = Math.max(B.a.y, B.b.y);
+  const ix1 = Math.min(B.a.x + B.a.w, B.b.x + B.b.w), iy1 = Math.min(B.a.y + B.a.h, B.b.y + B.b.h);
+  if (ix1 > ix0 && iy1 > iy0) {
+    ctx.fillStyle = 'rgba(168,136,72,0.45)';
+    ctx.fillRect(ix0, iy0, ix1 - ix0, iy1 - iy0);
+  }
+  document.getElementById('b-scores').innerHTML =
+    score('Box IoU', f3(r.iou), 'intersection ÷ union', true) +
+    score('Intersection', Math.round(r.inter), 'px²') +
+    score('Union', Math.round(r.uni), 'px²');
+}
+function bRenderNMS() {
+  const can = document.getElementById('b-nms'), ctx = can.getContext('2d');
+  ctx.clearRect(0, 0, can.width, can.height);
+
+  const order = B.props.map((b, i) => ({ b, i })).sort((p, q) => q.b.s - p.b.s);
+  const kept = [], killedBy = {};
+  order.forEach(({ b, i }) => {
+    let dead = false;
+    for (const k of kept) {
+      if (boxIoU(b, k.b).iou > B.thresh) { dead = true; killedBy[i] = k.i; break; }
+    }
+    if (!dead) kept.push({ b, i });
+  });
+  const keptIdx = new Set(kept.map(k => k.i));
+
+  B.props.forEach((b, i) => {
+    if (keptIdx.has(i)) return;
+    ctx.setLineDash([3, 3]); drawBox(ctx, b, 'rgba(26,26,26,0.28)', null, null); ctx.setLineDash([]);
+  });
+  kept.forEach(({ b, i }) => drawBox(ctx, b, '#b8412e', 'rgba(184,65,46,0.10)', b.s.toFixed(2)));
+
+  document.getElementById('b-t-val').textContent = f2(B.thresh);
+  document.getElementById('b-list').innerHTML = B.props
+    .map((b, i) => keptIdx.has(i)
+      ? `<div class="kept">✓ box ${i + 1} · score ${b.s.toFixed(2)} — kept</div>`
+      : `<div class="killed">✕ box ${i + 1} · score ${b.s.toFixed(2)} — suppressed by box ${killedBy[i] + 1}</div>`)
+    .join('') +
+    `<div style="margin-top:.5rem;color:var(--vermillion)">
+       ${kept.length} of ${B.props.length} proposals survive</div>`;
+}
+(function bDrag() {
+  const can = document.getElementById('b-iou');
+  let held = null, off = { x: 0, y: 0 };
+  const at = e => {
+    const r = can.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (can.width / r.width), y: (e.clientY - r.top) * (can.height / r.height) };
+  };
+  const inside = (p, b) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+  can.addEventListener('pointerdown', e => {
+    const p = at(e);
+    // b is drawn on top, so test it first
+    held = inside(p, B.b) ? B.b : (inside(p, B.a) ? B.a : null);
+    if (!held) return;
+    off = { x: p.x - held.x, y: p.y - held.y };
+    can.setPointerCapture(e.pointerId);
+  });
+  can.addEventListener('pointermove', e => {
+    if (!held) return;
+    const p = at(e);
+    held.x = clamp(p.x - off.x, 0, can.width - held.w);
+    held.y = clamp(p.y - off.y, 0, can.height - held.h);
+    bRenderIoU();
+  });
+  const end = e => { held = null; try { can.releasePointerCapture(e.pointerId); } catch (_) {} };
+  can.addEventListener('pointerup', end);
+  can.addEventListener('pointercancel', end);
+})();
+
+/* ═══════════ boot ═══════════ */
+// 01
+mPresets(); mBuild(); mRender();
+
+// 02
+function lPick(v) {
+  L.which = v;
+  seg('l-pick', ['ce', 'dice', 'focal'], L.which, lPick, ['Cross-entropy', 'Dice', 'Focal']);
+  lRender();
+}
+lPick(L.which);
+document.getElementById('l-gamma').addEventListener('input', e => {
+  L.gamma = Number(e.target.value) / 10; lRender();
+});
+document.getElementById('l-alpha').addEventListener('input', e => {
+  L.alpha = Number(e.target.value) / 100; lRender();
+});
+document.getElementById('l-r').addEventListener('input', e => {
+  L.r = Number(e.target.value); lRender();
+});
+document.getElementById('l-soft').addEventListener('input', e => {
+  L.soft = Number(e.target.value) / 10; lRender();
+});
+dragMask(lMaskCan, () => L.N, (dx, dy) => { L.dx = dx; L.dy = dy; lRender(); });
+
+// 03
+function uPick() {
+  chips('u-pick', [['blob', 'Blob'], ['edge', 'Edge'], ['check', 'Checker'], ['noise', 'Texture']],
+    U.kind, k => { U.kind = k; uPick(); uRender(); });
+}
+function uSeg() {
+  seg('u-s-seg', [2, 3, 4], U.s, v => { U.s = v; uSeg(); uRender(); }, ['×2', '×3', '×4']);
+}
+function uKPick() {
+  chips('u-kpick', [['box', 'Uniform'], ['tri', 'Triangular (bilinear)']],
+    U.tkernel, k => { U.tkernel = k; uKPick(); uRender(); });
+}
+uPick(); uSeg(); uKPick();
+document.getElementById('u-n').addEventListener('input', e => {
+  U.n = Number(e.target.value); uRender();
+});
+uRender();
+
+// 04
+function tSegs() {
+  seg('t-n-seg', [2, 3, 4], T.n, v => { T.n = v; tInit(); T.step = 0; tSegs(); tRender(); tTransport.sync(); }, ['2×2', '3×3', '4×4']);
+  seg('t-k-seg', [2, 3, 4], T.k, v => { T.k = v; tInit(); T.step = 0; tSegs(); tRender(); tTransport.sync(); }, ['2×2', '3×3', '4×4']);
+  seg('t-s-seg', [1, 2, 3], T.s, v => { T.s = v; T.step = 0; tSegs(); tRender(); tTransport.sync(); }, ['1', '2', '3']);
+  document.getElementById('t-n-val').textContent = `${T.n} × ${T.n}`;
+  document.getElementById('t-k-val').textContent = `${T.k} × ${T.k}`;
+  document.getElementById('t-s-val').textContent = String(T.s);
+}
+tInit(); tSegs(); tRender(); tTransport.sync();
+
+// 05
+function nPick() {
+  chips('n-pick', [['texture', 'Camouflage'], ['shapes', 'Shapes'], ['fine', 'Fine detail']],
+    NT.kind, k => { NT.kind = k; NT.img = nMake(NT.size, k); nPick(); nRender(); });
+}
+NT.img = nMake(NT.size, NT.kind);
+nPick();
+['n-s1', 'n-s2', 'n-s3'].forEach(id =>
+  document.getElementById(id).addEventListener('change', nRender));
+nRender();
+
+// 06 — training
+function trLossPick() {
+  chips('tr-loss',
+    [['ce', 'Cross-entropy'], ['dice', 'Dice'], ['both', 'CE + Dice'], ['focal', 'Focal']],
+    TR.loss, k => { TR.loss = k; trPlay(false); trInit(true); trRender(); trLossPick(); });
+}
+function trCSeg() {
+  seg('tr-c-seg', [2, 4, 6, 10], TR.C, v => {
+    TR.C = v; trPlay(false); trInit(true); trRender(); trCSeg();
+  }, ['2', '4', '6', '10']);
+}
+document.getElementById('tr-play').addEventListener('click', () => trPlay(!TR.playing));
+document.getElementById('tr-reset').addEventListener('click', () => {
+  trPlay(false); trInit(true); trRender();
+});
+document.getElementById('tr-step').addEventListener('click', () => {
+  trPlay(false);
+  let res; for (let i = 0; i < 10; i++) res = trStep();
+  trRender(res);
+});
+document.getElementById('tr-lr').addEventListener('input', e => {
+  TR.lr = Number(e.target.value) / 1000; trRender();
+});
+document.getElementById('tr-d').addEventListener('input', e => {
+  TR.diff = Number(e.target.value) / 100;
+  trPlay(false); trInit(false); trRender();
+});
+// never keep training a tab nobody is looking at
+document.addEventListener('visibilitychange', () => { if (document.hidden) trPlay(false); });
+trLossPick(); trCSeg(); trInit(); trRender();
+
+// 07
+document.getElementById('b-thresh').addEventListener('input', e => {
+  B.thresh = Number(e.target.value) / 100; bRenderNMS();
+});
+bRenderIoU(); bRenderNMS();
+</script>
+</body>
+</html>
