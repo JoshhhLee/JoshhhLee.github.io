@@ -62,7 +62,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Every image is a sum of waves</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.5–4.6 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform in 2D</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §4.5 Extensions to Functions of Two Variables; §4.6: The 2-D DFT and IDFT (p. 240) &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform in 2D</p>
   <p class="lede reveal d1">The dark square on the right is an empty spectrum. Each point in it stands for one wave. Its distance from the centre sets how many stripes fit across the image, and its direction sets which way the stripes run. Click anywhere to add that wave to the image, and click the same point again to remove it. Hover to preview a wave before you add it.</p>
 
   <div class="eqbox">
@@ -97,7 +97,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Reading a real spectrum</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.6 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform in 2D: visualizing spectra</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §4.6: Fourier Spectrum and Phase Angle (p. 249) &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform in 2D: visualizing spectra</p>
   <p class="lede reveal d1">A photograph contains every wave at once, and the spectrum shows how much of each. Most of the energy sits near the centre, in slow waves that set overall brightness and shading. Far from the centre are the fast waves that make up fine detail and sharp edges. Straight edges in the image produce bright streaks through the centre, running perpendicular to the edge. Hover over the spectrum to see which wave any point stands for.</p>
 
   <div class="eqbox">
@@ -144,7 +144,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Filtering: multiply, then invert</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.7–4.9 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform: applications</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §4.7 The Basics of Filtering in the Frequency Domain; §4.8 Lowpass (pp. 272–283); §4.9 Highpass (p. 284 on) &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform: applications</p>
   <p class="lede reveal d1">Frequency-domain filtering takes three steps: transform the image, multiply every coefficient by a filter value <i>H</i>(<i>u</i>, <i>v</i>) between 0 and 1, and transform back. A lowpass filter keeps the centre of the spectrum and removes fine detail. A highpass filter does the opposite. The filter's shape matters as much as its cutoff, and the spatial kernel on the right shows why.</p>
 
   <div class="eqbox">
@@ -185,7 +185,7 @@ section{scroll-margin-top:64px}
     <h2 class="section-heading-text">Periodic noise and notch filters</h2>
     <div class="section-heading-rule"></div>
   </div>
-  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.10, §5.4 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform: applications</p>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods, 4th ed.</b> §4.10: Notch Filters (p. 299), eq. 4-151; §5.4 Periodic Noise Reduction Using Frequency Domain Filtering &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform: applications</p>
   <p class="lede reveal d1">Electrical interference, scanned halftone prints and some cameras add a regular pattern on top of the image. In the image this pattern is spread across every pixel. In the spectrum it is concentrated into a few bright spikes, because it is made of only a few waves. Click on a spike to place a notch (a small hole in the filter) there, and click the notch again to remove it. Your goal is to remove the pattern and nothing else.</p>
 
   <div class="eqbox">
