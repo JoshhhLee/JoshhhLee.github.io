@@ -54,7 +54,7 @@
     font-weight: 300; color: var(--ink-soft);
     opacity: 0; z-index: 2;
     letter-spacing: 0.3em; font-size: 0.7rem;
-    animation: fadeInSide 2s ease-out 1.8s forwards;
+    animation: fadeInSide 1.5s ease-out 1s forwards;
     transition: opacity 0.8s ease;
   }
   .vertical-text.fading { opacity: 0 !important; }
@@ -73,7 +73,7 @@
     border-bottom: 1px solid transparent;
     transition: border-color 0.4s ease;
     opacity: 0;
-    animation: fadeDown 1.2s ease-out 0.2s forwards;
+    animation: fadeDown 0.8s ease-out 0.1s forwards;
   }
   .top-bar.scrolled { border-bottom-color: rgba(26, 26, 26, 0.1); }
   @keyframes fadeDown {
@@ -163,14 +163,14 @@
     color: var(--vermillion);
     letter-spacing: 0.5em; margin-bottom: 2rem;
     opacity: 0;
-    animation: fadeIn 1.5s ease-out 0.6s forwards;
+    animation: fadeIn 0.9s ease-out 0.15s forwards;
   }
   .hero-greeting {
     font-family: 'Inter', sans-serif;
     font-size: 0.75rem; letter-spacing: 0.5em;
     text-transform: uppercase; color: var(--ink-soft);
     margin-bottom: 1.5rem; opacity: 0;
-    animation: fadeIn 1.2s ease-out 0.4s forwards;
+    animation: fadeIn 0.9s ease-out 0.1s forwards;
   }
   .hero-name {
     font-family: 'Cormorant Garamond', serif;
@@ -182,16 +182,16 @@
   .hero-name .word {
     display: inline-block; opacity: 0;
     transform: translateY(20px);
-    animation: rise 1s cubic-bezier(0.2, 0.6, 0.2, 1) forwards;
+    animation: rise 0.9s cubic-bezier(0.2, 0.6, 0.2, 1) forwards;
   }
-  .hero-name .word:nth-child(1) { animation-delay: 0.8s; }
-  .hero-name .word:nth-child(2) { animation-delay: 1.05s; }
+  .hero-name .word:nth-child(1) { animation-delay: 0.2s; }
+  .hero-name .word:nth-child(2) { animation-delay: 0.32s; }
   @keyframes rise { to { opacity: 1; transform: translateY(0); } }
   .hero-name em { font-style: italic; font-weight: 300; color: var(--vermillion); }
   .hero-divider {
     width: 0; height: 1px; background: var(--ink);
     margin: 2rem auto;
-    animation: expand 1.2s ease-out 1.6s forwards;
+    animation: expand 0.9s ease-out 0.5s forwards;
   }
   @keyframes expand { to { width: 60px; } }
   .hero-title {
@@ -200,7 +200,7 @@
     font-size: clamp(1.1rem, 2vw, 1.5rem);
     color: var(--ink-soft); font-weight: 400;
     max-width: 600px; opacity: 0;
-    animation: fadeIn 1.5s ease-out 1.8s forwards;
+    animation: fadeIn 0.9s ease-out 0.5s forwards;
   }
   .hero-tagline {
     margin-top: 0.5rem;
@@ -208,7 +208,7 @@
     font-size: 0.8rem; letter-spacing: 0.3em;
     text-transform: uppercase; color: var(--sage);
     opacity: 0;
-    animation: fadeIn 1.5s ease-out 2s forwards;
+    animation: fadeIn 0.9s ease-out 0.6s forwards;
   }
 
   /* My Profile CTA button */
@@ -219,7 +219,7 @@
     flex-wrap: wrap;
     justify-content: center;
     opacity: 0;
-    animation: fadeIn 1.5s ease-out 2.2s forwards;
+    animation: fadeIn 0.9s ease-out 0.7s forwards;
   }
   .hero-cta {
     display: inline-flex;
@@ -280,7 +280,7 @@
     font-size: 0.7rem; letter-spacing: 0.3em;
     text-transform: uppercase; color: var(--ink-soft);
     text-decoration: none; opacity: 0;
-    animation: fadeIn 1s ease-out 2.4s forwards, bob 2s ease-in-out 3s infinite;
+    animation: fadeIn 0.9s ease-out 1s forwards, bob 2s ease-in-out 2s infinite;
   }
   .scroll-cue::after {
     content: ""; display: block;
@@ -297,7 +297,7 @@
   .menu-section { padding: 6rem 2rem; }
   .menu-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
     gap: 1.5rem; max-width: 1000px; margin: 0 auto;
   }
   .menu-block {
@@ -426,7 +426,7 @@
   .projects-section { padding: 8rem 2rem; background: rgba(235, 225, 207, 0.3); }
   .projects-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
     gap: 2rem; max-width: 1100px; margin: 0 auto;
   }
   .project-card {
@@ -831,6 +831,85 @@
   }
   footer a:hover { color: var(--vermillion-dark); }
 
+  /* Current section — same underline as hover, held in place */
+  .nav-links a.active { color: var(--ink); }
+  .nav-links a.active::after { transform: scaleX(1); }
+
+  /* Phone menu — the seal becomes the button */
+  .menu-toggle {
+    display: none;
+    width: 42px; height: 42px; padding: 0;
+    background: var(--vermillion); border: 0; cursor: pointer;
+    transform: rotate(-3deg); position: relative;
+    flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  }
+  .menu-toggle::before {
+    content: ""; position: absolute; inset: 4px;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .menu-toggle span {
+    display: block; width: 16px; height: 1.5px; background: var(--paper);
+    transition: transform 0.35s var(--ease-out), opacity 0.2s;
+  }
+  .menu-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+  .menu-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+  .menu-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+  .menu-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+
+  .mobile-menu {
+    position: fixed; inset: 0; z-index: 99;
+    background: var(--paper);
+    padding: 6.5rem 2rem 2rem;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.35s var(--ease-soft), visibility 0s linear 0.35s;
+  }
+  .mobile-menu.open {
+    opacity: 1; visibility: visible;
+    transition: opacity 0.35s var(--ease-soft), visibility 0s;
+  }
+  .mobile-menu a {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.9rem; color: var(--ink); text-decoration: none;
+    padding: 0.55rem 0; border-bottom: 1px solid rgba(26, 26, 26, 0.08);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  .mobile-menu a small {
+    font-family: 'Inter', sans-serif; font-size: 0.62rem;
+    letter-spacing: 0.2em; color: var(--vermillion); min-width: 1.6rem;
+  }
+  .mobile-menu a.active { color: var(--vermillion); font-style: italic; }
+  .mobile-menu-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 2rem; }
+  .mobile-menu-actions a {
+    font-family: 'Inter', sans-serif; font-size: 0.7rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    border: 1px solid var(--vermillion); color: var(--vermillion);
+    padding: 0.9rem 1.3rem;
+  }
+  .mobile-menu-actions a.fill { background: var(--vermillion); color: var(--paper); }
+
+  /* Back to top — a small seal that appears once the reader is well into the page */
+  .to-top {
+    position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 90;
+    width: 46px; height: 46px;
+    background: var(--vermillion); color: var(--paper);
+    border: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Inter', sans-serif; font-size: 1.1rem;
+    opacity: 0; pointer-events: none;
+    transform: translateY(10px) rotate(-3deg);
+    transition: opacity 0.4s var(--ease-soft), transform 0.4s var(--ease-out), background 0.3s;
+    box-shadow: 0 6px 18px rgba(26, 26, 26, 0.12);
+  }
+  .to-top::before {
+    content: ""; position: absolute; inset: 4px;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .to-top.show { opacity: 1; pointer-events: auto; transform: translateY(0) rotate(-3deg); }
+  .to-top:hover { background: var(--vermillion-dark); }
+  .to-top:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+
   /* Seven nav items: tighten tracking before they crowd the brand and seal */
   @media (max-width: 1200px) {
     .top-bar { gap: 1.5rem; padding: 1.2rem 2rem; }
@@ -853,9 +932,20 @@
     .timeline-item::before { left: 0; top: 1.9rem; }
     .timeline-date { text-align: left; font-size: 1rem; margin-bottom: 0.5rem; }
   }
-  /* Below this the links no longer fit; "Main Menu" jumps to the Contents grid instead */
+  /* Below this the links no longer fit; the seal turns into a menu button */
   @media (max-width: 760px) {
-    .nav-links { display: none; }
+    .nav-links, .top-bar .seal { display: none; }
+    .menu-toggle { display: flex; }
+    .to-top { right: 1rem; bottom: 1rem; }
+    .profile-section { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .profile-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  /* Small phones: stack each label above its value */
+  @media (max-width: 480px) {
+    .info-row { grid-template-columns: 1fr; gap: 0.35rem; }
+  }
+  @media (min-width: 761px) {
+    .mobile-menu { display: none; }
   }
 </style>
 </head>
@@ -906,7 +996,28 @@
       <a href="projects/labs.html" class="nav-accent">The Labs</a>
     </nav>
     <div class="seal" title="印">印</div>
+    <button class="menu-toggle" id="menuToggle" type="button"
+            aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+      <span></span><span></span><span></span>
+    </button>
   </header>
+
+  <!-- Phone menu (outside the header: its backdrop-filter would trap a fixed child) -->
+  <nav class="mobile-menu" id="mobileMenu" aria-label="Site">
+    <a href="#menu"><small>00</small>Contents</a>
+    <a href="#profile"><small>01</small>Profile</a>
+    <a href="#experience"><small>02</small>Experience</a>
+    <a href="#project"><small>03</small>Projects</a>
+    <a href="#publication"><small>04</small>Publications</a>
+    <a href="#teaching"><small>05</small>Teaching</a>
+    <a href="#contact"><small>06</small>Contact</a>
+    <div class="mobile-menu-actions">
+      <a href="projects/labs.html" class="fill">The Labs &rarr;</a>
+      <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV &darr;</a>
+    </div>
+  </nav>
+
+  <button class="to-top" id="toTop" type="button" aria-label="Back to top">&uarr;</button>
 
   <!-- ============ HERO ============ -->
   <section class="hero" id="top">
@@ -914,8 +1025,8 @@
     <div class="hero-greeting">— Welcome —</div>
 
     <h1 class="hero-name">
-      <span class="word">My</span>
-      <span class="word"><em>Profile</em></span>
+      <span class="word">Joshu</span>
+      <span class="word"><em>Leonardy</em></span>
     </h1>
 
     <div class="hero-divider"></div>
@@ -1025,7 +1136,7 @@
             <h3>Hello — 初めまして</h3>
 
             <p>
-              I am currently a <span class="accent">MPhil students</span> at
+              I am currently an <span class="accent">MPhil student</span> at
               the Faculty of Electrical Engineering, Universiti Teknologi
               Malaysia, working as a Graduate Research Assistant at the
               Photonics Research Center. Previously, I received my B.Sc in
@@ -1060,7 +1171,7 @@
               <div class="info-label">Education</div>
               <div class="info-value">
                 MPhil., Electrical Engineering &mdash; UTM, Malaysia (2024 &mdash; Present)<br>
-                B.Sc., Physics (Electronics Instrumentation) &mdash; UNNES, Indonesia (August 2020 &mdash; Desember 2023) &middot; GPA 3.55
+                B.Sc., Physics (Electronics Instrumentation) &mdash; UNNES, Indonesia (August 2020 &mdash; December 2023) &middot; GPA 3.55
               </div>
             </div>
             <div class="info-row">
@@ -1630,17 +1741,73 @@
       revealEls.forEach(el => observer.observe(el));
     }
 
-    // Top bar border on scroll — rAF-throttled so it never fights the scroll
     const topBar = document.getElementById('topBar');
-    let scrollQueued = false;
+    const toTop = document.getElementById('toTop');
+    const menuToggle = document.getElementById('menuToggle');
+    const mobileMenu = document.getElementById('mobileMenu');
+
+    // Every in-page link in either menu, grouped by the section it points at
+    const navLinks = [...document.querySelectorAll('.nav-links a[href^="#"], .mobile-menu a[href^="#"]')];
+    const trackedIds = [...new Set(navLinks.map(a => a.getAttribute('href').slice(1)))];
+    const tracked = trackedIds.map(id => document.getElementById(id)).filter(Boolean)
+      .sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+
+    // The section whose top has passed ~35% of the screen is the one being read
+    function currentSection() {
+      const doc = document.documentElement;
+      if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4) return 'contact';
+      const line = window.innerHeight * 0.35;
+      let id = null;
+      for (const el of tracked) if (el.getBoundingClientRect().top <= line) id = el.id;
+      return id;
+    }
+
+    // Top bar border, back-to-top, and current section — rAF-throttled so they never fight the scroll
+    let scrollQueued = false, lastActive;
+    function onScroll() {
+      scrollQueued = false;
+      topBar.classList.toggle('scrolled', window.scrollY > 30);
+
+      const showTop = window.scrollY > window.innerHeight * 1.2;
+      toTop.classList.toggle('show', showTop);
+      toTop.tabIndex = showTop ? 0 : -1;
+
+      const active = currentSection();
+      if (active === lastActive) return;
+      lastActive = active;
+      navLinks.forEach(a => {
+        const on = a.getAttribute('href') === '#' + active;
+        a.classList.toggle('active', on);
+        if (on) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current');
+      });
+    }
     window.addEventListener('scroll', () => {
       if (scrollQueued) return;
       scrollQueued = true;
-      requestAnimationFrame(() => {
-        topBar.classList.toggle('scrolled', window.scrollY > 30);
-        scrollQueued = false;
-      });
+      requestAnimationFrame(onScroll);
     }, { passive: true });
+    onScroll();
+
+    toTop.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+      topBar.querySelector('.brand').focus({ preventScroll: true });
+    });
+
+    // Phone menu
+    function setMenu(open) {
+      mobileMenu.classList.toggle('open', open);
+      menuToggle.setAttribute('aria-expanded', String(open));
+      menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      document.body.style.overflow = open ? 'hidden' : '';
+      if (open) mobileMenu.querySelector('a').focus({ preventScroll: true });
+    }
+    menuToggle.addEventListener('click', () => setMenu(!mobileMenu.classList.contains('open')));
+    mobileMenu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && mobileMenu.classList.contains('open')) { setMenu(false); menuToggle.focus(); }
+    });
+    // Rotating to landscape can cross the breakpoint with the menu open
+    window.matchMedia('(min-width: 761px)').addEventListener('change', e => { if (e.matches) setMenu(false); });
 
     // Rotating left vertical text — cycles through research areas
     const verticalPhrases = [
@@ -1662,8 +1829,8 @@
           leftVertical.classList.remove('fading');
         }, 800);
       };
-      // Start cycling after the initial fade-in finishes (~3.8s)
-      setTimeout(() => { cycleTimer = setInterval(cycle, 4000); }, 3800);
+      // Start cycling after the initial fade-in finishes (~2.5s)
+      setTimeout(() => { cycleTimer = setInterval(cycle, 4000); }, 2500);
       document.addEventListener('visibilitychange', () => {
         if (document.hidden && cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
         else if (!document.hidden && !cycleTimer) { cycleTimer = setInterval(cycle, 4000); }
