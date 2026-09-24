@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spatial Filtering Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive image processing lab: kernels and correlation vs convolution, box and Gaussian smoothing, noise and the median filter, Laplacian and unsharp-mask sharpening, and Sobel edge detection — on sample images or your own photograph." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+section{scroll-margin-top:64px}
+
+/* kernel editor */
+.k-edit{display:grid;gap:3px;width:fit-content}
+.k-edit input{width:52px;height:40px;border:1px solid var(--line);background:rgba(255,255,255,.6);text-align:center;
+  font-family:'Inter',sans-serif;font-size:.74rem;color:var(--ink);padding:0;-moz-appearance:textfield}
+.k-edit input::-webkit-outer-spin-button,.k-edit input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.k-edit input.neg{color:var(--vermillion)}
+.k-edit input.zero{color:var(--ink-light)}
+.k-row{display:flex;flex-wrap:wrap;gap:1.6rem 2.4rem;align-items:flex-start;margin-bottom:1.6rem}
+.k-sum{font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink-soft);margin-top:.7rem;max-width:34ch;line-height:1.6}
+.k-sum b{color:var(--vermillion);font-weight:500}
+
+/* products grid in the inspector */
+.kp{display:grid;gap:2px;margin:.3rem 0 .6rem}
+.kp div{border:1px solid var(--line);background:rgba(255,255,255,.55);font-family:'Inter',sans-serif;
+  font-size:.56rem;line-height:1.3;padding:.2rem .15rem;text-align:center;color:var(--ink-soft);white-space:nowrap}
+.kp div b{display:block;font-weight:500;color:var(--ink);font-size:.62rem}
+.kp div.c{border-color:var(--vermillion)}
+.kp div.off{opacity:.35}
+.sorted{display:flex;flex-wrap:wrap;gap:2px;margin:.35rem 0 .6rem}
+.sorted span{font-family:'Inter',sans-serif;font-size:.6rem;min-width:26px;text-align:center;padding:.18rem .1rem;
+  border:1px solid var(--line);background:rgba(255,255,255,.55)}
+.sorted span.imp{color:var(--ink-light);text-decoration:line-through}
+.sorted span.pick{background:var(--vermillion);border-color:var(--vermillion);color:var(--paper)}
+.sorted span.gap{border:0;background:none}
+
+.kbars{max-width:320px}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#kernel">Kernel</a><a href="#smooth">Smoothing</a><a href="#noise">Noise</a>
+    <a href="#sharpen">Sharpening</a><a href="#edges">Edges</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">空 · 間 · 濾 · 波</div>
+  <h1>Spatial <em>Filtering</em> Lab</h1>
+  <div class="hero-divider"></div>
+  <p>In lab 02 every output pixel depended on one input pixel. Here each output is computed from a small neighbourhood around it, using a grid of weights called a kernel. That one change is enough to blur, remove noise, sharpen and find edges. Each operation is shown here as a kernel, as the arithmetic at the pixel you point at, and as a result on your own image.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="kernel">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">近 · 傍</div>
+    <h2 class="section-heading-text">A kernel and its neighbourhood</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.4 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters</p>
+  <p class="lede reveal d1">Place the kernel over a pixel, multiply each weight by the pixel beneath it, and add up the products. The sum is the output value for that pixel. Point at the image and the inspector shows every product. You can type your own weights into the kernel; fractions like <span class="mono">1/9</span> work too.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>g</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;<span class="sigma"><small>a</small><span class="big">Σ</span><small>s = −a</small></span><span class="sigma"><small>b</small><span class="big">Σ</span><small>t = −b</small></span><i>w</i>(<i>s</i>, <i>t</i>)&nbsp;<i>f</i>(<i>x</i> <span id="eq1-op">+</span> <i>s</i>, <i>y</i> <span id="eq1-op2">+</span> <i>t</i>)</div>
+    <div class="eqkey" id="eq1"></div>
+    <p class="eqgloss">This is <i>correlation</i>. <i>Convolution</i> is the same sum with the minus signs, which is the same as rotating the kernel 180° first. For a symmetric kernel such as a box or a Gaussian the two give identical results. For an asymmetric one they differ, and the <i>Shift</i> kernel shows which way. The border setting decides what <i>f</i> means outside the image, because the kernel still needs values to read there.</p>
+  </div>
+
+  <div class="k-row">
+    <div>
+      <span class="label">Kernel <span class="mono" id="k-dim"></span></span>
+      <div class="k-edit" id="k-edit"></div>
+      <p class="k-sum" id="k-sum"></p>
+    </div>
+    <div class="controls" style="margin-top:0;flex:1;min-width:260px">
+      <div style="grid-column:1/-1"><span class="label">Presets</span><div class="chiprow" id="k-pre"></div></div>
+      <div><span class="label">Size</span><div class="seg" id="k-size"></div></div>
+      <div><span class="label">Operation</span><div class="seg" id="k-mode"></div></div>
+      <div><span class="label">Border</span><div class="seg" id="k-border"></div></div>
+      <div><span class="label">Display negatives as</span><div class="seg" id="k-show"></div></div>
+    </div>
+  </div>
+  <div id="pick1"></div>
+  <div id="st1"></div>
+  <div class="scoreboard" id="sb1"></div>
+  <div id="t1"></div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="smooth">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">平 · 滑 · 化</div>
+    <h2 class="section-heading-text">Smoothing: box versus Gaussian</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.5.1 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters: smoothing, separability</p>
+  <p class="lede reveal d1">A smoothing kernel has positive weights that add up to 1, so it replaces each pixel with a weighted average of its neighbours. A box kernel weights every neighbour equally. A Gaussian kernel gives most weight to the nearest neighbours and less to the far ones. The row profile below plots the brightness along one row of the image, so you can see how each kernel spreads out a sharp edge. Point at the image to choose which row is plotted.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>w</i>(<i>s</i>, <i>t</i>)&nbsp;=&nbsp;<i>K</i>&nbsp;<i>e</i><sup>−(<i>s</i>² + <i>t</i>²) / 2<i>σ</i>²</sup>&nbsp;=&nbsp;<i>K</i>&nbsp;<i>e</i><sup>−<i>s</i>² / 2<i>σ</i>²</sup>&nbsp;·&nbsp;<i>e</i><sup>−<i>t</i>² / 2<i>σ</i>²</sup></div>
+    <div class="eqkey" id="eq2"></div>
+    <p class="eqgloss">The second form is the useful one. A 2-D Gaussian is a 1-D Gaussian along the rows multiplied by one along the columns. That means you can blur every row with a short 1-D kernel and then every column with the same kernel, which costs 2<i>n</i> multiplications per pixel instead of <i>n</i>². A box kernel is separable in the same way. The weights are cut off at 3<i>σ</i> from the centre, because beyond that they add less than 0.3% to the sum.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Kernel</span><div class="seg" id="s-kind"></div></div>
+    <div id="s-box-w"><span class="label">Box size <span class="mono" id="s-box-v"></span></span><input type="range" id="s-box" min="3" max="21" step="2" value="7" aria-label="Box size"></div>
+    <div id="s-sig-w"><span class="label">Gaussian σ <span class="mono" id="s-sig-v"></span></span><input type="range" id="s-sig" min="0.5" max="6" step="0.25" value="2" aria-label="Gaussian sigma"></div>
+  </div>
+  <div id="pick2"></div>
+  <div id="st2"></div>
+  <div class="ip-charts">
+    <div class="ip-chart kbars"><span class="cap">1-D kernel weights <em id="k2-cap"></em></span><canvas id="k2"></canvas></div>
+    <div class="ip-chart"><span class="cap">Row profile <em id="p2-cap"></em></span><canvas id="p2"></canvas></div>
+  </div>
+  <div class="scoreboard" id="sb2"></div>
+  <div id="t2"></div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="noise">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">雑 · 音 · 除 · 去</div>
+    <h2 class="section-heading-text">Noise, and why the median wins</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.5.2, §5.2–5.3 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Filters: nonlinear filters</p>
+  <p class="lede reveal d1">Averaging reduces noise, but it also blurs whatever the noise is sitting on. A single 255 among eight values of 40 raises a 3×3 mean by almost 24. The median ignores that outlier completely: sort the nine values and take the middle one. That makes it an <i>order-statistic</i> filter. Unlike every filter in section 01, it is not a weighted sum, so no kernel can represent it. The scoreboard measures each result against the clean image using PSNR, where higher means closer to the original.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>g</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;median&nbsp;{&nbsp;<i>f</i>(<i>s</i>, <i>t</i>)&nbsp;:&nbsp;(<i>s</i>, <i>t</i>)&nbsp;∈&nbsp;<i>S<sub>xy</sub></i>&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;PSNR&nbsp;=&nbsp;10&nbsp;log<sub>10</sub>(255² / MSE)</div>
+    <div class="eqkey" id="eq3"><span>Point at the image to see the window sorted.</span></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Noise</span><div class="seg" id="n-type"></div></div>
+    <div><span class="label" id="n-amt-l">Density</span><input type="range" id="n-amt" min="0" max="50" step="1" value="10" aria-label="Noise amount"></div>
+    <div><span class="label">Sample</span><button type="button" class="chip" id="n-seed">New noise</button></div>
+    <div style="grid-column:span 2"><span class="label">Filter</span><div class="seg" id="n-filter"></div></div>
+    <div><span class="label">Window</span><div class="seg" id="n-size"></div></div>
+  </div>
+  <div id="pick3"></div>
+  <div id="st3"></div>
+  <div class="ip-charts">
+    <div class="ip-chart"><span class="cap">Row profile <em id="p3-cap"></em></span><canvas id="p3"></canvas></div>
+    <div class="ip-chart"><span class="cap">PSNR against the clean image <em>· same window size</em></span><div class="bars" id="n-bars" style="margin-top:.4rem"></div></div>
+  </div>
+  <div class="scoreboard" id="sb3"></div>
+  <div id="t3"></div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="sharpen">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">鮮 · 鋭 · 化</div>
+    <h2 class="section-heading-text">Sharpening: adding the detail back</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.6.1–3.6.3 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Edges and contours: sharpening</p>
+  <p class="lede reveal d1">Smoothing averages detail away. Sharpening works in the opposite direction: it measures the detail and adds more of it back. The Laplacian measures detail with a second derivative, which is zero where the image is flat and large where brightness changes abruptly. Unsharp masking measures detail as the difference between the image and a blurred copy of it. Either way, watch the row profile for <i>overshoot</i>: values pushed past the original on both sides of an edge. That overshoot is what makes an edge look crisp, and when it is too strong it shows up as a halo or gets clipped at 0 or 255.</p>
+
+  <div class="eqbox">
+    <div class="eqmath" id="eq4-main"></div>
+    <div class="eqkey" id="eq4"><span>Point at an edge to put its numbers through the equation.</span></div>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Method</span><div class="seg" id="h-method"></div></div>
+    <div id="h-lap-w"><span class="label">Neighbours</span><div class="seg" id="h-neigh"></div></div>
+    <div id="h-c-w"><span class="label">Strength c <span class="mono" id="h-c-v"></span></span><input type="range" id="h-c" min="0" max="2" step="0.1" value="1" aria-label="Laplacian strength"></div>
+    <div id="h-sig-w"><span class="label">Blur σ <span class="mono" id="h-sig-v"></span></span><input type="range" id="h-sig" min="0.5" max="5" step="0.25" value="2" aria-label="Blur sigma"></div>
+    <div id="h-k-w"><span class="label">Amount k <span class="mono" id="h-k-v"></span></span><input type="range" id="h-k" min="0" max="5" step="0.1" value="1.5" aria-label="Unsharp amount"></div>
+    <div><span class="label">Show</span><div class="seg" id="h-view"></div></div>
+  </div>
+  <div id="pick4"></div>
+  <div id="st4"></div>
+  <div class="ip-charts">
+    <div class="ip-chart"><span class="cap">Row profile <em>· shaded bands are outside 0–255 and will clip</em></span><canvas id="p4"></canvas></div>
+  </div>
+  <div class="scoreboard" id="sb4"></div>
+  <div id="t4"></div>
+</section>
+
+<!-- ══════ 05 ══════ -->
+<section id="edges">
+  <div class="section-heading reveal">
+    <span class="section-num">— 05 —</span>
+    <div class="section-heading-kanji">輪 · 郭</div>
+    <h2 class="section-heading-text">Gradients and edges</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §3.6.4, §10.2 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — Edges and contours</p>
+  <p class="lede reveal d1">The first derivative measures how quickly brightness changes. You need two kernels: one responds to change from left to right, the other to change from top to bottom. Together they form the gradient, a vector that points uphill in brightness. Its length is the edge strength. The Sobel kernel is a derivative with a small amount of smoothing built in, which is why it copes with noise better than the plain Roberts cross.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>M</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;√(<i>g<sub>x</sub></i>² + <i>g<sub>y</sub></i>²)&nbsp;&nbsp;≈&nbsp;&nbsp;|<i>g<sub>x</sub></i>| + |<i>g<sub>y</sub></i>|</div>
+    <div class="eqkey" id="eq5"><span>Point at an edge to see <i>g<sub>x</sub></i> and <i>g<sub>y</sub></i> computed from its nine neighbours.</span></div>
+    <p class="eqgloss">A note on axes when reading the book: Gonzalez &amp; Woods take <i>x</i> down the rows and <i>y</i> across the columns. Here, as in most software, <i>x</i> runs left to right. So this lab's <i>g<sub>x</sub></i> is the book's <i>g<sub>y</sub></i>, and the other way round. The magnitude is the same either way.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Operator</span><div class="seg" id="d-op"></div></div>
+    <div style="grid-column:span 2"><span class="label">Show</span><div class="seg" id="d-view"></div></div>
+    <div><span class="label">Smooth first</span><div class="seg" id="d-pre"></div></div>
+    <div><span class="label">Edge threshold <span class="mono" id="d-t-v"></span></span><input type="range" id="d-t" min="1" max="100" value="25" aria-label="Edge threshold"></div>
+  </div>
+  <div id="pick5"></div>
+  <div id="st5"></div>
+  <div class="scoreboard" id="sb5"></div>
+  <div class="note">An edge map from a threshold is only a first step. The edges come out thick, broken, and full of small fragments from noise. Canny's detector fixes each of those problems in turn: it thins the edges to one pixel, then links them using two thresholds instead of one. That is planned for lab 07.</div>
+  <div id="t5"></div>
+</section>
+
+<nav class="lab-pager">
+  <a href="histogram-lab.html" class="prev">
+    <span class="pager-dir">← Previous</span>
+    <span class="pager-title">02 · Intensity &amp; Histograms</span>
+  </a>
+  <a href="convolution-lab.html" class="next">
+    <span class="pager-dir">Where this leads →</span>
+    <span class="pager-title">Learned kernels: the Convolution Lab</span>
+  </a>
+</nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+    <p style="margin-top:.6rem">Your images never leave the browser. Everything runs on your own machine.</p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script src="../assets/imgproc.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Spatial Filtering Lab
+   ═══════════════════════════════════════════════════════════════════ */
+
+let IMG = null;
+const $ = id => document.getElementById(id);
+const f1 = v => v.toFixed(1).replace('-', '−');
+const par = v => v < 0 ? '(' + f1(v) + ')' : f1(v);   // negatives bracketed inside a product
+const nf = v => (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : Math.abs(v) < 0.1 ? v.toFixed(3) : v.toFixed(2)).replace('-', '−');
+
+/** f at (x, y) under a border rule — the inspector's copy of what the filter reads. */
+function at(img, x, y, border) {
+  const { w, h } = img;
+  if (x < 0 || y < 0 || x >= w || y >= h) {
+    if (border === 'zero') return 0;
+    if (border === 'reflect') {
+      x = x < 0 ? -x : x >= w ? 2 * (w - 1) - x : x;
+      y = y < 0 ? -y : y >= h ? 2 * (h - 1) - y : y;
+    }
+    x = clamp(x, 0, w - 1); y = clamp(y, 0, h - 1);
+  }
+  return img.data[y * w + x];
+}
+
+/** Grid of v × w cells for the inspector, and the sum. */
+function productsHTML(img, x, y, k, n, border) {
+  const r = n >> 1;
+  let sum = 0, cells = '';
+  for (let t = -r; t <= r; t++)
+    for (let s = -r; s <= r; s++) {
+      const wt = k[(t + r) * n + (s + r)], v = at(img, x + s, y + t, border), p = wt * v;
+      sum += p;
+      cells += '<div class="' + (s === 0 && t === 0 ? 'c' : '') + (wt === 0 ? ' off' : '') + '"><b>' + nf(v) + '</b>× ' + nf(wt) + '</div>';
+    }
+  return { html: '<div class="kp" style="grid-template-columns:repeat(' + n + ',minmax(0,1fr))">' + cells + '</div>', sum };
+}
+
+/* ═════ 01 — kernel playground ═════ */
+
+const KPRE = {
+  identity: { label: 'Identity', n: 3, w: [0, 0, 0, 0, 1, 0, 0, 0, 0] },
+  box: { label: 'Box', n: 3, w: Array(9).fill(1 / 9) },
+  gauss: { label: 'Gaussian', n: 3, w: [1, 2, 1, 2, 4, 2, 1, 2, 1].map(v => v / 16) },
+  box5: { label: 'Box 5×5', n: 5, w: Array(25).fill(1 / 25) },
+  sharpen: { label: 'Sharpen', n: 3, w: [0, -1, 0, -1, 5, -1, 0, -1, 0] },
+  laplace: { label: 'Laplacian', n: 3, w: [0, 1, 0, 1, -4, 1, 0, 1, 0] },
+  sobel: { label: 'Sobel x', n: 3, w: [-1, 0, 1, -2, 0, 2, -1, 0, 1] },
+  emboss: { label: 'Emboss', n: 3, w: [-2, -1, 0, -1, 1, 1, 0, 1, 2] },
+  shift: { label: 'Shift', n: 3, w: [0, 0, 0, 0, 0, 1, 0, 0, 0] }
+};
+const K = { n: 3, w: KPRE.box.w.slice(), pre: 'box', mode: 'corr', border: 'zero', show: 'clamp',
+            edited: false, shiftModes: new Set(), zeroSeen: false };
+const keff = () => K.mode === 'conv' ? IP.flip(K.w) : K.w;
+
+function parseW(s) {
+  s = String(s).trim().replace('−', '-');
+  if (s.includes('/')) { const [a, b] = s.split('/').map(Number); return b ? a / b : 0; }
+  const v = Number(s); return isFinite(v) ? v : 0;
+}
+function buildKernel() {
+  const el = $('k-edit');
+  el.innerHTML = '';
+  el.style.gridTemplateColumns = 'repeat(' + K.n + ',52px)';
+  K.w.forEach((v, i) => {
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'decimal';
+    inp.value = nf(v);
+    inp.className = v < 0 ? 'neg' : v === 0 ? 'zero' : '';
+    inp.setAttribute('aria-label', 'Weight row ' + (Math.floor(i / K.n) + 1) + ', column ' + (i % K.n + 1));
+    inp.addEventListener('change', () => { K.w[i] = parseW(inp.value); K.pre = null; K.edited = true; buildK(); render1(); });
+    el.appendChild(inp);
+  });
+  $('k-dim').textContent = K.n + ' × ' + K.n;
+}
+function resizeKernel(n) {
+  const old = K.w, on = K.n, w = new Array(n * n).fill(0), d = (n - on) / 2;
+  for (let j = 0; j < on; j++) for (let i = 0; i < on; i++) {
+    const jj = j + d, ii = i + d;
+    if (jj >= 0 && ii >= 0 && jj < n && ii < n) w[jj * n + ii] = old[j * on + i];
+  }
+  K.n = n; K.w = w; K.pre = null;
+}
+function buildK() {
+  chips('k-pre', Object.keys(KPRE).map(k => [k, KPRE[k].label]), K.pre, k => {
+    K.pre = k; K.n = KPRE[k].n; K.w = KPRE[k].w.slice(); buildK(); render1();
+  });
+  seg('k-size', [3, 5], K.n, n => { resizeKernel(n); buildK(); render1(); }, ['3 × 3', '5 × 5']);
+  seg('k-mode', ['corr', 'conv'], K.mode, m => { K.mode = m; buildK(); render1(); }, ['Correlation', 'Convolution']);
+  seg('k-border', ['zero', 'replicate', 'reflect'], K.border, b => { K.border = b; buildK(); render1(); }, ['Zero', 'Replicate', 'Reflect']);
+  seg('k-show', ['clamp', 'abs', 'offset'], K.show, s => { K.show = s; buildK(); render1(); }, ['Clip', '|v|', '128 + v']);
+  $('eq1-op').textContent = $('eq1-op2').textContent = K.mode === 'conv' ? '−' : '+';
+  buildKernel();
+}
+
+const st1 = IP.stage('st1', {
+  explain: (r, s, x, y) => {
+    const p = productsHTML(IMG, x, y, keff(), K.n, K.border);
+    return (K.mode === 'conv' ? 'Kernel rotated 180° for convolution:' : 'Each cell: pixel × weight') + p.html +
+      'Σ = <b>' + f1(p.sum) + '</b> → shown as <b>' + s + '</b>' +
+      (K.show === 'clamp' && (p.sum < 0 || p.sum > 255) ? ' (clipped)' : K.show === 'offset' ? ' (128 + v·' + K.scale.toFixed(2) + ')' : K.show === 'abs' ? ' (|v|·' + K.scale.toFixed(2) + ')' : '');
+  }
+});
+
+function render1() {
+  const sum = K.w.reduce((a, b) => a + b, 0);
+  const out = IP.correlate(IMG, keff(), K.n, K.n, K.border), disp = IP.toDisplay(out, K.show);
+  K.scale = disp.scale;
+  st1.set(IMG, disp.img);
+  let lo = Infinity, hi = -Infinity, clip = 0;
+  for (const v of out.data) { if (v < lo) lo = v; if (v > hi) hi = v; if (v < 0 || v > 255) clip++; }
+  $('k-sum').innerHTML = 'Σ<i>w</i> = <b>' + nf(sum) + '</b>. ' + (Math.abs(sum - 1) < 1e-6
+    ? 'Weights sum to 1, so flat regions keep their brightness.'
+    : Math.abs(sum) < 1e-6 ? 'Weights sum to 0, so flat regions become 0. This kernel is a detector, not a smoother, and its output is signed.'
+    : 'Weights sum to ' + nf(sum) + ', so a flat region is multiplied by that much.');
+  $('eq1').innerHTML = '<span>' + (K.mode === 'conv' ? 'Convolution' : 'Correlation') + '</span><span>' + K.n + ' × ' + K.n + ' = ' + K.n * K.n + ' products per pixel</span>' +
+    '<span>' + (IMG.w * IMG.h * K.n * K.n).toLocaleString() + ' multiplications for the whole image</span>';
+  $('sb1').innerHTML =
+    score('Σ weights', nf(sum), Math.abs(sum - 1) < 1e-6 ? 'preserves brightness' : 'changes brightness', true) +
+    score('Lowest output', f1(lo), lo < 0 ? 'below 0' : 'in range') +
+    score('Highest output', f1(hi), hi > 255 ? 'above 255' : 'in range') +
+    score('Out of range', (clip / out.data.length * 100).toFixed(1) + '%', K.show === 'clamp' ? 'clipped for display' : 'rescaled for display');
+  if (K.pre === 'shift') K.shiftModes.add(K.mode);
+  if (K.border === 'zero' && Math.abs(sum - 1) < 1e-6 && K.n === 5) K.zeroSeen = true;
+  tries1.check();
+}
+const tries1 = IP.tries('t1', [
+  { text: 'Choose <i>Shift</i> and switch between correlation and convolution. Which way does the image move in each case, and why?',
+    test: () => K.shiftModes.size === 2 },
+  { text: 'Use <i>Box 5×5</i> with <i>Zero</i> border and look for the dark frame around the edge. Then switch the border to <i>Replicate</i>.',
+    test: () => K.zeroSeen && K.border !== 'zero' && K.n === 5 },
+  { text: 'Type in a kernel of your own whose weights sum to 0, and view it as <i>|v|</i>. What does it detect?',
+    test: () => K.edited && Math.abs(K.w.reduce((a, b) => a + b, 0)) < 1e-9 && K.w.some(v => v) && K.show === 'abs' }
+]);
+
+/* ═════ 02 — smoothing ═════ */
+
+const S = { kind: 'gauss', box: 7, sigma: 2, row: null, col: null, sawBox15: false };
+const k1d = () => S.kind === 'box' ? Array(S.box).fill(1 / S.box) : IP.gauss1d(S.sigma);
+
+const st2 = IP.stage('st2', {
+  explain: (r, s, x, y) => {
+    const k = k1d(), n = k.length;
+    return '<i>g</i> = Σ <i>w f</i> over ' + n + ' × ' + n + ' = ' + n * n + ' pixels = <b>' + f1(S.out.data[y * IMG.w + x]) + '</b> → <b>' + s + '</b>. ' +
+      'The centre pixel was ' + r + '; its own weight is only ' + (k[n >> 1] * k[n >> 1] * 100).toFixed(1) + '% of the total.';
+  }
+});
+st2.onProbe = (r, s, x, y) => { S.row = y; S.col = x; drawCharts2(); tries2.check(); };
+
+function buildS() {
+  seg('s-kind', ['box', 'gauss'], S.kind, v => { S.kind = v; buildS(); render2(); }, ['Box', 'Gaussian']);
+  $('s-box-w').style.display = S.kind === 'box' ? '' : 'none';
+  $('s-sig-w').style.display = S.kind === 'gauss' ? '' : 'none';
+}
+$('s-box').addEventListener('input', e => { S.box = +e.target.value; render2(); });
+$('s-sig').addEventListener('input', e => { S.sigma = +e.target.value; render2(); });
+
+function render2() {
+  const k = k1d(), n = k.length;
+  S.out = IP.separable(IMG, k, 'replicate');
+  S.disp = IP.toDisplay(S.out, 'clamp').img;
+  st2.set(IMG, S.disp);
+  $('s-box-v').textContent = S.box + ' × ' + S.box;
+  $('s-sig-v').textContent = '= ' + S.sigma.toFixed(2) + ' → ' + n + ' × ' + n;
+  $('k2-cap').textContent = '· ' + n + ' taps';
+  $('eq2').innerHTML = S.kind === 'gauss'
+    ? '<span><i>σ</i> = <b>' + S.sigma.toFixed(2) + '</b></span><span>radius ⌈3σ⌉ = ' + (n >> 1) + '</span><span>kernel ' + n + ' × ' + n + '</span><span>centre weight ' + (k[n >> 1] * k[n >> 1]).toFixed(4) + '</span>'
+    : '<span>Box ' + n + ' × ' + n + '</span><span>every weight = 1/' + n * n + ' = ' + (1 / (n * n)).toFixed(4) + '</span>';
+  $('sb2').innerHTML =
+    score('Kernel', n + ' × ' + n, S.kind === 'box' ? 'box' : 'Gaussian σ = ' + S.sigma.toFixed(2), true) +
+    score('Direct', n * n, 'multiplications per pixel') +
+    score('Separable', 2 * n, 'multiplications per pixel') +
+    score('Saving', (n * n / (2 * n)).toFixed(1) + '×', 'from separability');
+  if (S.kind === 'box' && S.box >= 15) S.sawBox15 = true;
+  drawCharts2();
+  tries2.check();
+}
+function drawKernelBars(canvas, k) {
+  const c = canvas, dpr = window.devicePixelRatio || 1, w = c.clientWidth || 300, h = 110;
+  c.width = w * dpr; c.height = h * dpr; c.style.height = h + 'px';
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const n = k.length, max = Math.max(...k), bw = (w - 8) / n;
+  k.forEach((v, i) => {
+    const bh = v / max * (h - 26);
+    ctx.fillStyle = i === n >> 1 ? IP.col('vermillion') : IP.col('ink');
+    ctx.fillRect(4 + i * bw + bw * 0.15, h - 16 - bh, bw * 0.7, bh);
+  });
+  ctx.fillStyle = IP.col('ink-light'); ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('−' + (n >> 1), 4 + bw / 2, h - 3); ctx.fillText('0', w / 2, h - 3); ctx.fillText('+' + (n >> 1), w - 4 - bw / 2, h - 3);
+}
+function drawCharts2() {
+  if (!S.out) return;
+  drawKernelBars($('k2'), k1d());
+  const y = S.row != null ? S.row : IMG.h >> 1;
+  $('p2-cap').textContent = '· row ' + y;
+  IP.drawProfile($('p2'), [
+    { data: IP.row(IMG, y), color: 'rgba(26,26,26,.55)', label: 'original' },
+    { data: IP.row(S.out, y), color: IP.col('vermillion'), width: 1.8, label: 'smoothed' }
+  ], { marker: S.col });
+}
+const tries2 = IP.tries('t2', [
+  { text: '<i>Test chart</i>: blur with a box of 15 × 15 or more. Which line gratings disappear first?',
+    test: () => IP.key === 'chart' && S.sawBox15 },
+  { text: 'Now switch to a Gaussian and find a <i>σ</i> that blurs about as much. Compare the kernel sizes in the scoreboard.',
+    test: () => S.sawBox15 && S.kind === 'gauss' },
+  { text: 'Point at a sharp edge with <i>σ</i> ≥ 4 and watch how wide the ramp becomes in the row profile.',
+    test: () => S.kind === 'gauss' && S.sigma >= 4 && S.row != null }
+]);
+
+/* ═════ 03 — noise ═════ */
+
+const N = { type: 'sp', sp: 10, g: 20, filter: 'median', size: 3, seed: 1, row: null, col: null, noisy: null, noisyKey: '', seen: new Set() };
+const FILTERS = [['mean', 'Mean'], ['gauss', 'Gaussian'], ['median', 'Median'], ['min', 'Min'], ['max', 'Max']];
+function applyFilter(img, f, size) {
+  const r = size >> 1;
+  if (f === 'mean') return IP.toDisplay(IP.separable(img, Array(size).fill(1 / size), 'replicate'), 'clamp').img;
+  if (f === 'gauss') return IP.toDisplay(IP.separable(img, IP.gauss1d(size / 4), 'replicate'), 'clamp').img;
+  return IP.rank(img, r, f === 'min' ? 0 : f === 'max' ? 1 : 0.5);
+}
+function buildN() {
+  seg('n-type', ['sp', 'gauss'], N.type, v => { N.type = v; buildN(); render3(); }, ['Salt & pepper', 'Gaussian']);
+  seg('n-filter', FILTERS.map(f => f[0]), N.filter, v => { N.filter = v; buildN(); render3(); }, FILTERS.map(f => f[1]));
+  seg('n-size', [3, 5, 7], N.size, v => { N.size = v; buildN(); render3(); }, ['3 × 3', '5 × 5', '7 × 7']);
+  const amt = $('n-amt');
+  if (N.type === 'sp') { amt.max = 50; amt.value = N.sp; }
+  else { amt.max = 60; amt.value = N.g; }
+  labelAmt();
+}
+function labelAmt() {
+  $('n-amt-l').innerHTML = N.type === 'sp' ? 'Density <span class="mono">' + N.sp + '% of pixels</span>' : 'Noise σ <span class="mono">' + N.g + ' grey levels</span>';
+}
+$('n-amt').addEventListener('input', e => { if (N.type === 'sp') N.sp = +e.target.value; else N.g = +e.target.value; labelAmt(); render3(); });
+$('n-seed').addEventListener('click', () => { N.seed++; render3(); });
+
+const st3 = IP.stage('st3', {
+  beforeLabel: 'Noisy', afterLabel: 'Filtered',
+  explain: (r, s, x, y) => {
+    const n = N.size, rr = n >> 1, vals = [];
+    for (let t = -rr; t <= rr; t++) for (let u = -rr; u <= rr; u++) vals.push(at(N.noisy, x + u, y + t, 'replicate'));
+    if (N.filter === 'mean' || N.filter === 'gauss') {
+      const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+      return (N.filter === 'mean' ? 'Mean of the ' + vals.length + ' values = ' : 'Weighted average (Gaussian) → ') + '<b>' + s + '</b>' +
+        (N.filter === 'mean' ? '' : ' (plain mean would be ' + f1(m) + ')') + '. ' +
+        (vals.some(v => v === 0 || v === 255) ? 'Impulses in the window drag the average towards 0 or 255.' : 'No impulses here.');
+    }
+    const sorted = vals.slice().sort((a, b) => a - b), idx = N.filter === 'min' ? 0 : N.filter === 'max' ? sorted.length - 1 : sorted.length >> 1;
+    let shown = sorted.map((v, i) => ({ v, i }));
+    if (sorted.length > 25) shown = shown.filter(o => o.i < 6 || o.i > sorted.length - 7 || Math.abs(o.i - idx) <= 3);
+    let html = '<div class="sorted">', last = -1;
+    shown.forEach(o => {
+      if (o.i !== last + 1) html += '<span class="gap">…</span>';
+      html += '<span class="' + (o.i === idx ? 'pick' : (o.v === 0 || o.v === 255) && N.type === 'sp' ? 'imp' : '') + '">' + o.v + '</span>';
+      last = o.i;
+    });
+    html += '</div>';
+    return 'The ' + sorted.length + ' values, sorted' + html + (N.filter === 'median' ? 'Middle value (position ' + (idx + 1) + ' of ' + sorted.length + ')' : N.filter === 'min' ? 'Smallest value' : 'Largest value') + ' = <b>' + s + '</b>.';
+  }
+});
+st3.onProbe = (r, s, x, y) => { N.row = y; N.col = x; drawCharts3(); };
+
+function render3() {
+  const key = [IP.key, IMG.w, IMG.h, N.type, N.type === 'sp' ? N.sp : N.g, N.seed].join('|');
+  if (key !== N.noisyKey || N.noisyOf !== IMG) {
+    N.noisy = IP.noise(IMG, N.type, N.type === 'sp' ? N.sp / 100 : N.g, N.seed);
+    N.noisyKey = key; N.noisyOf = IMG;
+  }
+  N.out = applyFilter(N.noisy, N.filter, N.size);
+  st3.set(N.noisy, N.out);
+  const pN = IP.psnr(IMG, N.noisy), pF = IP.psnr(IMG, N.out);
+  N.pN = pN; N.pF = pF;
+  const scores = ['mean', 'gauss', 'median'].map(f => [f, f === N.filter ? pF : IP.psnr(IMG, applyFilter(N.noisy, f, N.size))]);
+  const best = scores.reduce((a, b) => b[1] > a[1] ? b : a);
+  N.best = best[0];
+  const fin = v => isFinite(v) ? v : 99;
+  const top = Math.max(fin(pN), ...scores.map(s => fin(s[1])), 1);
+  $('n-bars').innerHTML = bar('No filter', fin(pN).toFixed(1), top, 'sage') +
+    scores.map(([f, v]) => bar(FILTERS.find(x => x[0] === f)[1] + (f === best[0] ? ' ★' : ''), fin(v).toFixed(1), top)).join('');
+  $('sb3').innerHTML =
+    score('Noisy', fin(pN).toFixed(1) + ' dB', 'PSNR before filtering') +
+    score(FILTERS.find(f => f[0] === N.filter)[1], fin(pF).toFixed(1) + ' dB', 'PSNR after filtering', true) +
+    score('Gain', (fin(pF) - fin(pN) >= 0 ? '+' : '−') + Math.abs(fin(pF) - fin(pN)).toFixed(1) + ' dB', pF > pN ? 'closer to the clean image' : 'further from the clean image');
+  N.seen.add(N.type + ':' + N.filter);
+  drawCharts3();
+  tries3.check();
+}
+function drawCharts3() {
+  if (!N.out) return;
+  const y = N.row != null ? N.row : IMG.h >> 1;
+  $('p3-cap').textContent = '· row ' + y;
+  IP.drawProfile($('p3'), [
+    { data: IP.row(N.noisy, y), color: 'rgba(26,26,26,.35)', width: 1, label: 'noisy' },
+    { data: IP.row(IMG, y), color: IP.col('sage'), width: 1.4, dash: [4, 3], label: 'clean' },
+    { data: IP.row(N.out, y), color: IP.col('vermillion'), width: 1.6, label: 'filtered' }
+  ], { marker: N.col });
+}
+const tries3 = IP.tries('t3', [
+  { text: 'Salt and pepper at 10%: compare the mean and the median at 3 × 3. How many dB apart are they?',
+    test: () => N.seen.has('sp:mean') && N.seen.has('sp:median') },
+  { text: 'Switch to Gaussian noise. Is the median still the best filter?',
+    test: () => N.type === 'gauss' && N.seen.has('gauss:median') && (N.seen.has('gauss:mean') || N.seen.has('gauss:gauss')) },
+  { text: 'Raise the salt-and-pepper density to 40% or more. The 3 × 3 median breaks down. On <i>Coins</i> or <i>Foggy hills</i>, find a window that gains at least 12 dB. Why can\'t the test chart reach that?',
+    test: () => N.type === 'sp' && N.sp >= 40 && N.filter === 'median' && N.pF - N.pN >= 12 },
+  { text: 'Try <i>Min</i> on salt-and-pepper noise. Which kind of impulse does it remove, and which does it spread?',
+    test: () => N.seen.has('sp:min') || N.seen.has('sp:max') }
+]);
+
+/* ═════ 04 — sharpening ═════ */
+
+const H = { method: 'unsharp', neigh: 4, c: 1, sigma: 2, k: 1.5, view: 'result', row: null, col: null };
+const LAP = { 4: [0, 1, 0, 1, -4, 1, 0, 1, 0], 8: [1, 1, 1, 1, -8, 1, 1, 1, 1] };
+
+function buildH() {
+  seg('h-method', ['laplacian', 'unsharp'], H.method, v => { H.method = v; buildH(); render4(); }, ['Laplacian', 'Unsharp mask']);
+  seg('h-neigh', [4, 8], H.neigh, v => { H.neigh = v; buildH(); render4(); }, ['4', '8']);
+  seg('h-view', ['result', 'detail'], H.view, v => { H.view = v; buildH(); render4(); }, ['Result', 'Added detail']);
+  const lap = H.method === 'laplacian';
+  $('h-lap-w').style.display = $('h-c-w').style.display = lap ? '' : 'none';
+  $('h-sig-w').style.display = $('h-k-w').style.display = lap ? 'none' : '';
+  $('eq4-main').innerHTML = lap
+    ? '<i>g</i>&nbsp;=&nbsp;<i>f</i>&nbsp;−&nbsp;<i>c</i>&nbsp;∇²<i>f</i>,&nbsp;&nbsp;&nbsp;∇²<i>f</i>&nbsp;=&nbsp;' +
+      (H.neigh === 4 ? '<i>f</i><sub>up</sub> + <i>f</i><sub>down</sub> + <i>f</i><sub>left</sub> + <i>f</i><sub>right</sub> − 4<i>f</i>' : '(sum of 8 neighbours) − 8<i>f</i>')
+    : '<i>g</i>&nbsp;=&nbsp;<i>f</i>&nbsp;+&nbsp;<i>k</i>&nbsp;(<i>f</i>&nbsp;−&nbsp;<i>f̄</i>)&nbsp;&nbsp;&nbsp;<span style="font-size:.8em;color:var(--ink-light)">f̄ = Gaussian blur · k = 1 unsharp mask · k &gt; 1 highboost</span>';
+}
+$('h-c').addEventListener('input', e => { H.c = +e.target.value; render4(); });
+$('h-sig').addEventListener('input', e => { H.sigma = +e.target.value; render4(); });
+$('h-k').addEventListener('input', e => { H.k = +e.target.value; render4(); });
+
+const st4 = IP.stage('st4', {
+  explain: (r, s, x, y) => {
+    const i = y * IMG.w + x, g = H.g.data[i];
+    if (H.method === 'laplacian') {
+      const lap = H.lap.data[i];
+      let terms;
+      if (H.neigh === 4) terms = [at(IMG, x, y - 1), at(IMG, x, y + 1), at(IMG, x - 1, y), at(IMG, x + 1, y)].join(' + ') + ' − 4 × ' + r;
+      else terms = '(' + [-1, 0, 1].flatMap(t => [-1, 0, 1].filter(u => u || t).map(u => at(IMG, x + u, y + t))).reduce((a, b) => a + b, 0) + ') − 8 × ' + r;
+      return '∇²<i>f</i> = ' + terms + ' = <b>' + f1(lap) + '</b><br><i>g</i> = ' + r + ' − ' + H.c.toFixed(1) + ' × ' + par(lap) + ' = <b>' + f1(g) + '</b>' +
+        (g < 0 || g > 255 ? ' → clipped to ' + clamp(Math.round(g), 0, 255) : '') + '. ' + (Math.abs(lap) < 1 ? 'Flat here, so nothing changes.' : '');
+    }
+    const b = H.blur.data[i], m = r - b;
+    return '<i>f̄</i> = ' + f1(b) + ',&nbsp; mask = ' + r + ' − ' + f1(b) + ' = <b>' + f1(m) + '</b><br><i>g</i> = ' + r + ' + ' + H.k.toFixed(1) + ' × ' + par(m) + ' = <b>' + f1(g) + '</b>' +
+      (g < 0 || g > 255 ? ' → clipped to ' + clamp(Math.round(g), 0, 255) : '');
+  }
+});
+st4.onProbe = (r, s, x, y) => { H.row = y; H.col = x; drawCharts4(); tries4.check(); };
+
+function render4() {
+  const f = IMG, n = f.data.length, g = IP.makeF(f.w, f.h), detail = IP.makeF(f.w, f.h);
+  if (H.method === 'laplacian') {
+    H.lap = IP.correlate(f, LAP[H.neigh], 3, 3, 'replicate');
+    for (let i = 0; i < n; i++) { detail.data[i] = -H.c * H.lap.data[i]; g.data[i] = f.data[i] + detail.data[i]; }
+  } else {
+    H.blur = IP.separable(f, IP.gauss1d(H.sigma), 'replicate');
+    for (let i = 0; i < n; i++) { detail.data[i] = H.k * (f.data[i] - H.blur.data[i]); g.data[i] = f.data[i] + detail.data[i]; }
+  }
+  H.g = g;
+  st4.set(f, H.view === 'result' ? IP.toDisplay(g, 'clamp').img : IP.toDisplay(detail, 'offset').img);
+  let lo = Infinity, hi = -Infinity, clip = 0;
+  for (const v of g.data) { if (v < lo) lo = v; if (v > hi) hi = v; if (v < 0 || v > 255) clip++; }
+  H.clip = clip / n;
+  $('h-c-v').textContent = '= ' + H.c.toFixed(1);
+  $('h-sig-v').textContent = '= ' + H.sigma.toFixed(2);
+  $('h-k-v').textContent = '= ' + H.k.toFixed(1) + (H.k > 1 ? ' (highboost)' : H.k === 1 ? ' (unsharp)' : '');
+  $('sb4').innerHTML =
+    score('Clipped', (H.clip * 100).toFixed(1) + '%', 'pixels pushed outside 0–255', true) +
+    score('Lowest', f1(lo), 'before clipping') +
+    score('Highest', f1(hi), 'before clipping') +
+    score('Showing', H.view === 'result' ? 'Result' : 'Detail', H.view === 'result' ? 'f plus detail, clipped' : 'mid-grey = 0');
+  drawCharts4();
+  tries4.check();
+}
+function drawCharts4() {
+  if (!H.g) return;
+  const y = H.row != null ? H.row : IMG.h >> 1;
+  IP.drawProfile($('p4'), [
+    { data: IP.row(IMG, y), color: 'rgba(26,26,26,.55)', label: 'original · row ' + y },
+    { data: IP.row(H.g, y), color: IP.col('vermillion'), width: 1.8, label: 'sharpened (before clipping)' }
+  ], { marker: H.col, shade: true, height: 160 });
+}
+const tries4 = IP.tries('t4', [
+  { text: '<i>Coins</i>: use unsharp masking with <i>k</i> = 1, point at a coin\'s rim, and find the halo in the row profile.',
+    test: () => IP.key === 'coins' && H.method === 'unsharp' && Math.abs(H.k - 1) < 0.05 && H.row != null },
+  { text: 'Push highboost to <i>k</i> ≥ 3. Which pixels clip first, and why those ones?',
+    test: () => H.method === 'unsharp' && H.k >= 3 },
+  { text: '<i>Night street</i>: sharpen with the Laplacian and switch to <i>Added detail</i>. What else got sharpened along with the edges?',
+    test: () => IP.key === 'night' && H.method === 'laplacian' && H.view === 'detail' }
+]);
+
+/* ═════ 05 — gradients and edges ═════ */
+
+const OPS = {
+  sobel: { label: 'Sobel', gx: [-1, 0, 1, -2, 0, 2, -1, 0, 1], gy: [-1, -2, -1, 0, 0, 0, 1, 2, 1],
+           fx: 'g<sub>x</sub> = (z<sub>3</sub> + 2z<sub>6</sub> + z<sub>9</sub>) − (z<sub>1</sub> + 2z<sub>4</sub> + z<sub>7</sub>)',
+           fy: 'g<sub>y</sub> = (z<sub>7</sub> + 2z<sub>8</sub> + z<sub>9</sub>) − (z<sub>1</sub> + 2z<sub>2</sub> + z<sub>3</sub>)' },
+  prewitt: { label: 'Prewitt', gx: [-1, 0, 1, -1, 0, 1, -1, 0, 1], gy: [-1, -1, -1, 0, 0, 0, 1, 1, 1],
+           fx: 'g<sub>x</sub> = (z<sub>3</sub> + z<sub>6</sub> + z<sub>9</sub>) − (z<sub>1</sub> + z<sub>4</sub> + z<sub>7</sub>)',
+           fy: 'g<sub>y</sub> = (z<sub>7</sub> + z<sub>8</sub> + z<sub>9</sub>) − (z<sub>1</sub> + z<sub>2</sub> + z<sub>3</sub>)' },
+  roberts: { label: 'Roberts', gx: [0, 0, 0, 0, -1, 0, 0, 0, 1], gy: [0, 0, 0, 0, 0, -1, 0, 1, 0],
+           fx: 'g<sub>x</sub> = z<sub>9</sub> − z<sub>5</sub>', fy: 'g<sub>y</sub> = z<sub>8</sub> − z<sub>6</sub>' }
+};
+const D = { op: 'sobel', view: 'mag', pre: 0, T: 25, seen: new Set() };
+const sq = v => par(v) + '²';
+
+function buildD() {
+  seg('d-op', Object.keys(OPS), D.op, v => { D.op = v; buildD(); render5(); }, Object.values(OPS).map(o => o.label));
+  seg('d-view', ['gx', 'gy', 'mag', 'edges'], D.view, v => { D.view = v; buildD(); render5(); }, ['gx', 'gy', 'Magnitude', 'Edges']);
+  seg('d-pre', [0, 1, 2], D.pre, v => { D.pre = v; buildD(); render5(); }, ['None', 'σ 1', 'σ 2']);
+  $('d-t').disabled = D.view !== 'edges';
+}
+$('d-t').addEventListener('input', e => { D.T = +e.target.value; render5(); });
+
+const st5 = IP.stage('st5', {
+  explain: (r, s, x, y) => {
+    const src = D.src, z = [];
+    for (let t = -1; t <= 1; t++) for (let u = -1; u <= 1; u++) z.push(at(src, x + u, y + t, 'replicate'));
+    const zs = z.map(v => D.pre ? v.toFixed(0) : v);
+    let grid = '<div class="kp" style="grid-template-columns:repeat(3,minmax(0,1fr));max-width:190px">';
+    z.forEach((v, i) => { grid += '<div' + (i === 4 ? ' class="c"' : '') + '><b>' + zs[i] + '</b>z<sub>' + (i + 1) + '</sub></div>'; });
+    grid += '</div>';
+    const i = y * IMG.w + x, gx = D.gx.data[i], gy = D.gy.data[i], m = Math.hypot(gx, gy);
+    return (D.pre ? 'Neighbours after smoothing (σ ' + D.pre + '):' : 'Neighbours z<sub>1</sub>…z<sub>9</sub>:') + grid +
+      OPS[D.op].fx + ' = <b>' + f1(gx) + '</b><br>' + OPS[D.op].fy + ' = <b>' + f1(gy) + '</b><br>' +
+      'M = √(' + sq(gx) + ' + ' + sq(gy) + ') = <b>' + f1(m) + '</b> &nbsp;(|g<sub>x</sub>| + |g<sub>y</sub>| = ' + f1(Math.abs(gx) + Math.abs(gy)) + ')' +
+      (m > 1 ? '<br>Direction ' + f1(Math.atan2(gy, gx) * 180 / Math.PI) + '° (pointing towards brighter)' : '');
+  }
+});
+
+function render5() {
+  D.src = D.pre ? IP.separable(IMG, IP.gauss1d(D.pre), 'replicate') : IMG;
+  const o = OPS[D.op];
+  D.gx = IP.correlate(D.src, o.gx, 3, 3, 'replicate');
+  D.gy = IP.correlate(D.src, o.gy, 3, 3, 'replicate');
+  const n = IMG.data.length, mag = IP.makeF(IMG.w, IMG.h);
+  for (let i = 0; i < n; i++) mag.data[i] = Math.hypot(D.gx.data[i], D.gy.data[i]);
+  const md = IP.toDisplay(mag, 'abs');
+  let shown, edges = 0;
+  if (D.view === 'gx') shown = IP.toDisplay(D.gx, 'offset').img;
+  else if (D.view === 'gy') shown = IP.toDisplay(D.gy, 'offset').img;
+  else if (D.view === 'mag') shown = md.img;
+  else {
+    shown = IP.make(IMG.w, IMG.h);
+    const t = D.T / 100 * 255;
+    for (let i = 0; i < n; i++) if (md.img.data[i] > t) { shown.data[i] = 255; edges++; }
+  }
+  st5.set(IMG, shown);
+  $('d-t-v').textContent = D.T + '% of strong';
+  let mx = 0; for (const v of mag.data) if (v > mx) mx = v;
+  D.edgeFrac = edges / n;
+  $('sb5').innerHTML =
+    score('Operator', o.label, D.pre ? 'after Gaussian σ ' + D.pre : 'no smoothing', true) +
+    score('Strongest edge', f1(mx), 'max M') +
+    score('Edge pixels', D.view === 'edges' ? (D.edgeFrac * 100).toFixed(1) + '%' : '—', D.view === 'edges' ? 'above the threshold' : 'switch to Edges') +
+    score('Display', D.view === 'gx' || D.view === 'gy' ? '128 = 0' : D.view === 'mag' ? 'scaled' : 'binary', D.view === 'gx' || D.view === 'gy' ? 'dark = negative' : '');
+  D.seen.add(D.view);
+  tries5.check();
+}
+const tries5 = IP.tries('t5', [
+  { text: 'View <i>g<sub>x</sub></i> and then <i>g<sub>y</sub></i> on the test chart. Which one lights up the vertical line gratings?',
+    test: () => D.seen.has('gx') && D.seen.has('gy') },
+  { text: '<i>Night street</i>: show <i>Edges</i> with no smoothing, then smooth with σ 2 first. What disappears, and what survives?',
+    test: () => IP.key === 'night' && D.view === 'edges' && D.pre === 2 },
+  { text: 'Compare Roberts with Sobel on noisy-looking areas. Point at a pixel and check how many neighbours each one reads.',
+    test: () => D.op === 'roberts' && D.seen.has('mag') }
+]);
+
+/* ═════ wiring ═════ */
+
+['pick1', 'pick2', 'pick3', 'pick4', 'pick5'].forEach(id => IP.picker(id));
+IP.onImage(img => {
+  IMG = img;
+  S.row = S.col = N.row = N.col = H.row = H.col = null;
+  render1(); render2(); render3(); render4(); render5();
+});
+IP.onResize(() => { drawCharts2(); drawCharts3(); drawCharts4(); });
+
+buildK(); buildS(); buildN(); buildH(); buildD();
+IP.useSample('chart');
+</script>
+</body>
+</html>

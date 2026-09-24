@@ -132,6 +132,48 @@ const IP = (() => {
         });
       }
     },
+    // edges, fine lines, steps and text — something for every filter to act on
+    chart: {
+      label: 'Test chart',
+      make: () => {
+        const c = document.createElement('canvas');
+        c.width = SW; c.height = SH;
+        const x = c.getContext('2d');
+        x.fillStyle = '#9a9a9a'; x.fillRect(0, 0, SW, SH);
+        x.fillStyle = '#2a2a2a'; x.fillRect(18, 18, 112, 112);
+        x.fillStyle = '#e8e8e8'; x.beginPath(); x.arc(74, 74, 36, 0, Math.PI * 2); x.fill();
+        // line gratings of width 1, 2, 3, 4 px
+        x.fillStyle = '#1e1e1e';
+        for (let g = 1; g <= 4; g++) {
+          const x0 = 148 + (g - 1) * 52;
+          for (let i = 0; i < 5; i++) x.fillRect(x0 + i * g * 2, 18, g, 52);
+        }
+        // step wedge, 8 levels
+        for (let i = 0; i < 8; i++) {
+          const v = Math.round(20 + i * 30);
+          x.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
+          x.fillRect(148 + i * 25.5, 82, 26, 46);
+        }
+        // smooth ramp
+        const g = x.createLinearGradient(18, 0, 342, 0);
+        g.addColorStop(0, '#000'); g.addColorStop(1, '#fff');
+        x.fillStyle = g; x.fillRect(18, 142, 324, 22);
+        // text, large and small
+        x.fillStyle = '#141414';
+        x.font = '600 28px Georgia, "Times New Roman", serif'; x.fillText('Filter 3×3', 18, 208);
+        x.font = '12px Georgia, "Times New Roman", serif'; x.fillText('fine print survives a small kernel', 18, 234);
+        x.fillText('but not a large one', 18, 250);
+        // checkerboard and a thin diagonal
+        for (let j = 0; j < 10; j++) for (let i = 0; i < 12; i++) {
+          x.fillStyle = (i + j) % 2 ? '#f2f2f2' : '#101010';
+          x.fillRect(250 + i * 8, 178 + j * 8, 8, 8);
+        }
+        x.strokeStyle = '#f2f2f2'; x.lineWidth = 1;
+        x.beginPath(); x.moveTo(214.5, 176); x.lineTo(238.5, 258); x.stroke();
+        const d = x.getImageData(0, 0, SW, SH).data;
+        return build((u, v, px, py) => d[(py * SW + px) * 4] + grain(px, py, 5) * 3);
+      }
+    },
     // text under a strong lighting gradient — defeats any single global threshold
     page: {
       label: 'Uneven page',
@@ -619,10 +661,201 @@ const IP = (() => {
     };
   }
 
+  /* ═════ neighbourhood operations ═════
+     Float images are { w, h, data: Float32Array } — filters can go negative
+     or past 255, and the lab decides how to display that. */
+
+  const makeF = (w, h) => ({ w, h, data: new Float32Array(w * h) });
+
+  /** Seeded PRNG, so "the same noise" really is the same between renders. */
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /**
+   * Index map for coordinates -r … n-1+r under a border rule.
+   * zero → -1 (read as 0) · replicate → nearest edge · reflect → mirror, edge not repeated
+   */
+  function borderMap(n, r, mode) {
+    const m = new Int32Array(n + 2 * r);
+    for (let i = -r; i < n + r; i++) {
+      let j = i;
+      if (i < 0 || i >= n) {
+        if (mode === 'zero') j = -1;
+        else if (mode === 'reflect') { j = i < 0 ? -i : 2 * (n - 1) - i; j = clamp(j, 0, n - 1); }
+        else j = clamp(i, 0, n - 1);
+      }
+      m[i + r] = j;
+    }
+    return m;
+  }
+
+  /**
+   * Correlation: g(x,y) = Σ_s Σ_t w(s,t) f(x+s, y+t), kernel k is kw×kh row-major.
+   * For convolution pass flip(k) — convolution is correlation with the kernel rotated 180°.
+   */
+  function correlate(img, k, kw, kh, border) {
+    const { w, h, data } = img, rx = kw >> 1, ry = kh >> 1, out = makeF(w, h), o = out.data;
+    const mx = borderMap(w, rx, border || 'replicate'), my = borderMap(h, ry, border || 'replicate');
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        let acc = 0, i = 0;
+        for (let t = 0; t < kh; t++) {
+          const yy = my[y + t];
+          if (yy < 0) { i += kw; continue; }
+          const row = yy * w;
+          for (let s = 0; s < kw; s++, i++) {
+            const wt = k[i];
+            if (!wt) continue;
+            const xx = mx[x + s];
+            if (xx >= 0) acc += wt * data[row + xx];
+          }
+        }
+        o[y * w + x] = acc;
+      }
+    return out;
+  }
+  const flip = k => Array.from(k).reverse();
+
+  /** A symmetric 1-D kernel applied along rows then columns — n² work becomes 2n. */
+  function separable(img, k1, border) {
+    const n = k1.length;
+    return correlate(correlate(img, k1, n, 1, border), k1, 1, n, border);
+  }
+
+  /** Sampled Gaussian, radius ⌈3σ⌉, normalised to sum 1. */
+  function gauss1d(sigma) {
+    const r = Math.max(1, Math.ceil(3 * sigma)), k = [];
+    let sum = 0;
+    for (let i = -r; i <= r; i++) { const v = Math.exp(-(i * i) / (2 * sigma * sigma)); k.push(v); sum += v; }
+    return k.map(v => v / sum);
+  }
+
+  /**
+   * Order-statistic filter over a (2r+1)² window, replicate border.
+   * q = 0 → min, 0.5 → median, 1 → max. A running histogram per row (Huang's
+   * method) keeps it fast enough for a slider.
+   */
+  function rank(img, r, q) {
+    const { w, h, data } = img, out = make(w, h), hist = new Int32Array(256);
+    const n = (2 * r + 1) * (2 * r + 1), target = Math.round(q * (n - 1));
+    const cx = x => x < 0 ? 0 : x >= w ? w - 1 : x, cy = y => y < 0 ? 0 : y >= h ? h - 1 : y;
+    for (let y = 0; y < h; y++) {
+      hist.fill(0);
+      for (let dy = -r; dy <= r; dy++) {
+        const row = cy(y + dy) * w;
+        for (let dx = -r; dx <= r; dx++) hist[data[row + cx(dx)]]++;
+      }
+      for (let x = 0; x < w; x++) {
+        if (x > 0) {
+          const xo = cx(x - r - 1), xi = cx(x + r);
+          for (let dy = -r; dy <= r; dy++) {
+            const row = cy(y + dy) * w;
+            hist[data[row + xo]]--; hist[data[row + xi]]++;
+          }
+        }
+        let acc = 0, v = 0;
+        for (; v < 256; v++) { acc += hist[v]; if (acc > target) break; }
+        out.data[y * w + x] = v;
+      }
+    }
+    return out;
+  }
+
+  /** 'sp': salt-and-pepper with density `amount` · 'gauss': additive, σ = `amount` grey levels */
+  function noise(img, type, amount, seed) {
+    const out = clone(img), d = out.data, rnd = rng(seed || 1);
+    if (type === 'sp') {
+      for (let i = 0; i < d.length; i++) if (rnd() < amount) d[i] = rnd() < 0.5 ? 0 : 255;
+    } else {
+      for (let i = 0; i < d.length; i += 2) {
+        const u = Math.max(rnd(), 1e-12), v = rnd(), m = Math.sqrt(-2 * Math.log(u));
+        d[i] = img.data[i] + amount * m * Math.cos(2 * Math.PI * v);
+        if (i + 1 < d.length) d[i + 1] = img.data[i + 1] + amount * m * Math.sin(2 * Math.PI * v);
+      }
+    }
+    return out;
+  }
+
+  /** Peak signal-to-noise ratio in dB against a clean reference. Higher is closer. */
+  function psnr(ref, test) {
+    let se = 0;
+    const a = ref.data, b = test.data;
+    for (let i = 0; i < a.length; i++) { const e = a[i] - b[i]; se += e * e; }
+    const mse = se / a.length;
+    return mse === 0 ? Infinity : 10 * Math.log10(255 * 255 / mse);
+  }
+
+  /**
+   * Float → displayable 8-bit.
+   * clamp: round and clip · abs: |v| scaled so the 99.5th percentile is white
+   * offset: 128 + v·scale, so zero is mid-grey and sign is visible
+   */
+  function toDisplay(f, how) {
+    const out = make(f.w, f.h), d = f.data, o = out.data;
+    if (how === 'clamp' || !how) {
+      for (let i = 0; i < d.length; i++) o[i] = d[i];
+      return { img: out, scale: 1 };
+    }
+    const step = Math.max(1, Math.floor(d.length / 20000)), sample = [];
+    for (let i = 0; i < d.length; i += step) sample.push(Math.abs(d[i]));
+    sample.sort((a, b) => a - b);
+    const p = Math.max(sample[Math.floor(sample.length * 0.995)] || 0, 1e-6);
+    const scale = how === 'abs' ? 255 / p : 127 / p;
+    for (let i = 0; i < d.length; i++) o[i] = how === 'abs' ? Math.abs(d[i]) * scale : 128 + d[i] * scale;
+    return { img: out, scale };
+  }
+
+  /**
+   * Intensity along one row. series: [{ data, color, width, dash, label }]
+   * The range grows past 0–255 when a filter overshoots, so clipping is visible.
+   */
+  function drawProfile(canvas, series, o) {
+    o = o || {};
+    const { ctx, w, h } = fit(canvas, o.height || 140);
+    let lo = 0, hi = 255;
+    series.forEach(s => { for (let i = 0; i < s.data.length; i++) { if (s.data[i] < lo) lo = s.data[i]; if (s.data[i] > hi) hi = s.data[i]; } });
+    const L = 30, R = 6, T = 16, B = h - 16, n = series[0].data.length;
+    const X = i => L + (i / Math.max(1, n - 1)) * (w - L - R), Y = v => B - (v - lo) / (hi - lo) * (B - T);
+    ctx.fillStyle = col('ink-light'); ctx.textAlign = 'right';
+    [0, 255].forEach(v => {
+      ctx.save(); ctx.strokeStyle = 'rgba(26,26,26,.18)'; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(w - R, Y(v)); ctx.stroke(); ctx.restore();
+      ctx.fillText(v, L - 4, Y(v) + 3);
+    });
+    if (lo < 0) ctx.fillText(Math.round(lo), L - 4, B + 3);
+    if (hi > 255) ctx.fillText(Math.round(hi), L - 4, T + 3);
+    if (o.shade) { ctx.fillStyle = 'rgba(184,65,46,.07)'; ctx.fillRect(L, T, w - L - R, Y(255) - T); ctx.fillRect(L, Y(0), w - L - R, B - Y(0)); }
+    let lx = L + 4;
+    series.forEach(s => {
+      ctx.save(); ctx.strokeStyle = s.color || col('ink'); ctx.lineWidth = s.width || 1.2;
+      if (s.dash) ctx.setLineDash(s.dash);
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) i ? ctx.lineTo(X(i), Y(s.data[i])) : ctx.moveTo(X(i), Y(s.data[i]));
+      ctx.stroke(); ctx.restore();
+      if (s.label) {
+        ctx.fillStyle = s.color || col('ink'); ctx.textAlign = 'left';
+        ctx.fillRect(lx, 5, 10, 2); ctx.fillText(s.label, lx + 14, 10);
+        lx += ctx.measureText(s.label).width + 30;
+      }
+    });
+    if (o.marker != null) vline(ctx, X(o.marker), T, B, col('vermillion'), [2, 3]);
+  }
+
+  /** One row of an image (8-bit or float) as a plain array, for drawProfile. */
+  const row = (img, y) => Array.from(img.data.subarray(y * img.w, (y + 1) * img.w));
+
   return {
-    SAMPLES, make, clone, applyLUT, histogram, cdf, stats,
+    SAMPLES, make, makeF, clone, applyLUT, histogram, cdf, stats,
     useSample, setImage, onImage: fn => bus.subs.push(fn),
     get image() { return bus.img; }, get key() { return bus.key; },
-    picker, stage, tries, drawGray, drawHist, drawCurve, drawSeries, onResize, col
+    picker, stage, tries, drawGray, drawHist, drawCurve, drawSeries, drawProfile, onResize, col,
+    rng, correlate, flip, separable, gauss1d, rank, noise, psnr, toDisplay, row
   };
 })();
