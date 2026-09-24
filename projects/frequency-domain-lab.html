@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Frequency Domain Lab — Joshu Leonardy</title>
+<meta name="description" content="An interactive image processing lab: build images from waves, read a 2-D Fourier spectrum point by point, swap magnitude and phase, filter with ideal, Butterworth and Gaussian lowpass and highpass filters, and remove periodic noise with notch filters — on sample images or your own photograph." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/lab.css">
+<style>
+section{scroll-margin-top:64px}
+
+/* square canvases shown side by side */
+.fd-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.4rem 1.6rem;margin-top:1.2rem;align-items:start}
+.fd-cell{min-width:0}
+.fd-cell canvas{display:block;width:100%;aspect-ratio:1/1;border:1px solid var(--line);background:var(--paper-dark)}
+.fd-cell canvas.px{image-rendering:pixelated}
+.fd-cell canvas.pick{cursor:crosshair;touch-action:none}
+.fd-cell .cap{font-family:'Inter',sans-serif;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-light);display:block;margin-bottom:.4rem}
+.fd-cell .cap em{font-style:normal;color:var(--vermillion);text-transform:none;letter-spacing:.04em}
+.fd-read{font-family:'Inter',sans-serif;font-size:.78rem;color:var(--ink-soft);line-height:1.8}
+.fd-read b{color:var(--vermillion);font-weight:500}
+.fd-read i{font-family:'Cormorant Garamond',serif;font-size:1.05rem}
+.fd-panel{border:1px solid var(--line);background:var(--card);padding:1.1rem 1.2rem}
+.fd-panel canvas{max-width:140px;margin-top:.6rem}
+
+.swap{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem 1.2rem;margin-top:1rem}
+.swap .cap{min-height:2.4em}
+
+.wave-list{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+.wave-list .chip b{font-weight:500;margin-left:.4rem}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <a class="brand" href="../index.html">Joshu <em>Leonardy</em></a>
+  <nav class="nav-links">
+    <a href="#waves">Waves</a><a href="#spectrum">Spectrum</a><a href="#filter">Filtering</a><a href="#notch">Notch</a>
+    <a href="labs.html">The Series</a>
+    <a href="../index.html">Back</a>
+  </nav>
+</header>
+
+<div class="container">
+
+<div class="hero">
+  <div class="hero-kanji">周 · 波 · 数 · 領 · 域</div>
+  <h1>Frequency <em>Domain</em> Lab</h1>
+  <div class="hero-divider"></div>
+  <p>Any image can be built by adding up waves: stripes of different spacing, direction and strength. The Fourier transform tells you how much of each wave an image contains. Laid out as a picture, that list is called the spectrum. This lab starts by building images out of waves by hand. It then reads a real photograph's spectrum point by point, and finishes by filtering images by editing the spectrum directly.</p>
+</div>
+
+<!-- ══════ 01 ══════ -->
+<section id="waves">
+  <div class="section-heading reveal">
+    <span class="section-num">— 01 —</span>
+    <div class="section-heading-kanji">波 · の · 和</div>
+    <h2 class="section-heading-text">Every image is a sum of waves</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.5–4.6 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform in 2D</p>
+  <p class="lede reveal d1">The dark square on the right is an empty spectrum. Each point in it stands for one wave. Its distance from the centre sets how many stripes fit across the image, and its direction sets which way the stripes run. Click anywhere to add that wave to the image, and click the same point again to remove it. Hover to preview a wave before you add it.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>f</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;<span style="font-size:.85em">1 / <i>MN</i></span>&nbsp;<span class="sigma"><small>M−1</small><span class="big">Σ</span><small>u = 0</small></span><span class="sigma"><small>N−1</small><span class="big">Σ</span><small>v = 0</small></span><i>F</i>(<i>u</i>, <i>v</i>)&nbsp;<i>e</i><sup>&nbsp;<i>j</i>2π(<i>ux</i>/<i>M</i> + <i>vy</i>/<i>N</i>)</sup></div>
+    <div class="eqkey" id="eq1"></div>
+    <p class="eqgloss">This is the inverse DFT, and it says the same thing as the picture: <i>f</i> is a weighted sum of waves, with weights <i>F</i>(<i>u</i>, <i>v</i>). A wave at (<i>u</i>, <i>v</i>) completes <i>u</i> cycles across the image and <i>v</i> cycles down it. Its crests are √(<i>u</i>² + <i>v</i>²) cycles per image apart, so the period is 256 / √(<i>u</i>² + <i>v</i>²) pixels. Each wave you add lights up <em>two</em> points, mirrored through the centre. A real image always has this symmetry, because a cosine is the sum of two complex exponentials, one at (<i>u</i>, <i>v</i>) and one at (−<i>u</i>, −<i>v</i>).</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:1/-1"><span class="label">Start from</span><div class="chiprow" id="w-pre"></div></div>
+    <div style="grid-column:1/-1"><span class="label">Waves in the image · click one to remove it</span><div class="wave-list" id="w-list"></div></div>
+  </div>
+  <div class="fd-row">
+    <div class="fd-cell"><span class="cap">Image <em>f(x, y)</em></span><canvas id="w-img" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">Spectrum <em>|F(u, v)|</em>, centred · click to add</span><canvas id="w-spec" class="px pick" width="256" height="256" aria-label="Spectrum. Click to add or remove a wave."></canvas></div>
+    <div class="fd-cell">
+      <div class="fd-panel">
+        <span class="label">Under the pointer</span>
+        <div class="fd-read" id="w-read">Hover over the spectrum.</div>
+        <canvas id="w-prev" width="256" height="256" style="width:100%;display:block;border:1px solid var(--line)"></canvas>
+      </div>
+    </div>
+  </div>
+  <div id="t1"></div>
+</section>
+
+<!-- ══════ 02 ══════ -->
+<section id="spectrum">
+  <div class="section-heading reveal">
+    <span class="section-num">— 02 —</span>
+    <div class="section-heading-kanji">振 · 幅 · と · 位 · 相</div>
+    <h2 class="section-heading-text">Reading a real spectrum</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.6 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform in 2D: visualizing spectra</p>
+  <p class="lede reveal d1">A photograph contains every wave at once, and the spectrum shows how much of each. Most of the energy sits near the centre, in slow waves that set overall brightness and shading. Far from the centre are the fast waves that make up fine detail and sharp edges. Straight edges in the image produce bright streaks through the centre, running perpendicular to the edge. Hover over the spectrum to see which wave any point stands for.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>F</i>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;<span class="sigma"><small>M−1</small><span class="big">Σ</span><small>x = 0</small></span><span class="sigma"><small>N−1</small><span class="big">Σ</span><small>y = 0</small></span><i>f</i>(<i>x</i>, <i>y</i>)&nbsp;<i>e</i><sup>&nbsp;−<i>j</i>2π(<i>ux</i>/<i>M</i> + <i>vy</i>/<i>N</i>)</sup>&nbsp;&nbsp;=&nbsp;&nbsp;|<i>F</i>|&nbsp;<i>e</i><sup>&nbsp;<i>jφ</i></sup></div>
+    <div class="eqkey" id="eq2"><span>Hover over the spectrum to read one coefficient.</span></div>
+    <p class="eqgloss">Each <i>F</i>(<i>u</i>, <i>v</i>) is a complex number. Its magnitude |<i>F</i>| says how strong that wave is, and its phase <i>φ</i> says where the wave's crests sit. The magnitudes span many orders of magnitude, since the centre value alone is the sum of every pixel. That is why spectra are shown as log(1 + |<i>F</i>|). Switch to <i>Linear</i> to see why. Images are cropped and resized to 256 × 256 here, so the DFT is exact and fast.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Show</span><div class="seg" id="s-view"></div></div>
+    <div><span class="label">Centring</span><div class="seg" id="s-centre"></div></div>
+  </div>
+  <div id="pick2"></div>
+  <div class="fd-row">
+    <div class="fd-cell"><span class="cap">Image</span><canvas id="s-img" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap" id="s-spec-cap">Spectrum</span><canvas id="s-spec" class="px pick" width="256" height="256" aria-label="Spectrum. Hover to read one coefficient."></canvas></div>
+    <div class="fd-cell">
+      <div class="fd-panel">
+        <span class="label">The wave at this point</span>
+        <div class="fd-read" id="s-read">Hover over the spectrum.</div>
+        <canvas id="s-basis" width="256" height="256" style="width:100%;display:block;border:1px solid var(--line)"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-h">Magnitude or phase: which one holds the picture?</h3>
+  <p class="lede">Take the magnitudes from one image and the phases from another, then invert. Before you look, guess which image you will recognise.</p>
+  <div><span class="label">Second image</span><div class="chiprow" id="s-b"></div></div>
+  <div class="swap">
+    <div class="fd-cell"><span class="cap">A</span><canvas id="x-a" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">B</span><canvas id="x-b" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">|A| with phase of B</span><canvas id="x-ab" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">|B| with phase of A</span><canvas id="x-ba" width="256" height="256"></canvas></div>
+  </div>
+  <div class="note">The phase wins. Magnitude records how much of each wave is present, but phase records where each wave's crests line up, and edges and shapes are exactly the places where many waves line up at once. This is why filters in the next section change the magnitude and leave the phase alone. Such filters are called <i>zero-phase</i> filters.</div>
+  <div id="t2"></div>
+</section>
+
+<!-- ══════ 03 ══════ -->
+<section id="filter">
+  <div class="section-heading reveal">
+    <span class="section-num">— 03 —</span>
+    <div class="section-heading-kanji">低 · 域 · と · 高 · 域</div>
+    <h2 class="section-heading-text">Filtering: multiply, then invert</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.7–4.9 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform: applications</p>
+  <p class="lede reveal d1">Frequency-domain filtering takes three steps: transform the image, multiply every coefficient by a filter value <i>H</i>(<i>u</i>, <i>v</i>) between 0 and 1, and transform back. A lowpass filter keeps the centre of the spectrum and removes fine detail. A highpass filter does the opposite. The filter's shape matters as much as its cutoff, and the spatial kernel on the right shows why.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>g</i>(<i>x</i>, <i>y</i>)&nbsp;=&nbsp;𝔉<sup>−1</sup>[&nbsp;<i>H</i>(<i>u</i>, <i>v</i>)&nbsp;<i>F</i>(<i>u</i>, <i>v</i>)&nbsp;]&nbsp;&nbsp;&nbsp;⇔&nbsp;&nbsp;&nbsp;<i>g</i>&nbsp;=&nbsp;<i>h</i>&nbsp;★&nbsp;<i>f</i></div>
+    <div class="eqkey" id="eq3"></div>
+    <p class="eqgloss">The convolution theorem is the bridge back to lab 03. Multiplying by <i>H</i> in the frequency domain is exactly the same as convolving with a kernel <i>h</i> in the spatial domain, where <i>h</i> is the inverse transform of <i>H</i>. A sharp cutoff in <i>H</i> gives an <i>h</i> with ripples that repeat outwards. Convolving with those ripples copies each edge a few times, faintly, and those copies are the ringing. A Gaussian <i>H</i> has a Gaussian <i>h</i>, which has no ripples and so causes no ringing.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div><span class="label">Pass</span><div class="seg" id="f-pass"></div></div>
+    <div style="grid-column:span 2"><span class="label">Shape</span><div class="seg" id="f-shape"></div></div>
+    <div><span class="label">Cutoff D₀ <span class="mono" id="f-d0-v"></span></span><input type="range" id="f-d0" min="2" max="120" value="30" aria-label="Cutoff frequency"></div>
+    <div id="f-n-w"><span class="label">Order n <span class="mono" id="f-n-v"></span></span><input type="range" id="f-n" min="1" max="10" value="2" aria-label="Butterworth order"></div>
+  </div>
+  <div id="pick3"></div>
+  <div class="fd-row">
+    <div class="fd-cell"><span class="cap">Filter <em>H(u, v)</em></span><canvas id="f-h" class="px" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">Filtered spectrum <em>H·F</em></span><canvas id="f-g" class="px" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">Spatial kernel <em>h(x, y)</em>, centre 49 × 49</span><canvas id="f-k" class="px" width="49" height="49"></canvas></div>
+  </div>
+  <div class="ip-charts" style="margin-top:1.2rem">
+    <div class="ip-chart"><span class="cap">Kernel cross-section <em>h(x, 0)</em> · negative lobes cause ringing</span><canvas id="f-kp"></canvas></div>
+    <div class="ip-chart"><span class="cap">Filter cross-section <em>H(u, 0)</em></span><canvas id="f-hp"></canvas></div>
+  </div>
+  <div id="st3" style="margin-top:1.6rem"></div>
+  <div class="ip-charts">
+    <div class="ip-chart"><span class="cap">Row profile <em id="f-row-cap"></em></span><canvas id="f-p"></canvas></div>
+  </div>
+  <div class="scoreboard" id="sb3"></div>
+  <div id="t3"></div>
+</section>
+
+<!-- ══════ 04 ══════ -->
+<section id="notch">
+  <div class="section-heading reveal">
+    <span class="section-num">— 04 —</span>
+    <div class="section-heading-kanji">周 · 期 · 雑 · 音</div>
+    <h2 class="section-heading-text">Periodic noise and notch filters</h2>
+    <div class="section-heading-rule"></div>
+  </div>
+  <p class="ip-ref"><b>Gonzalez &amp; Woods</b> §4.10, §5.4 &nbsp;·&nbsp; <b>Burger &amp; Burge</b> — The discrete Fourier transform: applications</p>
+  <p class="lede reveal d1">Electrical interference, scanned halftone prints and some cameras add a regular pattern on top of the image. In the image this pattern is spread across every pixel. In the spectrum it is concentrated into a few bright spikes, because it is made of only a few waves. Click on a spike to place a notch (a small hole in the filter) there, and click the notch again to remove it. Your goal is to remove the pattern and nothing else.</p>
+
+  <div class="eqbox">
+    <div class="eqmath"><i>H</i><sub>NR</sub>(<i>u</i>, <i>v</i>)&nbsp;=&nbsp;<span class="sigma"><small>Q</small><span class="big">Π</span><small>k = 1</small></span>[&nbsp;1 − <i>e</i><sup>&nbsp;−<i>D<sub>k</sub></i>² / 2<i>r</i>²</sup>&nbsp;]&nbsp;[&nbsp;1 − <i>e</i><sup>&nbsp;−<i>D</i><sub>−<i>k</i></sub>² / 2<i>r</i>²</sup>&nbsp;]</div>
+    <div class="eqkey" id="eq4"></div>
+    <p class="eqgloss"><i>D<sub>k</sub></i> is the distance from notch <i>k</i>. Each factor is a Gaussian hole of radius <i>r</i>, equal to 0 at the notch centre and close to 1 elsewhere. Notches always come in mirrored pairs, for the same symmetry reason as in section 01: removing only one of the pair would leave a filtered image that is no longer real-valued.</p>
+  </div>
+
+  <div class="controls" style="margin-top:0">
+    <div style="grid-column:span 2"><span class="label">Interference</span><div class="seg" id="n-pre"></div></div>
+    <div><span class="label">Notch radius r <span class="mono" id="n-r-v"></span></span><input type="range" id="n-r" min="1" max="12" value="2" aria-label="Notch radius"></div>
+    <div><span class="label">Notches</span><div class="chiprow"><button type="button" class="chip" id="n-find">Find spikes</button><button type="button" class="chip" id="n-clear">Clear</button></div></div>
+  </div>
+  <div id="pick4"></div>
+  <div class="fd-row">
+    <div class="fd-cell"><span class="cap">Noisy spectrum · <em>click spikes to notch them</em></span><canvas id="n-spec" class="px pick" width="256" height="256" aria-label="Spectrum of the noisy image. Click to add or remove a notch."></canvas></div>
+    <div class="fd-cell"><span class="cap">Notch filter <em>H<sub>NR</sub></em></span><canvas id="n-h" class="px" width="256" height="256"></canvas></div>
+    <div class="fd-cell"><span class="cap">What was removed <em>(noisy − result)</em></span><canvas id="n-diff" width="256" height="256"></canvas></div>
+  </div>
+  <div id="st4" style="margin-top:1.6rem"></div>
+  <div class="scoreboard" id="sb4"></div>
+  <div id="t4"></div>
+</section>
+
+<nav class="lab-pager">
+  <a href="spatial-filtering-lab.html" class="prev">
+    <span class="pager-dir">← Previous</span>
+    <span class="pager-title">03 · Spatial Filtering</span>
+  </a>
+  <a href="labs.html" class="next">
+    <span class="pager-dir">The series →</span>
+    <span class="pager-title">All labs</span>
+  </a>
+</nav>
+
+</div>
+
+<footer class="lab-footer">
+  <div class="container">
+    <p>Built for teaching · <a href="../index.html">joshhhlee.github.io</a></p>
+    <p style="margin-top:.6rem">Your images never leave the browser. Everything runs on your own machine.</p>
+  </div>
+</footer>
+
+<script src="../assets/lab.js"></script>
+<script src="../assets/imgproc.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Frequency Domain Lab
+   ═══════════════════════════════════════════════════════════════════ */
+
+const N = 256, H2 = N / 2;
+let IMG = null, SQ = null, FQ = null;
+const $ = id => document.getElementById(id);
+const f1 = v => v.toFixed(1).replace('-', '−');
+const sgn = v => (v < 0 ? '−' : '') + Math.abs(v);
+
+/** Pointer → pixel on a 256² canvas, measured inside its border. */
+function pixelAt(canvas, e) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: clamp(Math.floor((e.clientX - r.left - canvas.clientLeft) / canvas.clientWidth * N), 0, N - 1),
+    y: clamp(Math.floor((e.clientY - r.top - canvas.clientTop) / canvas.clientHeight * N), 0, N - 1)
+  };
+}
+/** A spectrum click → centred frequency (u, v). */
+function freqAt(canvas, e) {
+  const p = pixelAt(canvas, e);
+  return { u: p.x - H2, v: p.y - H2 };
+}
+const idxOf = (u, v) => ((v + N) % N) * N + (u + N) % N;
+const periodOf = (u, v) => { const d = Math.hypot(u, v); return d ? N / d : Infinity; };
+function describe(u, v) {
+  if (!u && !v) return 'the <b>DC term</b>: no wave at all, just the average brightness';
+  const T = periodOf(u, v), ang = Math.round(Math.atan2(v, u) * 180 / Math.PI);
+  const crest = ((ang + 90) % 180 + 180) % 180;
+  return 'period <b>' + f1(T) + ' px</b>, crests running at <b>' + crest + '°</b>' +
+    (v === 0 ? ' (vertical stripes)' : u === 0 ? ' (horizontal stripes)' : '');
+}
+/** The single real wave cos(2π(ux + vy)/N + φ), drawn as an image. */
+function waveImage(u, v, phi) {
+  const img = IP.make(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++)
+    img.data[y * N + x] = 128 + 110 * Math.cos(2 * Math.PI * (u * x + v * y) / N + (phi || 0));
+  return img;
+}
+function normalize(f) {
+  let lo = Infinity, hi = -Infinity;
+  for (const v of f.data) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  const out = IP.make(f.w, f.h), s = hi > lo ? 255 / (hi - lo) : 1;
+  for (let i = 0; i < f.data.length; i++) out.data[i] = (f.data[i] - lo) * s;
+  return out;
+}
+function ring(canvas, u, v, r, color, width) {
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = color; ctx.lineWidth = width || 1.5;
+  ctx.beginPath(); ctx.arc(u + H2 + 0.5, v + H2 + 0.5, r, 0, Math.PI * 2); ctx.stroke();
+}
+
+/* ═════ 01 — building images from waves ═════ */
+
+const W = { waves: [{ u: 8, v: 0 }], hover: null, pre: 'vstripe', far: false };
+const WPRE = {
+  vstripe: { label: 'Vertical stripes', w: [[8, 0]] },
+  hstripe: { label: 'Horizontal stripes', w: [[0, 8]] },
+  diag: { label: 'Diagonal', w: [[6, 6]] },
+  grid: { label: 'Two directions', w: [[6, 0], [0, 6]] },
+  mix: { label: 'Coarse + fine', w: [[3, 0], [40, 0]] },
+  clear: { label: 'Empty', w: [] }
+};
+function buildW() {
+  chips('w-pre', Object.keys(WPRE).map(k => [k, WPRE[k].label]), W.pre, k => {
+    W.pre = k; W.waves = WPRE[k].w.map(([u, v]) => ({ u, v })); buildW(); render1();
+  });
+  const el = $('w-list');
+  el.innerHTML = W.waves.length ? '' : '<span class="fd-read">No waves yet. The image is flat grey, and only the centre (DC) point is lit.</span>';
+  W.waves.forEach((w, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip';
+    b.innerHTML = '(' + sgn(w.u) + ', ' + sgn(w.v) + ')<b>×</b>';
+    b.setAttribute('aria-label', 'Remove wave u ' + w.u + ', v ' + w.v);
+    b.addEventListener('click', () => { W.waves.splice(i, 1); W.pre = null; buildW(); render1(); });
+    el.appendChild(b);
+  });
+}
+function render1() {
+  const f = IP.makeF(N, N), A = W.waves.length ? 110 / W.waves.length : 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let s = 128;
+    for (const w of W.waves) s += A * Math.cos(2 * Math.PI * (w.u * x + w.v * y) / N);
+    f.data[y * N + x] = s;
+  }
+  const img = IP.toDisplay(f, 'clamp').img;
+  IP.drawGray($('w-img'), img);
+  // the spectrum is computed, not drawn by hand: the dots are the real DFT of the image
+  const F = IP.dft(img), spec = IP.make(N, N);
+  let mx = 0; const mag = new Float64Array(N * N);
+  for (let k = 0; k < N * N; k++) { mag[k] = Math.hypot(F.re[k], F.im[k]); if (k && mag[k] > mx) mx = mag[k]; }
+  const c = $('w-spec');
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const m = mag[IP.shiftIndex(x, y, N, true)];
+    spec.data[y * N + x] = m > mx * 0.02 ? 255 : 18;
+  }
+  IP.drawGray(c, spec);
+  ring(c, 0, 0, 3, 'rgba(244,237,224,.5)', 1);
+  for (const w of W.waves) { ring(c, w.u, w.v, 6, '#b8412e', 2); ring(c, -w.u, -w.v, 6, '#b8412e', 2); }
+  if (W.hover) { ring(c, W.hover.u, W.hover.v, 5, 'rgba(244,237,224,.8)', 1); ring(c, -W.hover.u, -W.hover.v, 5, 'rgba(244,237,224,.8)', 1); }
+  $('eq1').innerHTML = W.waves.length
+    ? W.waves.map(w => '<span>cos 2π(' + sgn(w.u) + '<i>x</i> + ' + sgn(w.v) + '<i>y</i>)/256 · T = ' + f1(periodOf(w.u, w.v)) + ' px</span>').join('') +
+      '<span>' + W.waves.length * 2 + ' points lit, plus the centre</span>'
+    : '<span>Only <i>F</i>(0, 0): a flat image at the mean brightness</span>';
+  if (W.waves.some(w => Math.abs(w.u) >= 100 || Math.abs(w.v) >= 100)) W.far = true;
+  tries1.check();
+}
+(function () {
+  const c = $('w-spec');
+  c.addEventListener('pointermove', e => {
+    const p = freqAt(c, e);
+    if (W.hover && W.hover.u === p.u && W.hover.v === p.v) return;
+    W.hover = p;
+    $('w-read').innerHTML = '(<i>u</i>, <i>v</i>) = (' + sgn(p.u) + ', ' + sgn(p.v) + '): ' + describe(p.u, p.v) +
+      (p.u || p.v ? '. Its mirror point is (' + sgn(-p.u) + ', ' + sgn(-p.v) + ').' : '');
+    IP.drawGray($('w-prev'), waveImage(p.u, p.v));
+    render1();
+  });
+  c.addEventListener('pointerleave', () => { W.hover = null; render1(); });
+  c.addEventListener('click', e => {
+    const p = freqAt(c, e);
+    if (!p.u && !p.v) return;
+    const hit = W.waves.findIndex(w => Math.hypot(w.u - p.u, w.v - p.v) <= 4 || Math.hypot(w.u + p.u, w.v + p.v) <= 4);
+    if (hit >= 0) W.waves.splice(hit, 1); else W.waves.push(p);
+    W.pre = null; buildW(); render1();
+  });
+})();
+const tries1 = IP.tries('t1', [
+  { text: 'Make vertical stripes that repeat every 16 pixels, using a single wave.',
+    test: () => W.waves.length === 1 && W.waves[0].v === 0 && Math.abs(W.waves[0].u) === 16 },
+  { text: 'Build a pattern out of three or more waves. Can you predict what it will look like before you click?',
+    test: () => W.waves.length >= 3 },
+  { text: 'Add a wave far from the centre (|<i>u</i>| or |<i>v</i>| ≥ 100). Why do the stripes look so strange?',
+    test: () => W.far }
+]);
+
+/* ═════ 02 — a real spectrum ═════ */
+
+const S = { view: 'log', centred: true, B: 'coins', seen: new Set(), probes: new Set() };
+function buildS() {
+  seg('s-view', ['log', 'linear', 'phase'], S.view, v => { S.view = v; buildS(); render2(); }, ['log |F|', 'Linear |F|', 'Phase φ']);
+  seg('s-centre', [true, false], S.centred, v => { S.centred = v; buildS(); render2(); }, ['Centred', 'As computed']);
+  const others = Object.keys(IP.SAMPLES).filter(k => k !== IP.key).map(k => [k, IP.SAMPLES[k].label]);
+  if (!others.find(o => o[0] === S.B)) S.B = others[0][0];
+  chips('s-b', others, S.B, k => { S.B = k; S.swapped = true; buildS(); renderSwap(); });
+}
+function render2() {
+  IP.drawGray($('s-img'), SQ);
+  IP.drawGray($('s-spec'), IP.spectrumImage(FQ, S.view, S.centred));
+  $('s-spec-cap').innerHTML = (S.view === 'phase' ? 'Phase <em>φ(u, v)</em>' : S.view === 'log' ? 'Spectrum <em>log(1 + |F|)</em>' : 'Spectrum <em>|F|</em>, linear') +
+    (S.centred ? ', centred' : ', DC at the top-left corner');
+  S.seen.add(S.view + ':' + S.centred);
+  tries2.check();
+}
+function renderSwap() {
+  const B = IP.square(IP.SAMPLES[S.B].make(), N), FB = IP.dft(B);
+  const mix = (Fm, Fp) => {
+    const re = new Float64Array(N * N), im = new Float64Array(N * N);
+    for (let k = 0; k < N * N; k++) {
+      const m = Math.hypot(Fm.re[k], Fm.im[k]), p = Math.atan2(Fp.im[k], Fp.re[k]);
+      re[k] = m * Math.cos(p); im[k] = m * Math.sin(p);
+    }
+    return normalize(IP.idft({ n: N, re, im }));
+  };
+  IP.drawGray($('x-a'), SQ); IP.drawGray($('x-b'), B);
+  IP.drawGray($('x-ab'), mix(FQ, FB)); IP.drawGray($('x-ba'), mix(FB, FQ));
+  tries2.check();
+}
+(function () {
+  const c = $('s-spec');
+  c.addEventListener('pointermove', e => {
+    const { x, y } = pixelAt(c, e);
+    const k = IP.shiftIndex(x, y, N, S.centred), { u, v } = IP.freqOf(k, N);
+    const re = FQ.re[k], im = FQ.im[k], m = Math.hypot(re, im), phi = Math.atan2(im, re);
+    $('eq2').innerHTML = '<span><i>F</i>(' + sgn(u) + ', ' + sgn(v) + ') = ' + f1(re) + (im < 0 ? ' − ' : ' + ') + '<i>j</i>' + f1(Math.abs(im)) + '</span>' +
+      '<span>|<i>F</i>| = <b>' + f1(m) + '</b></span><span><i>φ</i> = ' + f1(phi * 180 / Math.PI) + '°</span>' +
+      '<span>log(1 + |<i>F</i>|) = ' + Math.log(1 + m).toFixed(2) + '</span>';
+    $('s-read').innerHTML = '(<i>u</i>, <i>v</i>) = (' + sgn(u) + ', ' + sgn(v) + '): ' + describe(u, v) +
+      (u || v ? '. The image contains this wave at a strength of <b>' + (2 * m / (N * N)).toFixed(2) + '</b> grey levels (2|F| / MN).' : '. Its value divided by MN is the mean: <b>' + f1(re / (N * N)) + '</b>.');
+    // drawn with the image's own phase, so its crests sit where this wave actually is in the picture
+    IP.drawGray($('s-basis'), waveImage(u, v, phi));
+    const d = Math.hypot(u, v);
+    if (d > 60) S.probes.add('far'); if (d > 0 && d < 10) S.probes.add('near');
+    tries2.check();
+  });
+})();
+const tries2 = IP.tries('t2', [
+  { text: 'Switch centring to <i>As computed</i>. Where did the bright centre go, and why is it in all four corners?',
+    test: () => S.seen.has('log:false') || S.seen.has('linear:false') },
+  { text: 'Hover over one point near the centre and one far from it. Compare their periods, then compare how bright each point is.',
+    test: () => S.probes.has('near') && S.probes.has('far') },
+  { text: 'Look at the two swapped images and change the second image. Which picture do you recognise each time?',
+    test: () => S.swapped },
+  { text: 'On the <i>Test chart</i>, find the streaks through the centre. Which edges in the image produce them?',
+    test: () => IP.key === 'chart' && S.probes.has('far') }
+]);
+
+/* ═════ 03 — lowpass and highpass ═════ */
+
+const F3 = { pass: 'low', shape: 'ideal', D0: 30, n: 2, row: null, col: null, seen: new Set() };
+function Hval(D) {
+  let lp;
+  if (F3.shape === 'ideal') lp = D <= F3.D0 ? 1 : 0;
+  else if (F3.shape === 'butter') lp = 1 / (1 + Math.pow(D / F3.D0, 2 * F3.n));
+  else lp = Math.exp(-(D * D) / (2 * F3.D0 * F3.D0));
+  return F3.pass === 'low' ? lp : 1 - lp;
+}
+function buildF() {
+  seg('f-pass', ['low', 'high'], F3.pass, v => { F3.pass = v; buildF(); render3(); }, ['Lowpass', 'Highpass']);
+  seg('f-shape', ['ideal', 'butter', 'gauss'], F3.shape, v => { F3.shape = v; buildF(); render3(); }, ['Ideal', 'Butterworth', 'Gaussian']);
+  $('f-n-w').style.display = F3.shape === 'butter' ? '' : 'none';
+}
+$('f-d0').addEventListener('input', e => { F3.D0 = +e.target.value; render3(); });
+$('f-n').addEventListener('input', e => { F3.n = +e.target.value; render3(); });
+
+const st3 = IP.stage('st3', {
+  afterLabel: 'Filtered',
+  explain: (r, s, x, y) => 'Filtered value <b>' + f1(F3.g.data[y * N + x]) + '</b>' + (F3.pass === 'high' ? ' (shown as 128 + v, because a highpass result is centred on 0)' : '') +
+    '. Every output pixel is a weighted sum of the <i>whole</i> image, weighted by the kernel <i>h</i> centred here.'
+});
+st3.onProbe = (r, s, x, y) => { F3.row = y; F3.col = x; drawProfile3(); };
+
+function render3() {
+  const Hu = new Float64Array(N * N);
+  for (let k = 0; k < N * N; k++) { const { u, v } = IP.freqOf(k, N); Hu[k] = Hval(Math.hypot(u, v)); }
+  // filter image, centred
+  const himg = IP.make(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) himg.data[y * N + x] = Hu[IP.shiftIndex(x, y, N, true)] * 255;
+  IP.drawGray($('f-h'), himg);
+  // H·F
+  const G = { n: N, re: new Float64Array(N * N), im: new Float64Array(N * N) };
+  let pAll = 0, pKept = 0;
+  for (let k = 0; k < N * N; k++) {
+    G.re[k] = FQ.re[k] * Hu[k]; G.im[k] = FQ.im[k] * Hu[k];
+    const p = FQ.re[k] * FQ.re[k] + FQ.im[k] * FQ.im[k];
+    pAll += p; pKept += p * Hu[k] * Hu[k];
+  }
+  IP.drawGray($('f-g'), IP.spectrumImage(G, 'log', true));
+  F3.g = IP.idft(G);
+  F3.alpha = pKept / pAll * 100;
+  st3.set(SQ, IP.toDisplay(F3.g, F3.pass === 'low' ? 'clamp' : 'offset').img);
+  // spatial kernel h = IDFT(H)
+  const h = IP.idft({ n: N, re: Hu, im: new Float64Array(N * N) });
+  const K = 49, kimg = IP.make(K, K), kr = K >> 1;
+  let hm = 0; const hc = [];
+  for (let y = -kr; y <= kr; y++) for (let x = -kr; x <= kr; x++) {
+    const v = h.data[((y + N) % N) * N + (x + N) % N]; hc.push(v);
+    if (F3.pass === 'high' && !x && !y) continue;     // the highpass centre spike would swamp the rest
+    hm = Math.max(hm, Math.abs(v));
+  }
+  hc.forEach((v, i) => { kimg.data[i] = 128 + clamp(v / (hm || 1), -1, 1) * 127; });
+  IP.drawGray($('f-k'), kimg);
+  const kline = []; for (let x = -kr; x <= kr; x++) kline.push(h.data[(x + N) % N]);
+  drawLine($('f-kp'), kline, { zero: true, clipCentre: F3.pass === 'high' });
+  const hline = []; for (let u = 0; u < H2; u++) hline.push(Hu[u]);
+  drawLine($('f-hp'), hline, { lo: 0, hi: 1, marker: F3.D0, xlabels: ['0', 'u = 127'] });
+  // count real lobes only: a Gaussian H is not quite periodic at the spectrum's edge, which leaves ~1e-6 dust
+  const kmax = Math.max(...kline.map(Math.abs));
+  let neg = 0; for (const v of kline) if (v < -1e-3 * kmax) neg++;
+  F3.neg = neg;
+  $('f-d0-v').textContent = '= ' + F3.D0 + ' (period ' + f1(N / F3.D0) + ' px)';
+  $('f-n-v').textContent = '= ' + F3.n;
+  const hs = { ideal: '<i>H</i> = 1 if <i>D</i> ≤ ' + F3.D0 + ', else 0',
+    butter: '<i>H</i> = 1 / [1 + (<i>D</i> / ' + F3.D0 + ')<sup>' + 2 * F3.n + '</sup>]',
+    gauss: '<i>H</i> = <i>e</i><sup>−<i>D</i>² / 2·' + F3.D0 + '²</sup>' }[F3.shape];
+  $('eq3').innerHTML = '<span>' + (F3.pass === 'low' ? '' : '<i>H</i><sub>HP</sub> = 1 − <i>H</i><sub>LP</sub>, &nbsp;') + hs + '</span>' +
+    '<span><i>D</i> = √(<i>u</i>² + <i>v</i>²)</span><span>power kept <b>' + F3.alpha.toFixed(2) + '%</b></span>';
+  $('sb3').innerHTML =
+    score('Power kept', F3.alpha.toFixed(2) + '%', 'Σ|HF|² / Σ|F|²', true) +
+    score('Cutoff', F3.D0, 'cycles per image') +
+    score('Kernel lobes', neg ? 'Yes' : 'None', neg ? neg + ' negative taps in h(x, 0)' : 'h never goes negative');
+  F3.seen.add(F3.pass + ':' + F3.shape);
+  drawProfile3();
+  tries3.check();
+}
+function drawProfile3() {
+  if (!F3.g) return;
+  const y = F3.row != null ? F3.row : H2;
+  $('f-row-cap').textContent = '· row ' + y;
+  const g = IP.row(F3.g, y).map(v => F3.pass === 'high' ? v + 128 : v);
+  IP.drawProfile($('f-p'), [
+    { data: IP.row(SQ, y), color: 'rgba(26,26,26,.5)', label: 'original' },
+    { data: g, color: IP.col('vermillion'), width: 1.8, label: F3.pass === 'high' ? 'filtered + 128' : 'filtered' }
+  ], { marker: F3.col });
+}
+/** Small line plot for kernels and filter profiles. */
+function drawLine(canvas, arr, o) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 300, h = 120;
+  canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  let data = arr.slice();
+  if (o.clipCentre) { const c = data.length >> 1; const rest = data.filter((v, i) => i !== c); const m = Math.max(...rest.map(Math.abs)); data[c] = clamp(data[c], -m * 1.2, m * 1.2); }
+  let lo = o.lo != null ? o.lo : Math.min(0, ...data), hi = o.hi != null ? o.hi : Math.max(...data);
+  if (hi === lo) hi = lo + 1;
+  const L = 6, R = 6, T = 10, B = h - 18, X = i => L + i / (data.length - 1) * (w - L - R), Y = v => B - (v - lo) / (hi - lo) * (B - T);
+  ctx.strokeStyle = 'rgba(26,26,26,.25)'; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(w - R, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+  if (o.zero) {
+    ctx.fillStyle = 'rgba(184,65,46,.18)';
+    data.forEach((v, i) => { if (v < 0) ctx.fillRect(X(i) - 1.5, Y(0), 3, Y(v) - Y(0)); });
+  }
+  ctx.strokeStyle = IP.col('ink'); ctx.lineWidth = 1.5; ctx.beginPath();
+  data.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))); ctx.stroke();
+  if (o.marker != null) {
+    ctx.strokeStyle = IP.col('vermillion'); ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(X(o.marker), T); ctx.lineTo(X(o.marker), B); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = IP.col('vermillion'); ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('D₀', X(o.marker) + 4, T + 8);
+  }
+  ctx.fillStyle = IP.col('ink-light'); ctx.font = '10px Inter, sans-serif';
+  const xl = o.xlabels || ['−' + (data.length >> 1), '+' + (data.length >> 1)];
+  ctx.textAlign = 'left'; ctx.fillText(xl[0], L, h - 4); ctx.textAlign = 'right'; ctx.fillText(xl[1], w - R, h - 4);
+  if (!o.xlabels) { ctx.textAlign = 'center'; ctx.fillText('0', w / 2, h - 4); }
+}
+const tries3 = IP.tries('t3', [
+  { text: '<i>Test chart</i>: apply an ideal lowpass with D₀ ≤ 40. Point at the black square and look for ripples beside its edge in the row profile.',
+    test: () => IP.key === 'chart' && F3.pass === 'low' && F3.shape === 'ideal' && F3.D0 <= 40 },
+  { text: 'Keep the same D₀ and switch to Gaussian. What happened to the negative lobes in the kernel, and to the ripples?',
+    test: () => F3.seen.has('low:ideal') && F3.shape === 'gauss' && F3.pass === 'low' },
+  { text: '<i>Coins</i>, Gaussian lowpass: keep at least 99% of the power with D₀ ≤ 25, then look at how much detail is gone. Where does the detail live? (Try <i>Night street</i> too. Why is it so different?)',
+    test: () => IP.key === 'coins' && F3.pass === 'low' && F3.shape === 'gauss' && F3.D0 <= 25 && F3.alpha >= 99 },
+  { text: 'Switch to a Butterworth highpass. Compare what is left of the image with lab 03\'s Laplacian.',
+    test: () => F3.pass === 'high' && F3.shape === 'butter' }
+]);
+
+/* ═════ 04 — periodic noise and notches ═════ */
+
+const NP = {
+  one: { label: 'One pattern', w: [[18, 10]] },
+  two: { label: 'Two patterns', w: [[18, 10], [-6, 34]] },
+  grid: { label: 'Screen grid', w: [[32, 0], [0, 32], [32, 32], [32, -32]] }
+};
+const Q = { pre: 'one', r: 2, notches: [], found: false, badNotch: false };
+function buildQ() {
+  seg('n-pre', Object.keys(NP), Q.pre, k => { Q.pre = k; Q.notches = []; buildQ(); render4(); }, Object.values(NP).map(o => o.label));
+}
+$('n-r').addEventListener('input', e => { Q.r = +e.target.value; render4(); });
+$('n-find').addEventListener('click', () => { Q.notches = findSpikes(); Q.found = true; render4(); });
+$('n-clear').addEventListener('click', () => { Q.notches = []; render4(); });
+
+const st4 = IP.stage('st4', { beforeLabel: 'Noisy', afterLabel: 'Notch-filtered',
+  explain: (r, s, x, y) => 'Noisy <b>' + r + '</b> → filtered <b>' + s + '</b>. Clean value was ' + SQ.data[y * N + x] + '.' });
+
+function noisyImage() {
+  const out = IP.makeF(N, N), A = 40 / Math.sqrt(NP[Q.pre].w.length);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let s = SQ.data[y * N + x];
+    for (const [u, v] of NP[Q.pre].w) s += A * Math.cos(2 * Math.PI * (u * x + v * y) / N);
+    out.data[y * N + x] = s;
+  }
+  return out;
+}
+/** Local peaks of |F| far from the centre that stand well above their surroundings. */
+function findSpikes() {
+  const mag = new Float64Array(N * N);
+  for (let k = 0; k < N * N; k++) mag[k] = Math.hypot(Q.F.re[k], Q.F.im[k]);
+  const out = [];
+  for (let v = -H2 + 3; v < H2 - 3; v++) for (let u = 0; u < H2 - 3; u++) {
+    if (u === 0 && v <= 0) continue;                 // half plane: the mirror comes free
+    if (Math.hypot(u, v) < 10) continue;
+    const m = mag[idxOf(u, v)], ring3 = [];
+    for (let t = -3; t <= 3; t++) for (let s = -3; s <= 3; s++) if (Math.max(Math.abs(s), Math.abs(t)) === 3) ring3.push(mag[idxOf(u + s, v + t)]);
+    ring3.sort((a, b) => a - b);
+    const med = ring3[ring3.length >> 1] || 1;
+    if (m > 12 * med && m > 2000) out.push({ u, v, m });
+  }
+  // keep only spikes comparable to the strongest: an image's own texture has peaks too, just far weaker
+  const top = out.reduce((a, q) => Math.max(a, q.m), 0);
+  return out.filter(q => q.m >= 0.4 * top).sort((a, b) => b.m - a.m).slice(0, 8).map(({ u, v }) => ({ u, v }));
+}
+function render4() {
+  Q.noisy = noisyImage();
+  Q.F = IP.dft(Q.noisy);          // unclipped: clipping would add spikes at sum and difference frequencies
+  const Hn = new Float64Array(N * N).fill(1), r2 = 2 * Q.r * Q.r;
+  for (let k = 0; k < N * N; k++) {
+    const { u, v } = IP.freqOf(k, N);
+    for (const q of Q.notches) {
+      Hn[k] *= (1 - Math.exp(-((u - q.u) ** 2 + (v - q.v) ** 2) / r2)) * (1 - Math.exp(-((u + q.u) ** 2 + (v + q.v) ** 2) / r2));
+    }
+  }
+  const G = { n: N, re: new Float64Array(N * N), im: new Float64Array(N * N) };
+  for (let k = 0; k < N * N; k++) { G.re[k] = Q.F.re[k] * Hn[k]; G.im[k] = Q.F.im[k] * Hn[k]; }
+  const g = IP.idft(G), noisy8 = IP.toDisplay(Q.noisy, 'clamp').img, out8 = IP.toDisplay(g, 'clamp').img;
+  st4.set(noisy8, out8);
+  // spectrum with notches marked
+  const c = $('n-spec');
+  IP.drawGray(c, IP.spectrumImage(Q.F, 'log', true));
+  Q.notches.forEach(q => { ring(c, q.u, q.v, Q.r + 2, '#b8412e', 1.6); ring(c, -q.u, -q.v, Q.r + 2, '#b8412e', 1.6); });
+  const himg = IP.make(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) himg.data[y * N + x] = Hn[IP.shiftIndex(x, y, N, true)] * 255;
+  IP.drawGray($('n-h'), himg);
+  const diff = IP.makeF(N, N);
+  for (let i = 0; i < N * N; i++) diff.data[i] = noisy8.data[i] - out8.data[i];
+  IP.drawGray($('n-diff'), IP.toDisplay(diff, 'offset').img);
+  Q.pN = IP.psnr(SQ, noisy8); Q.pF = IP.psnr(SQ, out8);
+  const db = v => isFinite(v) ? v.toFixed(1) + ' dB' : '∞ dB';
+  $('n-r-v').textContent = '= ' + Q.r;
+  $('eq4').innerHTML = '<span><i>Q</i> = <b>' + Q.notches.length + '</b> notch pair' + (Q.notches.length === 1 ? '' : 's') + '</span>' +
+    Q.notches.map(q => '<span>(' + sgn(q.u) + ', ' + sgn(q.v) + ') &amp; (' + sgn(-q.u) + ', ' + sgn(-q.v) + ')</span>').join('') +
+    '<span><i>r</i> = ' + Q.r + '</span>';
+  $('sb4').innerHTML =
+    score('Noisy', db(Q.pN), 'PSNR against clean') +
+    score('Filtered', db(Q.pF), isFinite(Q.pF) ? 'PSNR against clean' : 'identical to the clean image', true) +
+    score('Gain', isFinite(Q.pF) ? (Q.pF >= Q.pN ? '+' : '−') + db(Math.abs(Q.pF - Q.pN)) : '+∞', Q.notches.length + ' notch pair' + (Q.notches.length === 1 ? '' : 's'));
+  tries4.check();
+}
+(function () {
+  const c = $('n-spec');
+  c.addEventListener('click', e => {
+    const p = freqAt(c, e);
+    if (!p.u && !p.v) return;
+    const hit = Q.notches.findIndex(q => Math.hypot(q.u - p.u, q.v - p.v) <= Q.r + 2 || Math.hypot(q.u + p.u, q.v + p.v) <= Q.r + 2);
+    if (hit >= 0) Q.notches.splice(hit, 1);
+    else { Q.notches.push(p); if (Math.hypot(p.u, p.v) < 15) Q.badNotch = true; }
+    render4();
+  });
+})();
+const tries4 = IP.tries('t4', [
+  { text: '<i>One pattern</i>: click the two spikes by hand and gain at least 8 dB.',
+    test: () => Q.pre === 'one' && !Q.found && Q.pF - Q.pN >= 8 },
+  { text: '<i>Screen grid</i>: use <i>Find spikes</i>, then look at what was removed. Is any of the picture in there?',
+    test: () => Q.pre === 'grid' && Q.found },
+  { text: 'Put a notch close to the centre, on a spot that is not a spike. What part of the image does it damage?',
+    test: () => Q.badNotch },
+  { text: '<i>Uneven page</i>: use <i>Find spikes</i> and look at what was removed. What did it mistake for interference, and why?',
+    test: () => IP.key === 'page' && Q.found }
+]);
+
+/* ═════ wiring ═════ */
+
+['pick2', 'pick3', 'pick4'].forEach(id => IP.picker(id));
+IP.onImage(img => {
+  IMG = img;
+  SQ = IP.square(img, N);
+  FQ = IP.dft(SQ);
+  F3.row = F3.col = null;
+  buildS();
+  render2(); renderSwap(); render3(); render4();
+});
+IP.onResize(() => { render3(); });
+
+buildW(); render1();
+buildF(); buildQ();
+IP.useSample('chart');
+</script>
+</body>
+</html>
