@@ -5,1371 +5,589 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Welcome to My Personal Website</title>
 <meta name="description" content="Main Website" />
+<meta name="color-scheme" content="light dark" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Noto+Serif+JP:wght@300;400;500;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  // Apply a saved theme before first paint so the page doesn't flash
+  try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <style>
   :root {
-    --paper: #f4ede0;
-    --paper-dark: #ebe1cf;
-    --ink: #1a1a1a;
-    --ink-soft: #3d3d3d;
-    --ink-light: #6b6b6b;
-    --vermillion: #b8412e;
-    --vermillion-dark: #8a2e20;
-    --sage: #6b7a5a;
-    --gold: #a88848;
-    /* Motion — one easing vocabulary for the whole site */
-    --ease-out: cubic-bezier(0.22, 0.61, 0.24, 1);   /* decelerate, no overshoot */
-    --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);        /* gentle in-out for fades */
+    --bg: #fbfbfa;
+    --surface: #ffffff;
+    --ink: #111418;
+    --ink-soft: #3a4048;
+    --muted: #6b7280;
+    --line: #e6e7ea;
+    --chip: #f2f3f5;
+    --accent: #b8412e;
+    --accent-ink: #ffffff;
+    --accent-soft: #fbeee9;
+    --shadow: 0 1px 2px rgba(17, 20, 24, .04), 0 8px 24px rgba(17, 20, 24, .06);
+    --radius: 14px;
+    --max: 1120px;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1014; --surface: #161a20; --ink: #e9ebee; --ink-soft: #c5cad1; --muted: #8b939d;
+      --line: #262c34; --chip: #1e232a; --accent: #f07d62; --accent-ink: #1a0d09; --accent-soft: #2b1913;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1014; --surface: #161a20; --ink: #e9ebee; --ink-soft: #c5cad1; --muted: #8b939d;
+    --line: #262c34; --chip: #1e232a; --accent: #f07d62; --accent-ink: #1a0d09; --accent-soft: #2b1913;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; scroll-padding-top: 76px; -webkit-text-size-adjust: 100%; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   body {
-    background: var(--paper);
-    color: var(--ink);
-    font-family: 'Cormorant Garamond', 'Noto Serif JP', serif;
-    overflow-x: hidden;
-    position: relative;
-    min-height: 100vh;
-    background-image:
-      radial-gradient(ellipse at top right, rgba(184, 65, 46, 0.04), transparent 60%),
-      radial-gradient(ellipse at bottom left, rgba(107, 122, 90, 0.05), transparent 60%);
+    background: var(--bg); color: var(--ink);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
   }
-  body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: 0.4; z-index: 1;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0 0.05 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-  .watermark {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 90vmin; height: 90vmin;
-    z-index: 0; opacity: 0.08; pointer-events: none;
-  }
-  .watermark svg { width: 100%; height: 100%; }
-  .vertical-text {
-    position: fixed; top: 50%; transform: translateY(-50%);
-    writing-mode: vertical-rl;
-    font-family: 'Noto Serif JP', serif;
-    font-weight: 300; color: var(--ink-soft);
-    opacity: 0; z-index: 2;
-    letter-spacing: 0.3em; font-size: 0.7rem;
-    animation: fadeInSide 1.5s ease-out 1s forwards;
-    transition: opacity 0.8s ease;
-  }
-  .vertical-text.fading { opacity: 0 !important; }
-  .vertical-text.left { left: 2.5rem; }
-  .vertical-text.right { right: 2.5rem; }
-  @keyframes fadeInSide { to { opacity: 0.5; } }
+  a { color: inherit; }
+  img { display: block; max-width: 100%; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .container { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; z-index: 100; }
+  .skip:focus { left: 8px; }
 
-  /* Top nav */
-  .top-bar {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 1.2rem 3rem;
-    position: fixed; top: 0; left: 0; right: 0;
-    z-index: 100;
-    background: rgba(244, 237, 224, 0.85);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid transparent;
-    transition: border-color 0.4s ease;
-    opacity: 0;
-    animation: fadeDown 0.8s ease-out 0.1s forwards;
+  /* ---------- Top bar ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: saturate(160%) blur(12px); -webkit-backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid transparent; transition: border-color .2s;
   }
-  .top-bar.scrolled { border-bottom-color: rgba(26, 26, 26, 0.1); }
-  @keyframes fadeDown {
-    from { opacity: 0; transform: translateY(-12px); }
-    to { opacity: 1; transform: translateY(0); }
+  .nav.scrolled { border-bottom-color: var(--line); }
+  .nav-inner { display: flex; align-items: center; gap: 24px; height: 64px; }
+  .brand { font-weight: 700; letter-spacing: -.01em; text-decoration: none; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center; font-size: .8rem; font-weight: 700; letter-spacing: 0;
   }
-  .brand {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1rem; letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--ink); font-weight: 500; text-decoration: none;
-  }
-  .nav-links { display: flex; gap: 2rem; align-items: center; }
+  .nav-links { display: flex; gap: 2px; margin-left: auto; }
   .nav-links a {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.72rem; letter-spacing: 0.25em;
-    text-transform: uppercase; color: var(--ink-soft);
-    text-decoration: none; transition: color 0.3s;
-    position: relative; white-space: nowrap;
+    text-decoration: none; font-size: .9rem; color: var(--muted); padding: 7px 11px; border-radius: 8px;
+    transition: color .15s, background .15s;
   }
-  .nav-links a::after {
-    content: ""; position: absolute; bottom: -4px; left: 0; right: 0;
-    height: 1px; background: var(--vermillion);
-    transform: scaleX(0); transform-origin: left;
-    transition: transform 0.3s;
+  .nav-links a:hover { color: var(--ink); background: var(--chip); }
+  .nav-links a.active { color: var(--ink); font-weight: 500; }
+  .nav-actions { display: flex; align-items: center; gap: 8px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); cursor: pointer; display: grid; place-items: center;
   }
-  .nav-links a:hover { color: var(--ink); }
-  .nav-links a:hover::after { transform: scaleX(1); }
-  /* The Labs — the one nav item that is a destination, not an anchor */
-  .nav-links a.nav-accent {
-    color: var(--vermillion);
-    border: 1px solid rgba(184, 65, 46, 0.35);
-    padding: 0.42em 0.9em;
-    transition: color 0.3s, background 0.3s, border-color 0.3s;
+  .icon-btn svg { width: 17px; height: 17px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font: inherit; font-size: .92rem; font-weight: 500;
+    padding: 10px 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    cursor: pointer; transition: transform .15s, border-color .15s, background .15s; white-space: nowrap;
   }
-  .nav-links a.nav-accent::after { display: none; }
-  .nav-links a.nav-accent:hover {
-    color: var(--paper);
-    background: var(--vermillion);
-    border-color: var(--vermillion);
-  }
-  .seal {
-    width: 42px; height: 42px;
-    background: var(--vermillion); color: var(--paper);
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Noto Serif JP', serif;
-    font-weight: 700; font-size: 1rem;
-    transform: rotate(-3deg); position: relative;
-  }
-  .seal::before {
-    content: ""; position: absolute; inset: 4px;
-    border: 1px solid rgba(255,255,255,0.4);
+  .btn:hover { border-color: var(--ink); }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.primary:hover { transform: translateY(-1px); }
+  .btn.small { padding: 7px 13px; font-size: .85rem; }
+  .menu-btn { display: none; }
+  .mobile-menu { display: none; }
+  .theme-dark-icon { display: none; }
+  :root[data-theme="dark"] .theme-dark-icon { display: block; }
+  :root[data-theme="dark"] .theme-light-icon { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .theme-dark-icon { display: block; }
+    :root:not([data-theme="light"]) .theme-light-icon { display: none; }
   }
 
-  section { position: relative; z-index: 3; }
-  .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
-
-  .section-heading { text-align: center; margin-bottom: 4rem; }
-  .section-heading-kanji {
-    font-family: 'Noto Serif JP', serif;
-    color: var(--vermillion);
-    font-size: 0.9rem; letter-spacing: 0.5em;
-    margin-bottom: 0.8rem;
-  }
-  .section-heading-text {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 2.4rem; font-style: italic;
-    font-weight: 400; color: var(--ink);
-  }
-  .section-heading-rule {
-    width: 40px; height: 1px;
-    background: var(--ink);
-    margin: 1.5rem auto 0;
+  @media (max-width: 860px) {
+    .nav-links, .nav-actions .cv-btn { display: none; }
+    .nav-actions { margin-left: auto; }
+    .menu-btn { display: grid; }
+    .mobile-menu {
+      display: block; position: fixed; left: 0; right: 0; top: 64px; z-index: 49;
+      background: var(--bg); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
+      padding: 8px 16px 18px; transform: translateY(-8px); opacity: 0; visibility: hidden;
+      transition: opacity .18s, transform .18s, visibility .18s;
+    }
+    .mobile-menu.open { opacity: 1; transform: none; visibility: visible; }
+    .mobile-menu a { display: block; padding: 12px 8px; text-decoration: none; border-bottom: 1px solid var(--line); font-weight: 500; }
+    .mobile-menu a:last-of-type { border-bottom: 0; }
+    .mobile-menu .btn { margin-top: 10px; justify-content: center; width: 100%; display: flex; }
   }
 
-  /* Hero */
-  .hero {
-    min-height: 100vh;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    text-align: center; padding: 2rem;
-    position: relative;
+  /* ---------- Hero ---------- */
+  .hero { padding: 72px 0 64px; }
+  .hero-grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 48px; align-items: center; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 500; color: var(--muted);
+    padding: 5px 12px 5px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
   }
-  .hero-kanji {
-    font-family: 'Noto Serif JP', serif;
-    font-weight: 300; font-size: 1.1rem;
-    color: var(--vermillion);
-    letter-spacing: 0.5em; margin-bottom: 2rem;
-    opacity: 0;
-    animation: fadeIn 0.9s ease-out 0.15s forwards;
-  }
-  .hero-greeting {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.75rem; letter-spacing: 0.5em;
-    text-transform: uppercase; color: var(--ink-soft);
-    margin-bottom: 1.5rem; opacity: 0;
-    animation: fadeIn 0.9s ease-out 0.1s forwards;
-  }
-  .hero-name {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(3rem, 8vw, 6rem);
-    font-weight: 400; line-height: 1;
-    letter-spacing: -0.02em; margin-bottom: 1.5rem;
-    color: var(--ink);
-  }
-  .hero-name .word {
-    display: inline-block; opacity: 0;
-    transform: translateY(20px);
-    animation: rise 0.9s cubic-bezier(0.2, 0.6, 0.2, 1) forwards;
-  }
-  .hero-name .word:nth-child(1) { animation-delay: 0.2s; }
-  .hero-name .word:nth-child(2) { animation-delay: 0.32s; }
-  @keyframes rise { to { opacity: 1; transform: translateY(0); } }
-  .hero-name em { font-style: italic; font-weight: 300; color: var(--vermillion); }
-  .hero-divider {
-    width: 0; height: 1px; background: var(--ink);
-    margin: 2rem auto;
-    animation: expand 0.9s ease-out 0.5s forwards;
-  }
-  @keyframes expand { to { width: 60px; } }
-  .hero-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic;
-    font-size: clamp(1.1rem, 2vw, 1.5rem);
-    color: var(--ink-soft); font-weight: 400;
-    max-width: 600px; opacity: 0;
-    animation: fadeIn 0.9s ease-out 0.5s forwards;
-  }
-  .hero-tagline {
-    margin-top: 0.5rem;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.8rem; letter-spacing: 0.3em;
-    text-transform: uppercase; color: var(--sage);
-    opacity: 0;
-    animation: fadeIn 0.9s ease-out 0.6s forwards;
-  }
+  .eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: #2f9e6a; box-shadow: 0 0 0 3px color-mix(in srgb, #2f9e6a 22%, transparent); }
+  .hero h1 { font-size: clamp(2.5rem, 6vw, 4.2rem); line-height: 1.05; letter-spacing: -.035em; font-weight: 700; margin: 22px 0 6px; }
+  .hero .cn { font-size: 1rem; color: var(--muted); font-weight: 500; letter-spacing: .08em; }
+  .hero .lead { font-size: clamp(1.05rem, 2vw, 1.2rem); color: var(--ink-soft); margin: 20px 0 22px; max-width: 34em; }
+  .hero .lead strong { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font-size: .8rem; padding: 4px 11px; border-radius: 999px; background: var(--chip); color: var(--ink-soft); white-space: nowrap; }
+  .chip.accent { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .social { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 22px; font-size: .9rem; }
+  .social a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .social a:hover { color: var(--accent); }
+  .social svg { width: 16px; height: 16px; }
 
-  /* My Profile CTA button */
-  .hero-cta-group {
-    display: flex;
-    gap: 1rem;
-    margin-top: 2.5rem;
-    flex-wrap: wrap;
-    justify-content: center;
-    opacity: 0;
-    animation: fadeIn 0.9s ease-out 0.7s forwards;
-  }
-  .hero-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.8rem;
-    padding: 0.95rem 2.2rem;
-    border: 1px solid var(--ink);
-    background: transparent;
-    color: var(--ink);
-    text-decoration: none;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.78rem;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    font-weight: 500;
-    position: relative;
-    overflow: hidden;
-    transition: color 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
-  }
-  .hero-cta.secondary {
-    border-color: var(--vermillion);
-    color: var(--vermillion);
-  }
-  .hero-cta::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--vermillion);
-    transform: translateY(101%);
-    transition: transform 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
-    z-index: 0;
-  }
-  .hero-cta > span {
-    position: relative;
-    z-index: 1;
-    transition: color 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
-  }
-  .hero-cta:hover {
-    border-color: var(--vermillion);
-    color: var(--paper);
-  }
-  .hero-cta.secondary:hover { border-color: var(--ink); }
-  .hero-cta.secondary::before { background: var(--vermillion); }
-  .hero-cta:hover::before { transform: translateY(0); }
-  .hero-cta:hover .hero-cta-arrow {
-    transform: translateX(6px);
-  }
-  .hero-cta-arrow {
-    font-family: serif;
-    font-size: 1.1rem;
-    transition: transform 0.4s ease;
-  }
-  @keyframes fadeIn { to { opacity: 1; } }
-  .scroll-cue {
-    position: absolute; bottom: 2rem; left: 50%;
-    transform: translateX(-50%);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.7rem; letter-spacing: 0.3em;
-    text-transform: uppercase; color: var(--ink-soft);
-    text-decoration: none; opacity: 0;
-    animation: fadeIn 0.9s ease-out 1s forwards, bob 2s ease-in-out 2s infinite;
-  }
-  .scroll-cue::after {
-    content: ""; display: block;
-    width: 1px; height: 30px;
-    background: var(--ink-soft);
-    margin: 0.8rem auto 0;
-  }
-  @keyframes bob {
-    0%, 100% { transform: translateX(-50%) translateY(0); }
-    50% { transform: translateX(-50%) translateY(6px); }
-  }
+  .glance { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 26px; box-shadow: var(--shadow); }
+  .glance h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 1.9rem; line-height: 1.1; letter-spacing: -.03em; }
+  .stat span { font-size: .8rem; color: var(--muted); }
+  .glance ul { list-style: none; margin-top: 16px; display: grid; gap: 10px; }
+  .glance li { display: flex; gap: 10px; font-size: .9rem; color: var(--ink-soft); line-height: 1.45; }
+  .glance li::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: .5em; }
 
-  /* Menu blocks */
-  .menu-section { padding: 6rem 2rem; }
-  .menu-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
-    gap: 1.5rem; max-width: 1000px; margin: 0 auto;
-  }
-  .menu-block {
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(26, 26, 26, 0.12);
-    padding: 3rem 2rem;
-    cursor: pointer; text-decoration: none; color: inherit;
-    position: relative; overflow: hidden;
-    transition: all 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
-    min-height: 280px;
-    display: flex; flex-direction: column; justify-content: space-between;
-  }
-  .menu-block::before {
-    content: ""; position: absolute; inset: 0;
-    background: var(--ink);
-    transform: translateY(100%);
-    transition: transform 0.5s cubic-bezier(0.2, 0.6, 0.2, 1);
-    z-index: 0;
-  }
-  .menu-block:hover::before { transform: translateY(0); }
-  .menu-block > * { position: relative; z-index: 1; transition: color 0.5s; }
-  .menu-block:hover > *, .menu-block:hover .block-corner { color: var(--paper); }
-  .menu-block:hover .block-kanji { color: var(--vermillion); opacity: 1; }
-  .menu-block:hover .block-arrow { transform: translateX(8px); color: var(--vermillion); }
-  .block-number {
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic; font-weight: 300;
-    font-size: 1rem; color: var(--vermillion);
-    letter-spacing: 0.2em;
-  }
-  .block-kanji {
-    font-family: 'Cormorant Garamond', 'Noto Serif JP', serif;
-    font-size: 2.6rem; font-weight: 400;
-    color: var(--ink); opacity: 0.9;
-    margin: 0.6rem 0 1.2rem; line-height: 1.1;
-    letter-spacing: -0.01em;
-  }
-  .block-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 2rem; font-weight: 500;
-    margin-bottom: 0.5rem;
-  }
-  .block-desc {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.85rem; line-height: 1.6;
-    color: var(--ink-soft); font-weight: 300;
-  }
-  .block-foot {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-top: 2rem;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.7rem; letter-spacing: 0.3em; text-transform: uppercase;
-  }
-  .block-arrow { font-family: serif; font-size: 1.2rem; transition: all 0.4s ease; }
-  .block-corner { position: absolute; width: 14px; height: 14px; border-color: var(--ink); }
-  .block-corner.tl { top: 12px; left: 12px; border-top: 1px solid; border-left: 1px solid; }
-  .block-corner.br { bottom: 12px; right: 12px; border-bottom: 1px solid; border-right: 1px solid; }
+  /* ---------- Sections ---------- */
+  section.block { padding: 72px 0; border-top: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 36px; }
+  .sec-kicker { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: 6px; }
+  .sec-head h2 { font-size: clamp(1.7rem, 3.4vw, 2.3rem); letter-spacing: -.03em; line-height: 1.15; }
+  .sec-head p { color: var(--muted); max-width: 36em; margin-top: 6px; }
 
-  /* Profile */
-  .profile-section { padding: 8rem 2rem; }
-  .profile-grid {
-    display: grid;
-    grid-template-columns: 1fr 1.6fr;
-    gap: 4rem; align-items: start;
-  }
-  .profile-photo-wrap {
-    position: relative; aspect-ratio: 3/4;
-    background: var(--paper-dark);
-    border: 1px solid rgba(26,26,26,0.12);
-    overflow: hidden;
-  }
-  .profile-photo-wrap::before {
-    content: ""; position: absolute; inset: 14px;
-    border: 1px solid rgba(26,26,26,0.15);
-    pointer-events: none; z-index: 2;
-  }
-  .profile-photo-wrap img {
-    width: 100%; height: 100%; object-fit: cover; display: block;
-  }
-  .profile-photo-placeholder {
-    width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Noto Serif JP', serif;
-    font-size: 5rem; color: rgba(26,26,26,0.15);
-  }
-  .profile-bio h3 {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.8rem; font-style: italic;
-    font-weight: 500; margin-bottom: 1.2rem; color: var(--ink);
-  }
-  .profile-bio p {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.15rem; line-height: 1.7;
-    color: var(--ink-soft); margin-bottom: 1.2rem;
-  }
-  .profile-bio p .accent { color: var(--vermillion); font-style: italic; }
-  .info-list { margin-top: 2.5rem; border-top: 1px solid rgba(26,26,26,0.12); }
-  .info-row {
-    display: grid; grid-template-columns: 140px 1fr;
-    gap: 1rem; padding: 1.1rem 0;
-    border-bottom: 1px solid rgba(26,26,26,0.1);
-    font-family: 'Inter', sans-serif; font-size: 0.85rem;
-  }
-  .info-label {
-    font-size: 0.7rem; letter-spacing: 0.25em;
-    text-transform: uppercase; color: var(--vermillion); font-weight: 500;
-  }
-  .info-value { color: var(--ink-soft); line-height: 1.6; }
-  .info-value a {
-    color: var(--ink); text-decoration: none;
-    border-bottom: 1px solid var(--vermillion); transition: color 0.3s;
-  }
-  .info-value a:hover { color: var(--vermillion); }
-  .tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  .tag {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.7rem; letter-spacing: 0.15em;
-    text-transform: uppercase;
-    padding: 0.4rem 0.9rem;
-    border: 1px solid rgba(26,26,26,0.2);
-    color: var(--ink-soft); background: rgba(255,255,255,0.3);
-  }
+  /* About */
+  .about-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 56px; }
+  .bio p { color: var(--ink-soft); margin-bottom: 1.05em; font-size: 1.02rem; }
+  .bio .hl { color: var(--ink); font-weight: 600; }
+  .facts { display: grid; gap: 26px; align-content: start; }
+  .fact h3, .card-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; margin-bottom: 10px; }
+  .edu { list-style: none; display: grid; gap: 14px; }
+  .edu li { padding-left: 16px; border-left: 2px solid var(--line); }
+  .edu li:first-child { border-left-color: var(--accent); }
+  .edu b { display: block; font-weight: 600; line-height: 1.4; }
+  .edu span { font-size: .88rem; color: var(--muted); }
+  .people { list-style: none; display: grid; gap: 6px; font-size: .93rem; }
+  .people a { font-weight: 500; text-decoration: none; border-bottom: 1px solid var(--line); }
+  .people a:hover { color: var(--accent); border-color: var(--accent); }
+  .people small { color: var(--muted); font-size: .85rem; }
+  .people .role { display: block; font-size: .78rem; color: var(--muted); margin-top: 6px; }
+  .people .role:first-child { margin-top: 0; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: .93rem; }
+  .kv dt { color: var(--muted); }
+
+  .cards-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 48px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+  .plain-list { list-style: none; display: grid; gap: 9px; font-size: .9rem; color: var(--ink-soft); line-height: 1.45; }
+  .plain-list small { display: block; color: var(--muted); font-size: .8rem; }
+  details.more { margin-top: 12px; }
+  details.more summary { cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--accent); list-style: none; }
+  details.more summary::-webkit-details-marker { display: none; }
+  details.more summary::after { content: " ↓"; }
+  details.more[open] summary::after { content: " ↑"; }
+  details.more .plain-list { margin-top: 10px; }
+
+  /* Experience */
+  .xp { list-style: none; display: grid; }
+  .xp-item { display: grid; grid-template-columns: 170px 1fr; gap: 28px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .xp-item:first-child { padding-top: 0; }
+  .xp-when { font-size: .9rem; font-weight: 600; }
+  .xp-when small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; }
+  .xp-role { font-size: 1.08rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.4; }
+  .xp-org { color: var(--accent); font-size: .9rem; font-weight: 500; }
+  .xp-org span { color: var(--muted); font-weight: 400; }
+  .xp-desc { color: var(--ink-soft); font-size: .95rem; margin-top: 6px; }
+  .xp-desc ul { list-style: none; margin-top: 6px; display: grid; gap: 4px; }
+  .xp-desc li { padding-left: 16px; position: relative; }
+  .xp-desc li::before { content: "–"; position: absolute; left: 0; color: var(--muted); }
+  .xp-item.later { display: none; }
+  .xp.all .xp-item.later { display: grid; }
+  .show-more { margin-top: 22px; }
 
   /* Projects */
-  .projects-section { padding: 8rem 2rem; background: rgba(235, 225, 207, 0.3); }
-  .projects-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
-    gap: 2rem; max-width: 1100px; margin: 0 auto;
+  .proj-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .proj {
+    display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    overflow: hidden; text-decoration: none; transition: transform .18s, box-shadow .18s, border-color .18s;
   }
-  .project-card {
-    background: rgba(255,255,255,0.5);
-    border: 1px solid rgba(26,26,26,0.12);
-    padding: 2.5rem 2rem;
-    position: relative;
-    transition: all 0.4s ease;
-    text-decoration: none; color: inherit;
-    display: flex; flex-direction: column;
-    overflow: hidden;
-  }
-  .project-card:hover {
-    transform: translateY(-4px);
-    border-color: var(--vermillion);
-    background: rgba(255,255,255,0.75);
-  }
-  .project-image {
-    margin: -2.5rem -2rem 1.8rem;
-    height: 200px;
-    background: var(--paper-dark);
-    overflow: hidden;
-    position: relative;
-    border-bottom: 1px solid rgba(26,26,26,0.08);
-  }
-  .project-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    transition: transform 0.7s cubic-bezier(0.2, 0.6, 0.2, 1);
-    filter: saturate(0.92);
-  }
-  .project-card:hover .project-image img {
-    transform: scale(1.06);
-    filter: saturate(1);
-  }
-  .project-image::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(to bottom, transparent 60%, rgba(244,237,224,0.4) 100%);
-    pointer-events: none;
-  }
-  .project-year {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.7rem; letter-spacing: 0.3em;
-    color: var(--vermillion); text-transform: uppercase;
-    margin-bottom: 0.8rem;
-  }
-  .project-org {
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic; font-size: 0.95rem;
-    color: var(--ink-light); margin-bottom: 0.8rem;
-  }
-  .project-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.5rem; font-weight: 500;
-    line-height: 1.25; margin-bottom: 0.8rem;
-    color: var(--ink);
-  }
-  .project-desc {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.88rem; line-height: 1.65;
-    color: var(--ink-soft); font-weight: 300;
-    margin-bottom: 1.5rem; flex: 1;
-  }
-  .project-tags {
-    display: flex; flex-wrap: wrap;
-    gap: 0.4rem; margin-bottom: 1.2rem;
-  }
-  .project-tag {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.65rem; letter-spacing: 0.15em;
-    text-transform: uppercase; color: var(--sage);
-    padding: 0.3rem 0.7rem; background: rgba(107, 122, 90, 0.1);
-  }
-  .project-link {
-    margin-top: auto;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.72rem; letter-spacing: 0.25em;
-    text-transform: uppercase;
-    color: var(--ink);
-    text-decoration: none;
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    border-bottom: 1px solid var(--vermillion);
-    padding-bottom: 0.3rem;
-    align-self: flex-start;
-    transition: all 0.3s;
-  }
-  .project-link:hover { color: var(--vermillion); gap: 0.8rem; }
-
-  /* Experience timeline */
-  .experience-section { padding: 8rem 2rem; }
-  .timeline {
-    max-width: 900px;
-    margin: 0 auto;
-    position: relative;
-    padding-left: 0;
-  }
-  .timeline::before {
-    content: "";
-    position: absolute;
-    left: 160px;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: linear-gradient(to bottom,
-      transparent 0%,
-      rgba(26,26,26,0.2) 8%,
-      rgba(26,26,26,0.2) 92%,
-      transparent 100%);
-  }
-  .timeline-item {
-    display: grid;
-    grid-template-columns: 160px 1fr;
-    gap: 3rem;
-    padding: 1.8rem 0 2.4rem;
-    position: relative;
-  }
-  .timeline-item::before {
-    content: "";
-    position: absolute;
-    left: 154px;
-    top: 2.4rem;
-    width: 13px;
-    height: 13px;
-    background: var(--paper);
-    border: 1.5px solid var(--vermillion);
-    border-radius: 50%;
-    z-index: 2;
-    transition: all 0.3s ease;
-  }
-  .timeline-item:hover::before {
-    background: var(--vermillion);
-    transform: scale(1.2);
-  }
-  .timeline-date {
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic;
-    font-size: 1.1rem;
-    color: var(--vermillion);
-    font-weight: 500;
-    line-height: 1.3;
-    text-align: right;
-    padding-top: 0.2rem;
-    padding-right: 1.8rem;
-  }
-  .timeline-date small {
-    display: block;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.65rem;
-    letter-spacing: 0.2em;
-    color: var(--ink-light);
-    text-transform: uppercase;
-    font-style: normal;
-    margin-top: 0.3rem;
-  }
-  .timeline-content { padding-top: 0; }
-  .timeline-role {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.4rem;
-    font-weight: 500;
-    line-height: 1.3;
-    color: var(--ink);
-    margin-bottom: 0.3rem;
-  }
-  .timeline-org {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.8rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--sage);
-    font-weight: 500;
-    margin-bottom: 0.4rem;
-  }
-  .timeline-loc {
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic;
-    font-size: 0.95rem;
-    color: var(--ink-light);
-    margin-bottom: 0.8rem;
-  }
-  .timeline-desc {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.88rem;
-    line-height: 1.65;
-    color: var(--ink-soft);
-    font-weight: 300;
-  }
-  .timeline-desc ul {
-    list-style: none;
-    padding: 0;
-    margin-top: 0.5rem;
-  }
-  .timeline-desc li {
-    padding-left: 1.2rem;
-    position: relative;
-    margin-bottom: 0.4rem;
-  }
-  .timeline-desc li::before {
-    content: "—";
-    position: absolute;
-    left: 0;
-    color: var(--vermillion);
-  }
+  a.proj:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .proj-img { aspect-ratio: 16 / 10; background: var(--chip); overflow: hidden; border-bottom: 1px solid var(--line); }
+  .proj-img img { width: 100%; height: 100%; object-fit: cover; }
+  .proj-body { padding: 20px; display: flex; flex-direction: column; flex: 1; }
+  .proj-meta { font-size: .78rem; color: var(--muted); }
+  .proj-meta b { color: var(--accent); font-weight: 600; }
+  .proj h3 { font-size: 1.08rem; letter-spacing: -.01em; line-height: 1.35; margin: 6px 0 8px; }
+  .proj p { font-size: .9rem; color: var(--ink-soft); margin-bottom: 14px; }
+  .proj .chips { margin-top: auto; }
+  .proj .chip { font-size: .74rem; }
+  .proj-link { margin-top: 14px; font-size: .88rem; font-weight: 600; color: var(--accent); }
 
   /* Publications */
-  .publications-section { padding: 8rem 2rem; }
-  .pub-list { max-width: 950px; margin: 0 auto; }
-  .pub-item {
-    display: grid; grid-template-columns: 90px 1fr;
-    gap: 2rem; padding: 2.2rem 0;
-    border-bottom: 1px solid rgba(26,26,26,0.12);
-    align-items: start; transition: padding 0.3s;
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; }
+  .filter {
+    font: inherit; font-size: .85rem; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink-soft); cursor: pointer;
   }
-  .pub-item:hover { padding-left: 0.8rem; }
-  .pub-year {
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic; font-size: 1.6rem;
-    font-weight: 400; color: var(--vermillion);
-    letter-spacing: 0.05em;
+  .filter span { color: var(--muted); margin-left: 4px; font-size: .78rem; }
+  .filter.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .filter.on span { color: inherit; opacity: .7; }
+  .pubs { list-style: none; }
+  .pub { display: grid; grid-template-columns: 70px 1fr; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .pub[hidden] { display: none; }
+  .pub-year { font-weight: 600; color: var(--muted); font-size: .92rem; padding-top: 1px; }
+  .pub h3 { font-size: 1rem; font-weight: 600; line-height: 1.45; letter-spacing: -.005em; }
+  .pub-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font-size: .85rem; color: var(--muted); }
+  .badge { font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--chip); color: var(--ink-soft); letter-spacing: .01em; }
+  .badge.q1 { background: #e6f4ec; color: #17673f; }
+  .badge.q2 { background: #e8f0fb; color: #23538f; }
+  .badge.q3 { background: #fbf1df; color: #8a5a0b; }
+  .badge.award { background: var(--accent-soft); color: var(--accent); }
+  :root[data-theme="dark"] .badge.q1 { background: #14301f; color: #7fd4a3; }
+  :root[data-theme="dark"] .badge.q2 { background: #15243a; color: #8db8ef; }
+  :root[data-theme="dark"] .badge.q3 { background: #33270f; color: #e6b866; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .badge.q1 { background: #14301f; color: #7fd4a3; }
+    :root:not([data-theme="light"]) .badge.q2 { background: #15243a; color: #8db8ef; }
+    :root:not([data-theme="light"]) .badge.q3 { background: #33270f; color: #e6b866; }
   }
-  .pub-content { padding-top: 0.3rem; }
-  .pub-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.25rem; font-weight: 500;
-    line-height: 1.35; margin-bottom: 0.5rem; color: var(--ink);
-  }
-  .pub-authors {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.85rem; line-height: 1.6;
-    color: var(--ink-soft); margin-bottom: 0.4rem;
-  }
-  .pub-venue {
-    font-family: 'Cormorant Garamond', serif;
-    font-style: italic; font-size: 0.95rem;
-    color: var(--ink-light); margin-bottom: 0.8rem;
-  }
-  .pub-badge {
-    display: inline-block;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.65rem; letter-spacing: 0.15em;
-    text-transform: uppercase;
-    padding: 0.25rem 0.6rem; margin-left: 0.5rem;
-    background: var(--vermillion); color: var(--paper);
-    vertical-align: middle;
-  }
-  .pub-badge.q1 { background: var(--vermillion-dark); }
-  .pub-badge.q2 { background: var(--sage); }
-  .pub-badge.q3 { background: var(--gold); }
-  .pub-badge.q4 { background: var(--ink-light); }
-  .pub-badge.award { background: var(--vermillion-dark); }
-  .pub-links {
-    display: flex; gap: 1rem; flex-wrap: wrap;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
-  }
-  .pub-links a {
-    color: var(--ink-soft); text-decoration: none;
-    padding: 0.3rem 0.7rem;
-    border: 1px solid rgba(26,26,26,0.2);
-    transition: all 0.3s;
-  }
-  .pub-links a:hover {
-    background: var(--ink); color: var(--paper); border-color: var(--ink);
-  }
+  .pub-meta a { color: var(--accent); font-weight: 500; text-decoration: none; }
+  .pub-meta a:hover { text-decoration: underline; }
 
-  /* ===== Teaching & Learning ===== */
-  .teaching-section { padding: 8rem 2rem; background: var(--paper-dark); position: relative; z-index: 3; }
-  .teaching-lede {
-    max-width: 62ch; margin: -2rem auto 3.5rem; text-align: center;
-    color: var(--ink-soft); font-size: 1.15rem; line-height: 1.8;
+  /* Teaching */
+  .teach-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
+  .teach {
+    display: flex; flex-direction: column; text-decoration: none; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 18px; padding: 28px; transition: transform .18s, box-shadow .18s, border-color .18s;
   }
-  .resource-grid {
-    display: grid; grid-template-columns: 1.55fr 1fr;
-    gap: 2rem; align-items: stretch;
-  }
-  /* Same ink-fill interaction as the Contents blocks, so this reads as native */
-  .resource-card {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(26, 26, 26, 0.12);
-    padding: 3rem 2.4rem;
-    text-decoration: none; color: inherit;
-    position: relative; overflow: hidden;
-    display: flex; flex-direction: column;
-    transition: border-color 0.5s var(--ease-out), transform 0.5s var(--ease-out);
-  }
-  .resource-card::before {
-    content: ""; position: absolute; inset: 0;
-    background: var(--ink); transform: translateY(100%);
-    transition: transform 0.55s var(--ease-out); z-index: 0;
-  }
-  .resource-card:hover::before { transform: translateY(0); }
-  .resource-card > * { position: relative; z-index: 1; transition: color 0.5s var(--ease-soft); }
-  .resource-card:hover { transform: translateY(-4px); border-color: rgba(26, 26, 26, 0.3); }
-  .resource-card:hover > *, .resource-card:hover .block-corner { color: var(--paper); }
-  .resource-card:hover .resource-kanji,
-  .resource-card:hover .resource-title em { color: var(--vermillion); opacity: 1; }
-  .resource-card:hover .block-arrow { transform: translateX(8px); color: var(--vermillion); }
-  .resource-card:focus-visible { outline: 2px solid var(--vermillion); outline-offset: 4px; }
+  .teach:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .teach-tag { align-self: flex-start; font-size: .75rem; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+  .teach h3 { font-size: 1.45rem; letter-spacing: -.02em; margin: 14px 0 8px; }
+  .teach p { color: var(--ink-soft); font-size: .95rem; }
+  .teach ul { list-style: none; margin: 16px 0 20px; display: grid; gap: 8px; font-size: .9rem; color: var(--ink-soft); }
+  .teach li { padding-left: 16px; position: relative; line-height: 1.5; }
+  .teach li::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .teach li b { color: var(--ink); font-weight: 600; }
+  .teach-go { margin-top: auto; font-weight: 600; font-size: .92rem; color: var(--ink); }
 
-  .resource-head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 1rem; margin-bottom: 1.4rem;
+  /* Contact */
+  .contact { padding: 80px 0 40px; border-top: 1px solid var(--line); }
+  .contact-box { background: var(--ink); color: var(--bg); border-radius: 24px; padding: clamp(28px, 5vw, 56px); display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: center; }
+  .contact-box h2 { font-size: clamp(1.7rem, 3.4vw, 2.4rem); letter-spacing: -.03em; line-height: 1.15; }
+  .contact-box p { opacity: .75; margin-top: 10px; }
+  .contact-links { display: grid; gap: 10px; }
+  .contact-links a {
+    display: flex; justify-content: space-between; align-items: center; text-decoration: none; padding: 12px 16px; border-radius: 12px;
+    background: color-mix(in srgb, var(--bg) 8%, transparent); border: 1px solid color-mix(in srgb, var(--bg) 16%, transparent); font-weight: 500;
   }
-  .resource-kanji {
-    font-family: 'Noto Serif JP', serif; font-weight: 300;
-    color: var(--vermillion); letter-spacing: 0.35em; font-size: 0.95rem; opacity: 0.85;
-  }
-  .resource-tag {
-    font-family: 'Inter', sans-serif; font-size: 0.58rem;
-    letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-light);
-    border: 1px solid currentColor; padding: 0.35em 0.7em; white-space: nowrap;
-  }
-  .resource-title {
-    font-family: 'Cormorant Garamond', serif; font-weight: 400;
-    font-size: clamp(1.7rem, 3vw, 2.3rem); line-height: 1.2;
-    margin: 0 0 1rem; letter-spacing: -0.01em;
-  }
-  .resource-title em { font-style: italic; color: var(--vermillion); }
-  .resource-desc { color: var(--ink-soft); line-height: 1.8; margin: 0 0 1.6rem; max-width: 52ch; }
-  .resource-topics { list-style: none; margin: 0 0 2rem; padding: 0; }
-  .resource-topics li {
-    font-family: 'Inter', sans-serif; font-size: 0.74rem; letter-spacing: 0.02em;
-    color: var(--ink-light); padding: 0.42rem 0 0.42rem 1.5rem; position: relative;
-    border-bottom: 1px solid rgba(26, 26, 26, 0.07);
-  }
-  .resource-topics li::before {
-    content: "—"; position: absolute; left: 0; color: var(--vermillion); opacity: 0.7;
-  }
-  .resource-card:hover .resource-topics li { border-bottom-color: rgba(244, 237, 224, 0.15); }
-  .resource-foot {
-    margin-top: auto; padding-top: 1.4rem;
-    border-top: 1px solid rgba(26, 26, 26, 0.12);
-    display: flex; justify-content: space-between; align-items: center;
-    font-family: 'Inter', sans-serif; font-size: 0.66rem;
-    letter-spacing: 0.22em; text-transform: uppercase;
-  }
-  .resource-card:hover .resource-foot { border-top-color: rgba(244, 237, 224, 0.2); }
+  .contact-links a:hover { background: color-mix(in srgb, var(--bg) 16%, transparent); }
+  .contact-links a span { opacity: .6; font-weight: 400; font-size: .88rem; }
+  footer { padding: 28px 0 40px; color: var(--muted); font-size: .85rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  footer a { text-decoration: none; }
+  footer a:hover { color: var(--accent); }
 
-  @media (max-width: 900px) {
-    .resource-grid { grid-template-columns: 1fr; }
-    .teaching-section { padding: 5rem 1.2rem; }
-    .resource-card { padding: 2.4rem 1.6rem; }
-  }
-
-  /* Reveal — ink settling onto paper: rises, softens in, never bounces */
-  .reveal {
-    opacity: 0;
-    transform: translateY(22px);
-    transition:
-      opacity 1s var(--ease-soft),
-      transform 1s var(--ease-out);
-    will-change: opacity, transform;
-  }
-  .reveal.visible {
-    opacity: 1; transform: none;
-    will-change: auto;
-  }
-  .reveal.d1 { transition-delay: 0.08s; }
-  .reveal.d2 { transition-delay: 0.18s; }
-  .reveal.d3 { transition-delay: 0.28s; }
-  .reveal.d4 { transition-delay: 0.38s; }
-  .reveal.d5 { transition-delay: 0.48s; }
-  .reveal.d6 { transition-delay: 0.58s; }
-
-  /* Respect the reader: no motion if the OS asks for none */
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    *, *::before, *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-    .reveal { opacity: 1; transform: none; }
-  }
-
-  /* Footer */
-  footer {
-    text-align: center;
-    padding: 4rem 2rem 3rem;
-    position: relative; z-index: 3;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.75rem; letter-spacing: 0.25em;
-    text-transform: uppercase; color: var(--ink-soft);
-    border-top: 1px solid rgba(26, 26, 26, 0.1);
-    margin: 0 2rem;
-  }
-  footer .footer-seal {
-    width: 36px; height: 36px;
-    background: var(--vermillion); color: var(--paper);
-    display: inline-flex; align-items: center; justify-content: center;
-    font-family: 'Noto Serif JP', serif;
-    font-size: 0.85rem; margin-bottom: 1.2rem;
-    transform: rotate(-3deg);
-  }
-  footer a {
-    color: var(--vermillion); text-decoration: none;
-    margin: 0 0.5rem; transition: color 0.3s;
-  }
-  footer a:hover { color: var(--vermillion-dark); }
-
-  /* Current section — same underline as hover, held in place */
-  .nav-links a.active { color: var(--ink); }
-  .nav-links a.active::after { transform: scaleX(1); }
-
-  /* Phone menu — the seal becomes the button */
-  .menu-toggle {
-    display: none;
-    width: 42px; height: 42px; padding: 0;
-    background: var(--vermillion); border: 0; cursor: pointer;
-    transform: rotate(-3deg); position: relative;
-    flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-  }
-  .menu-toggle::before {
-    content: ""; position: absolute; inset: 4px;
-    border: 1px solid rgba(255,255,255,0.4);
-  }
-  .menu-toggle span {
-    display: block; width: 16px; height: 1.5px; background: var(--paper);
-    transition: transform 0.35s var(--ease-out), opacity 0.2s;
-  }
-  .menu-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
-  .menu-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
-  .menu-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
-  .menu-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
-
-  .mobile-menu {
-    position: fixed; inset: 0; z-index: 99;
-    background: var(--paper);
-    padding: 6.5rem 2rem 2rem;
-    display: flex; flex-direction: column;
-    overflow-y: auto;
-    opacity: 0; visibility: hidden;
-    transition: opacity 0.35s var(--ease-soft), visibility 0s linear 0.35s;
-  }
-  .mobile-menu.open {
-    opacity: 1; visibility: visible;
-    transition: opacity 0.35s var(--ease-soft), visibility 0s;
-  }
-  .mobile-menu a {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.9rem; color: var(--ink); text-decoration: none;
-    padding: 0.55rem 0; border-bottom: 1px solid rgba(26, 26, 26, 0.08);
-    display: flex; align-items: baseline; gap: 1rem;
-  }
-  .mobile-menu a small {
-    font-family: 'Inter', sans-serif; font-size: 0.62rem;
-    letter-spacing: 0.2em; color: var(--vermillion); min-width: 1.6rem;
-  }
-  .mobile-menu a.active { color: var(--vermillion); font-style: italic; }
-  .mobile-menu-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 2rem; }
-  .mobile-menu-actions a {
-    font-family: 'Inter', sans-serif; font-size: 0.7rem;
-    letter-spacing: 0.22em; text-transform: uppercase;
-    border: 1px solid var(--vermillion); color: var(--vermillion);
-    padding: 0.9rem 1.3rem;
-  }
-  .mobile-menu-actions a.fill { background: var(--vermillion); color: var(--paper); }
-
-  /* Back to top — a small seal that appears once the reader is well into the page */
   .to-top {
-    position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 90;
-    width: 46px; height: 46px;
-    background: var(--vermillion); color: var(--paper);
-    border: 0; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Inter', sans-serif; font-size: 1.1rem;
-    opacity: 0; pointer-events: none;
-    transform: translateY(10px) rotate(-3deg);
-    transition: opacity 0.4s var(--ease-soft), transform 0.4s var(--ease-out), background 0.3s;
-    box-shadow: 0 6px 18px rgba(26, 26, 26, 0.12);
+    position: fixed; right: 20px; bottom: 20px; z-index: 40; width: 42px; height: 42px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
+    cursor: pointer; font-size: 1.1rem; opacity: 0; visibility: hidden; transform: translateY(8px); transition: all .2s;
   }
-  .to-top::before {
-    content: ""; position: absolute; inset: 4px;
-    border: 1px solid rgba(255,255,255,0.4);
-  }
-  .to-top.show { opacity: 1; pointer-events: auto; transform: translateY(0) rotate(-3deg); }
-  .to-top:hover { background: var(--vermillion-dark); }
-  .to-top:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+  .to-top.show { opacity: 1; visibility: visible; transform: none; }
 
-  /* Seven nav items: tighten tracking before they crowd the brand and seal */
-  @media (max-width: 1200px) {
-    .top-bar { gap: 1.5rem; padding: 1.2rem 2rem; }
-    .brand { letter-spacing: 0.3em; white-space: nowrap; }
-    .nav-links { gap: 1rem; }
-    .nav-links a { font-size: 0.65rem; letter-spacing: 0.12em; }
+  /* ---------- Responsive ---------- */
+  @media (max-width: 960px) {
+    .hero-grid, .about-grid, .contact-box { grid-template-columns: 1fr; }
+    .hero-grid { gap: 36px; }
+    .about-grid { gap: 36px; }
+    .proj-grid { grid-template-columns: repeat(2, 1fr); }
+    .cards-3 { grid-template-columns: 1fr 1fr; }
+    .cards-3 .card:last-child { grid-column: 1 / -1; }
   }
-  @media (max-width: 900px) {
-    .vertical-text { display: none; }
-    .top-bar { padding: 1rem 1.5rem; }
-    .brand { font-size: 0.8rem; letter-spacing: 0.3em; }
-    .nav-links { gap: 1rem; }
-    .nav-links a { font-size: 0.62rem; letter-spacing: 0.1em; }
-    .profile-grid { grid-template-columns: 1fr; gap: 2.5rem; }
-    .info-row { grid-template-columns: 100px 1fr; }
-    .menu-block { min-height: 240px; padding: 2.5rem 1.8rem; }
-    .pub-item { grid-template-columns: 70px 1fr; gap: 1.2rem; }
-    .timeline::before { left: 6px; }
-    .timeline-item { grid-template-columns: 1fr; gap: 0.5rem; padding-left: 2rem; }
-    .timeline-item::before { left: 0; top: 1.9rem; }
-    .timeline-date { text-align: left; font-size: 1rem; margin-bottom: 0.5rem; }
-  }
-  /* Below this the links no longer fit; the seal turns into a menu button */
-  @media (max-width: 760px) {
-    .nav-links, .top-bar .seal { display: none; }
-    .menu-toggle { display: flex; }
-    .to-top { right: 1rem; bottom: 1rem; }
-    .profile-section { padding-left: 0.5rem; padding-right: 0.5rem; }
-    .profile-grid { grid-template-columns: minmax(0, 1fr); }
-  }
-  /* Small phones: stack each label above its value */
-  @media (max-width: 480px) {
-    .info-row { grid-template-columns: 1fr; gap: 0.35rem; }
-  }
-  @media (min-width: 761px) {
-    .mobile-menu { display: none; }
+  @media (max-width: 640px) {
+    .container { padding: 0 16px; }
+    .hero { padding: 40px 0 48px; }
+    section.block { padding: 52px 0; }
+    .sec-head { margin-bottom: 26px; }
+    .proj-grid, .teach-grid, .cards-3 { grid-template-columns: 1fr; }
+    .cards-3 { margin-top: 36px; }
+    .xp-item { grid-template-columns: 1fr; gap: 6px; padding: 18px 0; }
+    .xp-when small { display: inline; margin-left: 6px; }
+    .pub { grid-template-columns: 1fr; gap: 2px; padding: 16px 0; }
+    .pub-year { font-size: .8rem; }
+    .teach { padding: 22px; }
+    .stat b { font-size: 1.6rem; }
+    .contact { padding-top: 56px; }
   }
 </style>
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
 
-  <!-- Classical watermark -->
-  <div class="watermark" aria-hidden="true">
-    <svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="560" cy="220" r="90" fill="none" stroke="#1a1a1a" stroke-width="1.5"/>
-      <path d="M 50 480 Q 180 300 260 380 Q 340 280 420 360 Q 500 250 600 340 Q 700 280 750 360 L 750 600 L 50 600 Z" fill="none" stroke="#1a1a1a" stroke-width="1.2" opacity="0.7"/>
-      <path d="M 30 540 Q 150 400 250 460 Q 330 380 400 440 Q 480 360 580 440 Q 660 400 770 460 L 770 700 L 30 700 Z" fill="#1a1a1a" opacity="0.18"/>
-      <g stroke="#1a1a1a" stroke-width="1.5" fill="none" opacity="0.8">
-        <path d="M 0 620 Q 80 600 160 620 T 320 620 T 480 620 T 640 620 T 800 620"/>
-        <path d="M 0 650 Q 80 630 160 650 T 320 650 T 480 650 T 640 650 T 800 650"/>
-        <path d="M 0 680 Q 100 660 200 680 T 400 680 T 600 680 T 800 680"/>
-      </g>
-      <g stroke="#1a1a1a" stroke-width="2" fill="none" opacity="0.6">
-        <line x1="120" y1="120" x2="115" y2="450"/>
-        <line x1="115" y1="180" x2="155" y2="160"/>
-        <line x1="118" y1="240" x2="160" y2="225"/>
-        <line x1="116" y1="300" x2="150" y2="285"/>
-        <line x1="115" y1="360" x2="155" y2="345"/>
-      </g>
-      <g opacity="0.5">
-        <path d="M 680 80 Q 720 140 740 200 Q 750 240 745 290" stroke="#1a1a1a" stroke-width="1.8" fill="none"/>
-        <circle cx="700" cy="120" r="6" fill="#b8412e" opacity="0.7"/>
-        <circle cx="730" cy="170" r="5" fill="#b8412e" opacity="0.7"/>
-        <circle cx="742" cy="220" r="6" fill="#b8412e" opacity="0.7"/>
-        <circle cx="745" cy="270" r="4" fill="#b8412e" opacity="0.7"/>
-        <circle cx="718" cy="195" r="4" fill="#b8412e" opacity="0.5"/>
-      </g>
-    </svg>
-  </div>
-
-  <div class="vertical-text left">光学 · PHOTONICS · 光 学</div>
-  <div class="vertical-text right">研究 · RESEARCH · 学者</div>
-
-  <!-- ============ TOP NAV ============ -->
-  <header class="top-bar" id="topBar">
-    <a href="#menu" class="brand">Main Menu</a>
-    <nav class="nav-links">
-      <a href="#profile">Profile</a>
-      <a href="#experience">Experience</a>
-      <a href="#project">Projects</a>
-      <a href="#publication">Publications</a>
-      <a href="#teaching">Teaching</a>
-      <a href="#contact">Contact</a>
-      <a href="projects/labs.html" class="nav-accent">The Labs</a>
-    </nav>
-    <div class="seal" title="印">印</div>
-    <button class="menu-toggle" id="menuToggle" type="button"
-            aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
-      <span></span><span></span><span></span>
-    </button>
-  </header>
-
-  <!-- Phone menu (outside the header: its backdrop-filter would trap a fixed child) -->
-  <nav class="mobile-menu" id="mobileMenu" aria-label="Site">
-    <a href="#menu"><small>00</small>Contents</a>
-    <a href="#profile"><small>01</small>Profile</a>
-    <a href="#experience"><small>02</small>Experience</a>
-    <a href="#project"><small>03</small>Projects</a>
-    <a href="#publication"><small>04</small>Publications</a>
-    <a href="#teaching"><small>05</small>Teaching</a>
-    <a href="#contact"><small>06</small>Contact</a>
-    <div class="mobile-menu-actions">
-      <a href="projects/labs.html" class="fill">The Labs &rarr;</a>
-      <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV &darr;</a>
+  <!-- ============ TOP BAR ============ -->
+  <header class="nav" id="topBar">
+    <div class="container nav-inner">
+      <a href="#top" class="brand"><span class="brand-mark">JL</span>Joshu Leonardy Lee</a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#profile">About</a>
+        <a href="#experience">Experience</a>
+        <a href="#project">Projects</a>
+        <a href="#publication">Publications</a>
+        <a href="#teaching">Teaching</a>
+        <a href="projects/labs.html">The Labs</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch light or dark mode">
+          <svg class="theme-light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="theme-dark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <a class="btn small primary cv-btn" href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV</a>
+        <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
     </div>
+  </header>
+  <nav class="mobile-menu" id="mobileMenu" aria-label="Site">
+    <a href="#profile">About</a>
+    <a href="#experience">Experience</a>
+    <a href="#project">Projects</a>
+    <a href="#publication">Publications</a>
+    <a href="#teaching">Teaching</a>
+    <a href="projects/labs.html">The Labs</a>
+    <a class="btn primary" href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV</a>
   </nav>
 
-  <button class="to-top" id="toTop" type="button" aria-label="Back to top">&uarr;</button>
+  <main id="main">
 
   <!-- ============ HERO ============ -->
   <section class="hero" id="top">
-    <div class="hero-kanji">光 · 究 · 創</div>
-    <div class="hero-greeting">— Welcome —</div>
-
-    <h1 class="hero-name">
-      <span class="word">Joshu</span>
-      <span class="word"><em>Leonardy</em></span>
-    </h1>
-
-    <div class="hero-divider"></div>
-
-    <p class="hero-title">Joshu Leonardy Lee (李添炜) &mdash; PhD Student, Faculty of Electrical Engineering,<br>Universiti Teknologi Malaysia</p>
-    <p class="hero-tagline">Computer Vision &nbsp;|&nbsp; Artificial Intelligence &nbsp;|&nbsp; Photonics</p>
-
-    <div class="hero-cta-group">
-      <a href="#profile" class="hero-cta">
-        <span>My Profile</span>
-        <span class="hero-cta-arrow">&rarr;</span>
-      </a>
-      <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener" class="hero-cta secondary">
-        <span>Download CV</span>
-        <span class="hero-cta-arrow">&darr;</span>
-      </a>
-    </div>
-
-    <a href="#menu" class="scroll-cue">Explore</a>
-  </section>
-
-  <!-- ============ MENU ============ -->
-  <section class="menu-section" id="menu">
-    <div class="section-heading reveal">
-      <div class="section-heading-kanji">目 · 次</div>
-      <h2 class="section-heading-text">Contents</h2>
-    </div>
-
-    <div class="menu-grid">
-      <a href="#profile" class="menu-block reveal d1">
-        <span class="block-corner tl"></span>
-        <span class="block-corner br"></span>
-        <div>
-          <div class="block-number">— 01 —</div>
-          <div class="block-kanji">profile · 自</div>
-          <p class="block-desc">Background, academic journey, and the questions driving my research.</p>
+    <div class="container hero-grid">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>PhD Student · Universiti Teknologi Malaysia</span>
+        <h1>Joshu Leonardy Lee</h1>
+        <div class="cn" lang="zh">李添炜</div>
+        <p class="lead">
+          I work on <strong>computer vision</strong>, <strong>machine learning</strong> and
+          <strong>photonics</strong> &mdash; from optical fiber sensors to real-time object
+          segmentation, and the Python software that ties them together.
+        </p>
+        <div class="chips">
+          <span class="chip accent">Computer Vision</span>
+          <span class="chip accent">Artificial Intelligence</span>
+          <span class="chip accent">Photonics</span>
         </div>
-        <div class="block-foot"><span>About Me</span><span class="block-arrow">→</span></div>
-      </a>
-
-      <a href="#experience" class="menu-block reveal d2">
-        <span class="block-corner tl"></span>
-        <span class="block-corner br"></span>
-        <div>
-          <div class="block-number">— 02 —</div>
-          <div class="block-kanji">experience · 歴</div>
-          <p class="block-desc">Internships, research positions, teaching roles, and guest lectures.</p>
+        <div class="hero-cta">
+          <a class="btn primary" href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV &darr;</a>
+          <a class="btn" href="mailto:joshu@graduate.utm.my">Email me</a>
         </div>
-        <div class="block-foot"><span>Career Timeline</span><span class="block-arrow">→</span></div>
-      </a>
-
-      <a href="#project" class="menu-block reveal d3">
-        <span class="block-corner tl"></span>
-        <span class="block-corner br"></span>
-        <div>
-          <div class="block-number">— 03 —</div>
-          <div class="block-kanji">project · 作</div>
-          <p class="block-desc">Research at BRIN, UTM photonics work, and engineering projects.</p>
+        <div class="social">
+          <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 9l11 6 9-4.9V17h2V9L12 3zm-6.8 9.6v3.6L12 20l6.8-3.8v-3.6L12 16.3l-6.8-3.7z"/></svg>Google Scholar</a>
+          <a href="https://www.linkedin.com/in/joshuleonardylee" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.1c.5-1 1.8-2 3.8-2 4 0 4.8 2.6 4.8 6V21h-4v-5.6c0-1.3 0-3-1.9-3s-2.1 1.4-2.1 2.9V21H9z"/></svg>LinkedIn</a>
+          <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 2.9.8.1-.7.4-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg>GitHub</a>
         </div>
-        <div class="block-foot"><span>Selected Works</span><span class="block-arrow">→</span></div>
-      </a>
-
-      <a href="#publication" class="menu-block reveal d4">
-        <span class="block-corner tl"></span>
-        <span class="block-corner br"></span>
-        <div>
-          <div class="block-number">— 04 —</div>
-          <div class="block-kanji">publication · 著</div>
-          <p class="block-desc">Peer-reviewed papers, patents, and conference proceedings.</p>
-        </div>
-        <div class="block-foot"><span>Bibliography</span><span class="block-arrow">→</span></div>
-      </a>
-      <a href="#teaching" class="menu-block reveal d5">
-        <span class="block-corner tl"></span>
-        <span class="block-corner br"></span>
-        <div>
-          <div class="block-number">&mdash; 05 &mdash;</div>
-          <div class="block-kanji">teaching · 教</div>
-          <p class="block-desc">Interactive labs and study tools built for students to learn from.</p>
-        </div>
-        <div class="block-foot"><span>Learning Resources</span><span class="block-arrow">→</span></div>
-      </a>
-    </div>
-  </section>
-
-  <!-- ============ PROFILE ============ -->
-  <section class="profile-section" id="profile">
-    <div class="container">
-      <div class="section-heading reveal">
-        <div class="section-heading-kanji">自 · 己 · 紹 · 介</div>
-        <h2 class="section-heading-text">Profile</h2>
-        <div class="section-heading-rule"></div>
       </div>
 
-      <div class="profile-grid">
-        <!-- LEFT: photo -->
-        <div class="reveal d1">
-          <div class="profile-photo-wrap">
-            <div class="profile-photo-placeholder" aria-hidden="true">自</div>
-          </div>
+      <aside class="glance" aria-label="At a glance">
+        <h2>At a glance</h2>
+        <div class="stats">
+          <div class="stat"><b data-count="journal">6</b><span>Journal articles</span></div>
+          <div class="stat"><b data-count="conference">4</b><span>Conference papers</span></div>
+          <div class="stat"><b data-count="patent">2</b><span>Registered patents</span></div>
+          <div class="stat"><b data-count="copyright">3</b><span>Software copyrights</span></div>
+        </div>
+        <ul>
+          <li>UTM ASCEND Bright Talent International Scholarship (PhD, 2026)</li>
+          <li>Best Paper Award &mdash; IEEE conference (2024)</li>
+          <li>Research Assistant at BRIN Research Center for Photonics, 2024&ndash;2026</li>
+        </ul>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ ABOUT ============ -->
+  <section class="block" id="profile">
+    <div class="container">
+      <div class="sec-head">
+        <div>
+          <div class="sec-kicker">About</div>
+          <h2>Background &amp; research</h2>
+        </div>
+      </div>
+
+      <div class="about-grid">
+        <div class="bio">
+          <p>
+            I am currently a <span class="hl">PhD student</span> in Electrical Engineering at
+            Universiti Teknologi Malaysia, majoring in Computer Vision and Image Processing, as an
+            awardee of the <span class="hl">UTM ASCEND Bright Talent International Scholarship</span>.
+            Before that, I completed my MPhil at UTM (Mechatronics Engineering, majoring in Control
+            Systems and Optoelectronics), where I was a Graduate Lecture Assistant at the Photonics
+            Research Center. I received my B.Sc in Physics (Instrumentation Electronics) from
+            Universitas Negeri Semarang, Indonesia.
+          </p>
+          <p>
+            From 2024 to 2026 I was a <span class="hl">Research Assistant</span> at BRIN (National
+            Research and Innovation Agency, Indonesia), Research Center for Photonics &mdash;
+            Micro-Opto-Electronics and Microsystems group &mdash; where I developed a GUI for object
+            segmentation using YOLOv11 and SAM-2, and worked on smart weapon development.
+          </p>
+          <p>
+            My research focuses on <span class="hl">Image Processing</span>,
+            <span class="hl">Python-based Software Development</span>, ML and DL applications for
+            instrumentation systems, and Optical Fiber Sensor simulation and fabrication.
+          </p>
+          <p>
+            Outside the lab, I enjoy working in large, interdisciplinary teams &mdash; from rocket
+            avionics to physics STEM modules &mdash; and I am always curious to learn things outside
+            my own field.
+          </p>
         </div>
 
-        <!-- RIGHT: bio + info -->
-        <div class="reveal d2">
-          <div class="profile-bio">
-            <h3>Hello — 初めまして</h3>
-
-            <p>
-              I am currently a <span class="accent">PhD student</span> in
-              Electrical Engineering at Universiti Teknologi Malaysia, majoring
-              in Computer Vision and Image Processing, as an awardee of the
-              <span class="accent">UTM ASCEND Bright Talent International
-              Scholarship</span>. Before that, I completed my MPhil at UTM
-              (Mechatronics Engineering, majoring in Control Systems and
-              Optoelectronics), where I was a Graduate Lecture Assistant at
-              the Photonics Research Center. I received my B.Sc in Physics
-              (Instrumentation Electronics) from Universitas Negeri Semarang,
-              Indonesia.
-            </p>
-            <p>
-              From 2024 to 2026 I was a <span class="accent">Research Assistant</span>
-              at BRIN (National Research and Innovation Agency, Indonesia),
-              Research Center for Photonics &mdash; Micro-Opto-Electronics
-              and Microsystems group &mdash; where I developed a GUI for
-              object segmentation using YOLOv11 and SAM-2, and worked on
-              smart weapon development.
-            </p>
-            <p>
-              My research focuses on <span class="accent">Image Processing</span>,
-              <span class="accent">Python-based Software Development</span>,
-              ML and DL applications for instrumentation systems, and Optical
-              Fiber Sensor simulation and fabrication.
-            </p>
-            <p>
-              Outside the lab, I enjoy working in large, interdisciplinary
-              teams &mdash; from rocket avionics to physics STEM modules
-              &mdash; and I am always curious to learn things outside my own
-              field.
-            </p>
+        <div class="facts">
+          <div class="fact">
+            <h3>Education</h3>
+            <ul class="edu">
+              <li><b>PhD, Electrical Engineering</b><span>Computer Vision &amp; Image Processing · UTM, Malaysia · Sep 2026 &ndash; present</span></li>
+              <li><b>MPhil, Mechatronics Engineering</b><span>Control Systems &amp; Optoelectronics · UTM, Malaysia · Oct 2024 &ndash; Jun 2026</span></li>
+              <li><b>B.Sc., Physics</b><span>Instrumentation Electronics · UNNES, Indonesia · Aug 2020 &ndash; Dec 2024 · CGPA 3.55</span></li>
+            </ul>
           </div>
-
-          <div class="info-list">
-            <div class="info-row">
-              <div class="info-label">Affiliation</div>
-              <div class="info-value">
-                Universiti Teknologi Malaysia &mdash; Faculty of Electrical Engineering<br>
-                Formerly BRIN &mdash; Research Center for Photonics (MOEMS), 2024 &mdash; 2026
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Education</div>
-              <div class="info-value">
-                PhD, Electrical Engineering (Computer Vision &amp; Image Processing) &mdash; UTM, Malaysia (September 2026 &mdash; Present)<br>
-                MPhil, Mechatronics Engineering (Control Systems &amp; Optoelectronics) &mdash; UTM, Malaysia (October 2024 &mdash; June 2026)<br>
-                B.Sc., Physics (Instrumentation Electronics) &mdash; UNNES, Indonesia (August 2020 &mdash; December 2024) &middot; CGPA 3.55
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">PhD Supervisor</div>
-              <div class="info-value">
-                <a href="https://pure.utm.my/researcher/usman" target="_blank" rel="noopener">Assoc. Prof. Dr. Usman Ullah Sheikh</a> &mdash; Faculty of Electrical Engineering, UTM
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">MPhil Supervisors</div>
-              <div class="info-value">
-                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/74Y9" target="_blank" rel="noopener">Dr. Mohd Rashidi Salim</a> &mdash; Faculty of Electrical Engineering, UTM<br>
-                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/wygw" target="_blank" rel="noopener">Ir. Dr. Muhammad Yusof Mohd Noor</a> &mdash; Faculty of Electrical Engineering, UTM<br>
-                <a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/Ek8X" target="_blank" rel="noopener">Dr. Azizul Azizan</a> &mdash; Faculty of Artificial Intelligence, UTM<br>
-                <a href="https://brin.go.id/ornm/en/pusat-riset-fotonik/page/wptresna" target="_blank" rel="noopener">Dr. Eng. Wildan Panji Tresna</a> &mdash; Micro Opto-Electrical-Mechanical System (MOEMS) Research Group, BRIN
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Research</div>
-              <div class="info-value">
-                <div class="tag-list">
-                  <span class="tag">Image Processing</span>
-                  <span class="tag">Computer Vision</span>
-                  <span class="tag">Deep Learning</span>
-                  <span class="tag">Optical Fiber Sensors</span>
-                  <span class="tag">Photonics</span>
-                  <span class="tag">Sensor Fabrication</span>
-                  <span class="tag">Python Software Development</span>
-                </div>
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Tools</div>
-              <div class="info-value">
-                <div class="tag-list">
-                  <span class="tag">Python</span>
-                  <span class="tag">C++</span>
-                  <span class="tag">MATLAB</span>
-                  <span class="tag">KiCad</span>
-                  <span class="tag">ZW3D CAD</span>
-                  <span class="tag">Autodesk Inventor</span>
-                  <span class="tag">Ansys Lumerical FDTD</span>
-                  <span class="tag">COMSOL Multiphysics</span>
-                  <span class="tag">BeamPROP</span>
-                </div>
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Honours</div>
-              <div class="info-value">
-                UTM ASCEND Bright Talent International Scholarship &mdash; PhD (2026)<br>
-                Silver Medal, New Academia Learning Innovation (NALI) &mdash; UTM (2025)<br>
-                Best Paper Award &mdash; IEEE conference (2024)<br>
-                1st Place, Outstanding Student &mdash; Dept. of Physics, UNNES (2022) &middot; 2nd Place (2021)<br>
-                1st Place, National Scientific Writing Competition &mdash; Bangka Belitung University (2023)<br>
-                1st Place, National Essay Writing Competition &mdash; UNNES (2023) &middot; 3rd Place (2022)<br>
-                Grand Finalist, National Scientific Writing Competition &mdash; Lampung State University (2022)<br>
-                Team Member, Indonesian Flying Robot Contest (KRTI) &mdash; Electronics &amp; Design (2021, 2023)
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Training</div>
-              <div class="info-value">
-                AI in Medicine Summer School &amp; Bootcamp &mdash; Universiti Malaya (2026)<br>
-                Deep Learning Primer: A Hands-on Approach &mdash; Faculty of AI, UTM<br>
-                Robotics &amp; Applied Machine Learning; EV Design &amp; Simulation &mdash; Faculty of Electrical Engineering, UTM<br>
-                Wave Optics Simulation for Integrated Photonics using COMSOL &mdash; Universiti Sains Malaysia<br>
-                Data Science Summer School &mdash; Hertie School, online (2023)<br>
-                Drone Mapping &mdash; Indonesia Mapping Community, Cendrawasih University (2022)
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Location</div>
-              <div class="info-value">Skudai, Johor Bahru, Malaysia</div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Languages</div>
-              <div class="info-value">Bahasa Indonesia (Native) &middot; Hakka (Native) &middot; English (Professional) &middot; Mandarin (Beginner)</div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Contact</div>
-              <div class="info-value">
-                <a href="mailto:joshu@graduate.utm.my">joshu@graduate.utm.my</a>
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Links</div>
-              <div class="info-value">
-                <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank" rel="noopener">LinkedIn</a> &middot;
-                <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">GitHub</a> &middot;
-                <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">Google Scholar</a> &middot;
-                <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">CV (PDF)</a>
-              </div>
-            </div>
+          <div class="fact">
+            <h3>Supervisors</h3>
+            <ul class="people">
+              <li><span class="role">PhD</span><a href="https://pure.utm.my/researcher/usman" target="_blank" rel="noopener">Assoc. Prof. Dr. Usman Ullah Sheikh</a> <small>&middot; Faculty of Electrical Engineering, UTM</small></li>
+              <li><span class="role">MPhil</span><a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/74Y9" target="_blank" rel="noopener">Dr. Mohd Rashidi Salim</a> <small>&middot; Faculty of Electrical Engineering, UTM</small></li>
+              <li><a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/wygw" target="_blank" rel="noopener">Ir. Dr. Muhammad Yusof Mohd Noor</a> <small>&middot; Faculty of Electrical Engineering, UTM</small></li>
+              <li><a href="https://utmscholar.utm.my/Scholar/ScholarInfoDetails/Ek8X" target="_blank" rel="noopener">Dr. Azizul Azizan</a> <small>&middot; Faculty of Artificial Intelligence, UTM</small></li>
+              <li><a href="https://brin.go.id/ornm/en/pusat-riset-fotonik/page/wptresna" target="_blank" rel="noopener">Dr. Eng. Wildan Panji Tresna</a> <small>&middot; MOEMS Research Group, BRIN</small></li>
+            </ul>
           </div>
+          <div class="fact">
+            <h3>Details</h3>
+            <dl class="kv">
+              <dt>Based in</dt><dd>Skudai, Johor Bahru, Malaysia</dd>
+              <dt>Languages</dt><dd>Bahasa Indonesia (native) · Hakka (native) · English (professional) · Mandarin (beginner)</dd>
+              <dt>Email</dt><dd><a href="mailto:joshu@graduate.utm.my">joshu@graduate.utm.my</a></dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      <div class="cards-3">
+        <div class="card">
+          <h3 class="card-title">Research interests</h3>
+          <div class="chips">
+            <span class="chip">Image Processing</span>
+            <span class="chip">Computer Vision</span>
+            <span class="chip">Deep Learning</span>
+            <span class="chip">Optical Fiber Sensors</span>
+            <span class="chip">Photonics</span>
+            <span class="chip">Sensor Fabrication</span>
+            <span class="chip">Python Software Development</span>
+          </div>
+          <h3 class="card-title" style="margin-top:22px;">Tools</h3>
+          <div class="chips">
+            <span class="chip">Python</span>
+            <span class="chip">C++</span>
+            <span class="chip">MATLAB</span>
+            <span class="chip">KiCad</span>
+            <span class="chip">ZW3D CAD</span>
+            <span class="chip">Autodesk Inventor</span>
+            <span class="chip">Ansys Lumerical FDTD</span>
+            <span class="chip">COMSOL Multiphysics</span>
+            <span class="chip">BeamPROP</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Honours &amp; awards</h3>
+          <ul class="plain-list">
+            <li>UTM ASCEND Bright Talent International Scholarship<small>PhD · 2026</small></li>
+            <li>Silver Medal, New Academia Learning Innovation (NALI)<small>UTM · 2025</small></li>
+            <li>Best Paper Award<small>IEEE conference · 2024</small></li>
+            <li>1st Place, Outstanding Student<small>Dept. of Physics, UNNES · 2022 (2nd Place, 2021)</small></li>
+          </ul>
+          <details class="more">
+            <summary>4 more</summary>
+            <ul class="plain-list">
+              <li>1st Place, National Scientific Writing Competition<small>Bangka Belitung University · 2023</small></li>
+              <li>1st Place, National Essay Writing Competition<small>UNNES · 2023 (3rd Place, 2022)</small></li>
+              <li>Grand Finalist, National Scientific Writing Competition<small>Lampung State University · 2022</small></li>
+              <li>Team Member, Indonesian Flying Robot Contest (KRTI)<small>Electronics &amp; Design · 2021, 2023</small></li>
+            </ul>
+          </details>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Training &amp; courses</h3>
+          <ul class="plain-list">
+            <li>AI in Medicine Summer School &amp; Bootcamp<small>Universiti Malaya · 2026</small></li>
+            <li>Deep Learning Primer: A Hands-on Approach<small>Faculty of AI, UTM</small></li>
+            <li>Robotics &amp; Applied Machine Learning; EV Design &amp; Simulation<small>Faculty of Electrical Engineering, UTM</small></li>
+          </ul>
+          <details class="more">
+            <summary>3 more</summary>
+            <ul class="plain-list">
+              <li>Wave Optics Simulation for Integrated Photonics using COMSOL<small>Universiti Sains Malaysia</small></li>
+              <li>Data Science Summer School<small>Hertie School, online · 2023</small></li>
+              <li>Drone Mapping<small>Indonesia Mapping Community, Cendrawasih University · 2022</small></li>
+            </ul>
+          </details>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ============ EXPERIENCE ============ -->
-  <section class="experience-section" id="experience">
+  <section class="block" id="experience">
     <div class="container">
-      <div class="section-heading reveal">
-        <div class="section-heading-kanji">経 · 歴</div>
-        <h2 class="section-heading-text">Experience</h2>
-        <div class="section-heading-rule"></div>
+      <div class="sec-head">
+        <div>
+          <div class="sec-kicker">Experience</div>
+          <h2>Research, teaching &amp; industry</h2>
+        </div>
       </div>
 
-      <div class="timeline">
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2026
-            <small>27 Jul – 5 Aug 2026</small>
+      <ol class="xp" id="xpList">
+        <li class="xp-item">
+          <div class="xp-when">2026<small>27 Jul – 5 Aug 2026</small></div>
+          <div>
+            <h3 class="xp-role">Participant · AI in Medicine Summer School &amp; Bootcamp</h3>
+            <div class="xp-org">Universiti Malaya <span>· Kuala Lumpur, Malaysia</span></div>
+            <p class="xp-desc">Intensive summer school and bootcamp on applying artificial intelligence to medicine.</p>
           </div>
-          <div class="timeline-content">
-            <div class="timeline-org">Universiti Malaya</div>
-            <h3 class="timeline-role">Participant · AI in Medicine Summer School &amp; Bootcamp</h3>
-            <div class="timeline-loc">Kuala Lumpur, Malaysia</div>
-            <p class="timeline-desc">
-              Intensive summer school and bootcamp on applying artificial
-              intelligence to medicine.
-            </p>
+        </li>
+        <li class="xp-item">
+          <div class="xp-when">2025 – Present<small>Aug 2025 – now</small></div>
+          <div>
+            <h3 class="xp-role">PCB Designer &amp; CAD Engineer · Avionics</h3>
+            <div class="xp-org">UTM Rocketry Team <span>· Johor Bahru, Malaysia</span></div>
+            <p class="xp-desc">Designing avionics PCB systems and CAD components for a rocket flight subsystems including telemetry, control, and sensor integration.</p>
           </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2025 — Present
-            <small>Aug 2025 – Now</small>
+        </li>
+        <li class="xp-item">
+          <div class="xp-when">2025 – Present<small>Mar 2025 – now</small></div>
+          <div>
+            <h3 class="xp-role">Physics STEM Module Researcher</h3>
+            <div class="xp-org">KDSE · Universiti Teknologi Malaysia <span>· Johor Bahru, Malaysia</span></div>
+            <p class="xp-desc">Researching and developing physics STEM learning modules with the KDSE UTM team.</p>
           </div>
-          <div class="timeline-content">
-            <div class="timeline-org">UTM Rocketry Team</div>
-            <h3 class="timeline-role">PCB Designer &amp; CAD Engineer · Avionics</h3>
-            <div class="timeline-loc">Universiti Teknologi Malaysia · Johor Bahru, Malaysia</div>
-            <p class="timeline-desc">
-              Designing avionics PCB systems and CAD components for a rocket
-              flight subsystems including telemetry, control, and sensor
-              integration.
-            </p>
+        </li>
+        <li class="xp-item">
+          <div class="xp-when">2024 – 2026<small>Sept 2024 – Aug 2026</small></div>
+          <div>
+            <h3 class="xp-role">Research Assistant</h3>
+            <div class="xp-org">BRIN · Research Center for Photonics <span>· Serpong, Indonesia</span></div>
+            <p class="xp-desc">Led the development of a smart weapon scope system based on IR optics and a YOLOv11 object detection algorithm. Bridges photonic hardware with deep learning for real-time recognition.</p>
           </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2025 — Present
-            <small>Mar 2025 – Now</small>
-          </div>
-          <div class="timeline-content">
-            <div class="timeline-org">KDSE · Universiti Teknologi Malaysia</div>
-            <h3 class="timeline-role">Physics STEM Module Researcher</h3>
-            <div class="timeline-loc">Johor Bahru, Malaysia</div>
-            <p class="timeline-desc">
-              Researching and developing physics STEM learning modules with
-              the KDSE UTM team.
-            </p>
-          </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2024 — 2026
-            <small>Sept 2024 – Aug 2026</small>
-          </div>
-          <div class="timeline-content">
-            <div class="timeline-org">BRIN · Research Center for Photonics</div>
-            <h3 class="timeline-role">Research Assistant</h3>
-            <div class="timeline-loc">National Research and Innovation Agency · Serpong, Indonesia</div>
-            <p class="timeline-desc">
-              Led the development of a smart weapon scope system based on
-              IR optics and a YOLOv11 object detection algorithm. Bridges
-              photonic hardware with deep learning for real-time recognition.
-            </p>
-          </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2025
-            <small>Feb &amp; Nov 2025</small>
-          </div>
-          <div class="timeline-content">
-            <div class="timeline-org">University of Bangka Belitung</div>
-            <h3 class="timeline-role">Guest Lecturer</h3>
-            <div class="timeline-loc">Bangka Belitung, Indonesia</div>
-            <div class="timeline-desc">
+        </li>
+        <li class="xp-item">
+          <div class="xp-when">2025<small>Feb &amp; Nov 2025</small></div>
+          <div>
+            <h3 class="xp-role">Guest Lecturer</h3>
+            <div class="xp-org">University of Bangka Belitung <span>· Bangka Belitung, Indonesia</span></div>
+            <div class="xp-desc">
               Delivered two invited lectures:
               <ul>
                 <li>Department of Physics — "Deep Learning Applications for MMI-Based Optical Sensors"</li>
@@ -1377,81 +595,45 @@
               </ul>
             </div>
           </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2024
-            <small>Apr – Aug 2024</small>
+        </li>
+        <li class="xp-item">
+          <div class="xp-when">2024<small>Apr – Aug 2024</small></div>
+          <div>
+            <h3 class="xp-role">R&amp;D Engineer · PCB Department</h3>
+            <div class="xp-org">PT. Borine Technology Indonesia <span>· Semarang, Indonesia</span></div>
+            <p class="xp-desc">Research and development engineer in the PCB department, contributing to hardware design and prototyping.</p>
           </div>
-          <div class="timeline-content">
-            <div class="timeline-org">PT. Borine Technology Indonesia</div>
-            <h3 class="timeline-role">R&amp;D Engineer · PCB Department</h3>
-            <div class="timeline-loc">Semarang, Indonesia</div>
-            <p class="timeline-desc">
-              Research and development engineer in the PCB department,
-              contributing to hardware design and prototyping.
-            </p>
+        </li>
+        <li class="xp-item later">
+          <div class="xp-when">2023<small>Sept 2023</small></div>
+          <div>
+            <h3 class="xp-role">Intern</h3>
+            <div class="xp-org">UTM · Faculty of Electrical Engineering <span>· Johor Bahru, Malaysia</span></div>
+            <p class="xp-desc">Simulated a waveguide-based glucose biosensor using the surface plasmon resonance (SPR) method in BeamProp.</p>
           </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2023
-            <small>Sept 2023</small>
+        </li>
+        <li class="xp-item later">
+          <div class="xp-when">2023<small>Jun – Sept 2023</small></div>
+          <div>
+            <h3 class="xp-role">Student Intern · Research Center for Photonics</h3>
+            <div class="xp-org">BRIN · National Research &amp; Innovation Agency <span>· Serpong, Banten, Indonesia</span></div>
+            <p class="xp-desc">Developed an Arduino Nano microcontroller-based optical power meter — work that later resulted in two registered patents.</p>
           </div>
-          <div class="timeline-content">
-            <div class="timeline-org">UTM · Faculty of Electrical Engineering</div>
-            <h3 class="timeline-role">Intern</h3>
-            <div class="timeline-loc">Universiti Teknologi Malaysia · Johor Bahru, Malaysia</div>
-            <p class="timeline-desc">
-              Simulated a waveguide-based glucose biosensor using the surface
-              plasmon resonance (SPR) method in BeamProp.
-            </p>
+        </li>
+        <li class="xp-item later">
+          <div class="xp-when">2022 – 2024<small>Aug 2022 – 2024</small></div>
+          <div>
+            <h3 class="xp-role">Tutor</h3>
+            <div class="xp-org">EduPrivate <span>· Semarang, Indonesia</span></div>
+            <p class="xp-desc">Private tutor in mathematics, physics, and chemistry.</p>
           </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2023
-            <small>Jun – Sept 2023</small>
-          </div>
-          <div class="timeline-content">
-            <div class="timeline-org">BRIN · National Research &amp; Innovation Agency</div>
-            <h3 class="timeline-role">Student Intern · Research Center for Photonics</h3>
-            <div class="timeline-loc">Serpong, Banten, Indonesia</div>
-            <p class="timeline-desc">
-              Developed an Arduino Nano microcontroller-based optical power
-              meter — work that later resulted in two registered patents.
-            </p>
-          </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2022 — 2024
-            <small>Aug 2022 – 2024</small>
-          </div>
-          <div class="timeline-content">
-            <div class="timeline-org">EduPrivate</div>
-            <h3 class="timeline-role">Tutor</h3>
-            <div class="timeline-loc">Semarang, Indonesia</div>
-            <p class="timeline-desc">
-              Private tutor in mathematics, physics, and chemistry.
-            </p>
-          </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2022 — 2024
-            <small>Jan 2022 – Apr 2024</small>
-          </div>
-          <div class="timeline-content">
-            <div class="timeline-org">Universitas Negeri Semarang · Dept. of Physics</div>
-            <h3 class="timeline-role">Research &amp; Teaching Assistant</h3>
-            <div class="timeline-loc">Semarang, Indonesia</div>
-            <div class="timeline-desc">
+        </li>
+        <li class="xp-item later">
+          <div class="xp-when">2022 – 2024<small>Jan 2022 – Apr 2024</small></div>
+          <div>
+            <h3 class="xp-role">Research &amp; Teaching Assistant</h3>
+            <div class="xp-org">Universitas Negeri Semarang · Dept. of Physics <span>· Semarang, Indonesia</span></div>
+            <div class="xp-desc">
               Held multiple academic roles in parallel with my undergraduate studies:
               <ul>
                 <li>Research Assistant — Photonic Research Group (2022 – 2024)</li>
@@ -1461,543 +643,355 @@
               </ul>
             </div>
           </div>
-        </div>
-
-        <div class="timeline-item reveal d1">
-          <div class="timeline-date">
-            2021
-            <small>Aug – Dec 2021</small>
+        </li>
+        <li class="xp-item later">
+          <div class="xp-when">2021<small>Aug – Dec 2021</small></div>
+          <div>
+            <h3 class="xp-role">Student Intern</h3>
+            <div class="xp-org">PT. Alita &amp; Institut Teknologi Sepuluh Nopember (ITS) <span>· West Jakarta, Indonesia</span></div>
+            <p class="xp-desc">Built a GPS module-based delivery drone using the ESP8266 microcontroller for waypoint-based autonomous navigation.</p>
           </div>
-          <div class="timeline-content">
-            <div class="timeline-org">PT. Alita &amp; Institut Teknologi Sepuluh Nopember (ITS)</div>
-            <h3 class="timeline-role">Student Intern</h3>
-            <div class="timeline-loc">West Jakarta, DKI Jakarta, Indonesia</div>
-            <p class="timeline-desc">
-              Built a GPS module-based delivery drone using the ESP8266
-              microcontroller for waypoint-based autonomous navigation.
-            </p>
-          </div>
-        </div>
-
-      </div>
+        </li>
+      </ol>
+      <button class="btn show-more" id="xpMore" type="button" aria-controls="xpList" aria-expanded="false">Show earlier experience</button>
     </div>
   </section>
 
   <!-- ============ PROJECTS ============ -->
-  <section class="projects-section" id="project">
+  <section class="block" id="project">
     <div class="container">
-      <div class="section-heading reveal">
-        <div class="section-heading-kanji">作 · 品 · 集</div>
-        <h2 class="section-heading-text">Selected Projects</h2>
-        <div class="section-heading-rule"></div>
+      <div class="sec-head">
+        <div>
+          <div class="sec-kicker">Projects</div>
+          <h2>Selected projects</h2>
+          <p>Software and sensing systems from my research at UTM, BRIN and partner universities.</p>
+        </div>
       </div>
 
-      <div class="projects-grid">
-
-        <div class="project-card reveal d1">
-          <div class="project-image">
-            <img src="images/Project OSA.jpg" alt="Optical Spectrum Analyzer Software" loading="lazy">
-          </div>
-          <div class="project-year">2026 — MPhil Thesis · Copyright</div>
-          <div class="project-org">MPhil Research · UTM</div>
-          <h3 class="project-title">Optical Spectrum Analyzer (OSA) Software</h3>
-          <p class="project-desc">
-            Software for optical spectrum analysis featuring fitting plotter,
-            peak/dip detection, and integrated machine learning &amp; deep
-            learning training and analysis tools. Built in Python.
-          </p>
-          <div class="project-tags">
-            <span class="project-tag">Python</span>
-            <span class="project-tag">Machine Learning</span>
-            <span class="project-tag">Signal Processing</span>
-            <span class="project-tag">GUI</span>
+      <div class="proj-grid">
+        <div class="proj">
+          <div class="proj-img"><img src="images/Project OSA.jpg" alt="Optical Spectrum Analyzer Software" loading="lazy"></div>
+          <div class="proj-body">
+            <div class="proj-meta"><b>2026</b> · MPhil thesis · Copyright · UTM</div>
+            <h3>Optical Spectrum Analyzer (OSA) Software</h3>
+            <p>Software for optical spectrum analysis featuring fitting plotter, peak/dip detection, and integrated machine learning &amp; deep learning training and analysis tools. Built in Python.</p>
+            <div class="chips"><span class="chip">Python</span><span class="chip">Machine Learning</span><span class="chip">Signal Processing</span><span class="chip">GUI</span></div>
           </div>
         </div>
 
-        <a href="projects/asu.html" class="project-card reveal d2">
-          <div class="project-image">
-            <img src="images/Project ASU.jpg" alt="Augmented Segmentation Utility" loading="lazy">
+        <a href="projects/asu.html" class="proj">
+          <div class="proj-img"><img src="images/Project ASU.jpg" alt="Augmented Segmentation Utility" loading="lazy"></div>
+          <div class="proj-body">
+            <div class="proj-meta"><b>2026 · Ongoing</b> · BRIN · Telkom University · Kanazawa University</div>
+            <h3>Augmented Segmentation Utility (ASU)</h3>
+            <p>Object segmentation software combining YOLOv11 and SAM-2 for augmented annotation and segmentation workflows. International collaboration between BRIN, Telkom University, and Kanazawa University.</p>
+            <div class="chips"><span class="chip">YOLOv11</span><span class="chip">SAM-2</span><span class="chip">Image Segmentation</span><span class="chip">Python</span></div>
+            <span class="proj-link">View details &rarr;</span>
           </div>
-          <div class="project-year">2026 — Ongoing</div>
-          <div class="project-org">BRIN · Telkom University · Kanazawa University</div>
-          <h3 class="project-title">Augmented Segmentation Utility (ASU)</h3>
-          <p class="project-desc">
-            Object segmentation software combining YOLOv11 and SAM-2 for
-            augmented annotation and segmentation workflows. International
-            collaboration between BRIN, Telkom University, and Kanazawa
-            University.
-          </p>
-          <div class="project-tags">
-            <span class="project-tag">YOLOv11</span>
-            <span class="project-tag">SAM-2</span>
-            <span class="project-tag">Image Segmentation</span>
-            <span class="project-tag">Python</span>
-          </div>
-          <span class="project-link">View Details &rarr;</span>
         </a>
 
-        <div class="project-card reveal d3">
-          <div class="project-image">
-            <img src="images/Project UBB.jpg" alt="Heavy Metals Detection in Tin Mining Wastewater" loading="lazy">
-          </div>
-          <div class="project-year">2024 — 2025</div>
-          <div class="project-org">BRIN &amp; Bangka Belitung University · MoHE Grant</div>
-          <h3 class="project-title">Heavy Metals Detection in Tin Mining Wastewater</h3>
-          <p class="project-desc">
-            Environmentally friendly detection and treatment system for heavy
-            metals in tin mining wastewater, based on machine learning and
-            smart sensors. Funded by the Ministry of Higher Education,
-            Science, and Technology.
-          </p>
-          <div class="project-tags">
-            <span class="project-tag">Smart Sensors</span>
-            <span class="project-tag">Machine Learning</span>
-            <span class="project-tag">Environmental</span>
-            <span class="project-tag">Grant Research</span>
+        <div class="proj">
+          <div class="proj-img"><img src="images/Project UBB.jpg" alt="Heavy Metals Detection in Tin Mining Wastewater" loading="lazy"></div>
+          <div class="proj-body">
+            <div class="proj-meta"><b>2024 – 2025</b> · BRIN &amp; Bangka Belitung University · MoHE grant</div>
+            <h3>Heavy Metals Detection in Tin Mining Wastewater</h3>
+            <p>Environmentally friendly detection and treatment system for heavy metals in tin mining wastewater, based on machine learning and smart sensors. Funded by the Ministry of Higher Education, Science, and Technology.</p>
+            <div class="chips"><span class="chip">Smart Sensors</span><span class="chip">Machine Learning</span><span class="chip">Environmental</span><span class="chip">Grant Research</span></div>
           </div>
         </div>
 
-        <div class="project-card reveal d4">
-          <div class="project-image">
-            <img src="images/Project UNNES.jpg" alt="SPR Sensor for Halal Gelatin Detection" loading="lazy">
-          </div>
-          <div class="project-year">2023 — 2024</div>
-          <div class="project-org">BRIN &amp; UNNES · MoHE Grant</div>
-          <h3 class="project-title">AI-Integrated SPR Sensors for Halal Gelatin</h3>
-          <p class="project-desc">
-            Integration of artificial intelligence systems with surface plasmon
-            resonance (SPR) sensors for accurate gelatin identification and
-            halal licensing applications.
-          </p>
-          <div class="project-tags">
-            <span class="project-tag">SPR Sensor</span>
-            <span class="project-tag">AI</span>
-            <span class="project-tag">Photonics</span>
-            <span class="project-tag">Halal Tech</span>
+        <div class="proj">
+          <div class="proj-img"><img src="images/Project UNNES.jpg" alt="SPR Sensor for Halal Gelatin Detection" loading="lazy"></div>
+          <div class="proj-body">
+            <div class="proj-meta"><b>2023 – 2024</b> · BRIN &amp; UNNES · MoHE grant</div>
+            <h3>AI-Integrated SPR Sensors for Halal Gelatin</h3>
+            <p>Integration of artificial intelligence systems with surface plasmon resonance (SPR) sensors for accurate gelatin identification and halal licensing applications.</p>
+            <div class="chips"><span class="chip">SPR Sensor</span><span class="chip">AI</span><span class="chip">Photonics</span><span class="chip">Halal Tech</span></div>
           </div>
         </div>
 
-        <div class="project-card reveal d1">
-          <div class="project-image">
-            <img src="images/Project OPM.jpg" alt="Low-Cost Visible Light Optical Power Meter" loading="lazy">
-          </div>
-          <div class="project-year">2023</div>
-          <div class="project-org">BRIN &amp; UNNES</div>
-          <h3 class="project-title">Low-Cost Visible Light Optical Power Meter (LC-VLOPM)</h3>
-          <p class="project-desc">
-            Design and characterization of a low-cost visible-light optical
-            power meter using an Arduino Nano microcontroller. Both the
-            hardware design and source code were filed as registered patents.
-          </p>
-          <div class="project-tags">
-            <span class="project-tag">Arduino</span>
-            <span class="project-tag">Optical Instrumentation</span>
-            <span class="project-tag">Embedded Systems</span>
-            <span class="project-tag">Patent</span>
+        <div class="proj">
+          <div class="proj-img"><img src="images/Project OPM.jpg" alt="Low-Cost Visible Light Optical Power Meter" loading="lazy"></div>
+          <div class="proj-body">
+            <div class="proj-meta"><b>2023</b> · BRIN &amp; UNNES</div>
+            <h3>Low-Cost Visible Light Optical Power Meter (LC-VLOPM)</h3>
+            <p>Design and characterization of a low-cost visible-light optical power meter using an Arduino Nano microcontroller. Both the hardware design and source code were filed as registered patents.</p>
+            <div class="chips"><span class="chip">Arduino</span><span class="chip">Optical Instrumentation</span><span class="chip">Embedded Systems</span><span class="chip">Patent</span></div>
           </div>
         </div>
-
       </div>
     </div>
   </section>
 
   <!-- ============ PUBLICATIONS ============ -->
-  <section class="publications-section" id="publication">
+  <section class="block" id="publication">
     <div class="container">
-      <div class="section-heading reveal">
-        <div class="section-heading-kanji">著 · 作 · 目 · 録</div>
-        <h2 class="section-heading-text">Publications &amp; Patents</h2>
-        <div class="section-heading-rule"></div>
+      <div class="sec-head">
+        <div>
+          <div class="sec-kicker">Publications</div>
+          <h2>Papers, patents &amp; copyrights</h2>
+        </div>
+        <div class="filters" role="group" aria-label="Filter publications">
+          <button class="filter on" type="button" data-f="all">All<span></span></button>
+          <button class="filter" type="button" data-f="journal">Journals<span></span></button>
+          <button class="filter" type="button" data-f="conference">Conferences<span></span></button>
+          <button class="filter" type="button" data-f="ip">Patents &amp; copyrights<span></span></button>
+          <button class="filter" type="button" data-f="book">Book<span></span></button>
+        </div>
       </div>
 
-      <div class="pub-list">
-
-        <article class="pub-item reveal d1">
+      <ol class="pubs" id="pubList">
+        <li class="pub" data-type="journal">
           <div class="pub-year">2026</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              PySpecTrace: A Python-Based Graphical User Interface for Real-Time Spectroscopy Analysis and Data Analysis
-              <span class="pub-badge q1">WoS Q1</span>
-            </h3>
-            <p class="pub-venue">Journal Publication, 2026</p>
+          <div>
+            <h3>PySpecTrace: A Python-Based Graphical User Interface for Real-Time Spectroscopy Analysis and Data Analysis</h3>
+            <div class="pub-meta"><span class="badge q1">WoS Q1</span>Journal publication</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="journal">
           <div class="pub-year">2026</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Machine Learning-Based Wide-Range Refractive Index Sensing with Synthesis-Tuned Nanoparticles Coating Layer on MMI Fiber Sensors
-              <span class="pub-badge q2">WoS Q2</span>
-            </h3>
-            <p class="pub-venue">Journal Publication, 2026</p>
+          <div>
+            <h3>Machine Learning-Based Wide-Range Refractive Index Sensing with Synthesis-Tuned Nanoparticles Coating Layer on MMI Fiber Sensors</h3>
+            <div class="pub-meta"><span class="badge q2">WoS Q2</span>Journal publication</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="conference">
           <div class="pub-year">2026</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Comparative Analysis of Machine Learning Algorithms for Wide-Range Refractive Index Classification in Multimode Interference No-Core Fiber Sensors
-              <span class="pub-badge">Conference</span>
-            </h3>
-            <p class="pub-venue">Conference Paper, 2026</p>
+          <div>
+            <h3>Comparative Analysis of Machine Learning Algorithms for Wide-Range Refractive Index Classification in Multimode Interference No-Core Fiber Sensors</h3>
+            <div class="pub-meta"><span class="badge">Conference</span>Conference paper</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="journal">
           <div class="pub-year">2026</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Quantized LSTM for Predictive Thermal Monitoring of Temperature of Lithium-Ion Battery
-              <span class="pub-badge q3">WoS Q3</span>
-            </h3>
-            <p class="pub-venue">Journal Publication, 2026</p>
-            <div class="pub-links">
-              <a href="https://www.researchgate.net/publication/401312609" target="_blank" rel="noopener">ResearchGate</a>
-            </div>
+          <div>
+            <h3>Quantized LSTM for Predictive Thermal Monitoring of Temperature of Lithium-Ion Battery</h3>
+            <div class="pub-meta"><span class="badge q3">WoS Q3</span>Journal publication · <a href="https://www.researchgate.net/publication/401312609" target="_blank" rel="noopener">ResearchGate ↗</a></div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d2">
+        </li>
+        <li class="pub" data-type="ip">
           <div class="pub-year">2026</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Augmented Segmentation Utility (ASU) for Object Segmentation Software
-              <span class="pub-badge">Copyright</span>
-            </h3>
-            <p class="pub-venue">Registered Copyright, 2026</p>
+          <div>
+            <h3>Augmented Segmentation Utility (ASU) for Object Segmentation Software</h3>
+            <div class="pub-meta"><span class="badge">Copyright</span>Registered copyright</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="ip">
           <div class="pub-year">2026</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              SegLab v1.0 (Segmentation Lab for Medical Image) Software
-              <span class="pub-badge">Copyright</span>
-            </h3>
-            <p class="pub-venue">Registered Copyright, 2026</p>
+          <div>
+            <h3>SegLab v1.0 (Segmentation Lab for Medical Image) Software</h3>
+            <div class="pub-meta"><span class="badge">Copyright</span>Registered copyright</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="ip">
           <div class="pub-year">2026</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Optical Spectrum Analyzer Utility Software
-              <span class="pub-badge">Copyright</span>
-            </h3>
-            <p class="pub-venue">Registered Copyright, 2026</p>
+          <div>
+            <h3>Optical Spectrum Analyzer Utility Software</h3>
+            <div class="pub-meta"><span class="badge">Copyright</span>Registered copyright</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="journal">
           <div class="pub-year">2025</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Optimized Selectivity in No-Core Fiber Sensors for High Refractive Index Detection
-              <span class="pub-badge q2">Physica Scripta · Q2</span>
-            </h3>
-            <p class="pub-venue">Physica Scripta, 2025</p>
-            <div class="pub-links">
-              <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank" rel="noopener">Paper</a>
-            </div>
+          <div>
+            <h3>Optimized Selectivity in No-Core Fiber Sensors for High Refractive Index Detection</h3>
+            <div class="pub-meta"><span class="badge q2">Q2</span>Physica Scripta · <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank" rel="noopener">Paper ↗</a></div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d2">
+        </li>
+        <li class="pub" data-type="conference">
           <div class="pub-year">2025</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Optimizing Convolutional Layer in YOLOv8: Enhancing Accuracy and Efficiency for Camouflaged Object Detection in Complex Environments
-              <span class="pub-badge">IEEE</span>
-            </h3>
-            <p class="pub-venue">IEEE Conference Proceedings, 2025</p>
-            <div class="pub-links">
-              <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank" rel="noopener">Paper</a>
-            </div>
+          <div>
+            <h3>Optimizing Convolutional Layer in YOLOv8: Enhancing Accuracy and Efficiency for Camouflaged Object Detection in Complex Environments</h3>
+            <div class="pub-meta"><span class="badge">IEEE</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank" rel="noopener">Paper ↗</a></div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d3">
+        </li>
+        <li class="pub" data-type="conference">
           <div class="pub-year">2025</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Effect of Surrounding Refractive Index Changes on Amplitude Response in MMI-Based Fiber Optic Sensors
-              <span class="pub-badge">IEEE</span>
-            </h3>
-            <p class="pub-venue">IEEE Conference Proceedings, 2025</p>
-            <div class="pub-links">
-              <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank" rel="noopener">Paper</a>
-            </div>
+          <div>
+            <h3>Effect of Surrounding Refractive Index Changes on Amplitude Response in MMI-Based Fiber Optic Sensors</h3>
+            <div class="pub-meta"><span class="badge">IEEE</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank" rel="noopener">Paper ↗</a></div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="journal">
           <div class="pub-year">2025</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Design and Characterization of a Simple Temperature Sensor Based on a Polymer Sine S-Bend Optical Waveguide Structure
-              <span class="pub-badge q2">WoS Q2</span>
-            </h3>
-            <p class="pub-venue">Journal Publication, 2025</p>
+          <div>
+            <h3>Design and Characterization of a Simple Temperature Sensor Based on a Polymer Sine S-Bend Optical Waveguide Structure</h3>
+            <div class="pub-meta"><span class="badge q2">WoS Q2</span>Journal publication</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d2">
+        </li>
+        <li class="pub" data-type="journal">
           <div class="pub-year">2025</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Fabrication and Characterization of Low-Cost Optical Waveguides Using Recycled Expanded Polystyrene (EPS) as Core Material
-              <span class="pub-badge q2">Results in Optics · Q2</span>
-            </h3>
-            <p class="pub-venue">Results in Optics, 2025</p>
-            <div class="pub-links">
-              <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank" rel="noopener">Paper</a>
-            </div>
+          <div>
+            <h3>Fabrication and Characterization of Low-Cost Optical Waveguides Using Recycled Expanded Polystyrene (EPS) as Core Material</h3>
+            <div class="pub-meta"><span class="badge q2">Q2</span>Results in Optics · <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank" rel="noopener">Paper ↗</a></div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="conference">
           <div class="pub-year">2024</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Development of Color Detection Based on Camera Infrared Filter with Python Image Processing
-              <span class="pub-badge">IEEE</span>
-              <span class="pub-badge award">Best Paper</span>
-            </h3>
-            <p class="pub-venue">IEEE Conference Proceedings, 2024 &mdash; Best Paper Award</p>
-            <div class="pub-links">
-              <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank" rel="noopener">Paper</a>
-            </div>
+          <div>
+            <h3>Development of Color Detection Based on Camera Infrared Filter with Python Image Processing</h3>
+            <div class="pub-meta"><span class="badge">IEEE</span><span class="badge award">Best Paper Award</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank" rel="noopener">Paper ↗</a></div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d2">
+        </li>
+        <li class="pub" data-type="ip patent">
           <div class="pub-year">2023</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Design and Characterization of Low-Cost Visible Light Optical Power Meter (LC-VLOPM)
-              <span class="pub-badge">Patent</span>
-            </h3>
-            <p class="pub-venue">Registered Patent, 2023</p>
+          <div>
+            <h3>Design and Characterization of Low-Cost Visible Light Optical Power Meter (LC-VLOPM)</h3>
+            <div class="pub-meta"><span class="badge">Patent</span>Registered patent</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d3">
+        </li>
+        <li class="pub" data-type="ip patent">
           <div class="pub-year">2023</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Code for Optical Power Meter Measurement
-              <span class="pub-badge">Patent</span>
-            </h3>
-            <p class="pub-venue">Registered Patent, 2023</p>
+          <div>
+            <h3>Code for Optical Power Meter Measurement</h3>
+            <div class="pub-meta"><span class="badge">Patent</span>Registered patent</div>
           </div>
-        </article>
-
-        <article class="pub-item reveal d1">
+        </li>
+        <li class="pub" data-type="book">
           <div class="pub-year">2023</div>
-          <div class="pub-content">
-            <h3 class="pub-title">
-              Peran Fisikawan Indonesia dalam Pengembangan Ilmu Pendidikan, Sains, dan Teknologi Sebagai Upaya Membangun Sumber Daya Manusia Yang Berkualitas di Era Society 5.0
-              <span class="pub-badge q4">ISBN</span>
-            </h3>
-            <p class="pub-venue">Book Chapter, 2023</p>
+          <div>
+            <h3 lang="id">Peran Fisikawan Indonesia dalam Pengembangan Ilmu Pendidikan, Sains, dan Teknologi Sebagai Upaya Membangun Sumber Daya Manusia Yang Berkualitas di Era Society 5.0</h3>
+            <div class="pub-meta"><span class="badge">ISBN</span>Book chapter</div>
           </div>
-        </article>
-
-      </div>
+        </li>
+      </ol>
     </div>
   </section>
 
   <!-- ============ TEACHING ============ -->
-  <section class="teaching-section" id="teaching">
+  <section class="block" id="teaching">
     <div class="container">
-      <div class="section-heading reveal">
-        <div class="section-heading-kanji">教 · 材</div>
-        <h2 class="section-heading-text">Teaching &amp; Learning</h2>
+      <div class="sec-head">
+        <div>
+          <div class="sec-kicker">Teaching &amp; learning</div>
+          <h2>Tools I build for students</h2>
+          <p>Each one is meant to be opened in a lecture, played with, and argued about &mdash; not read.</p>
+        </div>
       </div>
 
-      <p class="teaching-lede reveal d1">
-        Tools I build for the people I teach. Each one is meant to be opened in a lecture,
-        played with, and argued about &mdash; not read.
-      </p>
-
-      <div class="resource-grid">
-
-        <a href="projects/labs.html" class="resource-card feature reveal d2">
-          <span class="block-corner tl"></span>
-          <span class="block-corner br"></span>
-          <div class="resource-head">
-            <span class="resource-kanji">実 験 室</span>
-            <span class="resource-tag">Interactive series</span>
-          </div>
-          <h3 class="resource-title">The Lab <em>Series</em></h3>
-          <p class="resource-desc">
-            Two series of interactive labs, each one a single page you open and play with, with
-            your own images. No install, no notebook, no account.
-          </p>
-          <ul class="resource-topics">
-            <li><strong>Image Processing</strong> &mdash; seven labs following Gonzalez &amp; Woods: pixels &amp; colour, histograms, spatial and frequency-domain filtering, restoration, morphology, and edges &amp; segmentation</li>
-            <li><strong>Computer Vision</strong> &mdash; convolution, segmentation and encoder&ndash;decoders, from the sliding window up to camouflaged object detection</li>
+      <div class="teach-grid">
+        <a href="projects/labs.html" class="teach">
+          <span class="teach-tag">Interactive series</span>
+          <h3>The Lab Series</h3>
+          <p>Two series of interactive labs, each one a single page you open and play with, with your own images. No install, no notebook, no account.</p>
+          <ul>
+            <li><b>Image Processing</b> &mdash; seven labs following Gonzalez &amp; Woods: pixels &amp; colour, histograms, spatial and frequency-domain filtering, restoration, morphology, and edges &amp; segmentation</li>
+            <li><b>Computer Vision</b> &mdash; convolution, segmentation and encoder&ndash;decoders, from the sliding window up to camouflaged object detection</li>
           </ul>
-          <div class="resource-foot"><span>Open the series</span><span class="block-arrow">→</span></div>
+          <span class="teach-go">Open the series &rarr;</span>
         </a>
 
-        <a href="https://joshhhlee.github.io/ielts-vocab-builder/" target="_blank" rel="noopener" class="resource-card reveal d3">
-          <span class="block-corner tl"></span>
-          <span class="block-corner br"></span>
-          <div class="resource-head">
-            <span class="resource-kanji">語 彙</span>
-            <span class="resource-tag">Study tool</span>
-          </div>
-          <h3 class="resource-title">IELTS <em>Study Kit</em></h3>
-          <p class="resource-desc">
-            A free IELTS course in one page, made for high school students who don&rsquo;t have
-            access to IELTS books. Explanations in English and Bahasa Indonesia. Works on a phone.
-          </p>
-          <ul class="resource-topics">
-            <li><strong>Grammar</strong> &mdash; a 145-unit course with practice questions</li>
-            <li><strong>Vocabulary</strong> &mdash; flashcards, quizzes and IELTS topic packs</li>
-            <li><strong>Reading &amp; Listening</strong> &mdash; a paraphrase trainer and spelling dictation</li>
-            <li><strong>Writing</strong> &mdash; an essay vocabulary checker</li>
+        <a href="https://joshhhlee.github.io/ielts-study-kit/" target="_blank" rel="noopener" class="teach">
+          <span class="teach-tag">Free study tool</span>
+          <h3>IELTS Study Kit</h3>
+          <p>A free IELTS course in one page, made for high school students who don&rsquo;t have access to IELTS books. Explanations in English and Bahasa Indonesia. Works on a phone.</p>
+          <ul>
+            <li><b>Grammar</b> &mdash; a 145-unit course with practice questions</li>
+            <li><b>Vocabulary</b> &mdash; flashcards, quizzes and IELTS topic packs</li>
+            <li><b>Reading &amp; Listening</b> &mdash; a paraphrase trainer and spelling dictation</li>
+            <li><b>Writing</b> &mdash; an essay vocabulary checker</li>
           </ul>
-          <div class="resource-foot"><span>Start studying</span><span class="block-arrow">↗</span></div>
+          <span class="teach-go">Start studying &nearr;</span>
         </a>
-
       </div>
     </div>
   </section>
 
-  <!-- ============ FOOTER ============ -->
-  <footer id="contact">
-    <div class="footer-seal">印</div>
-    <div>© 2026 — Joshu Leonardy · Made with patience &amp; tea</div>
-    <div style="margin-top: 0.8rem;">
-      <a href="mailto:joshu@graduate.utm.my">joshu@graduate.utm.my</a> &middot;
-      <a href="https://www.linkedin.com/in/joshu-leonardy" target="_blank" rel="noopener">LinkedIn</a> &middot;
-      <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">GitHub</a> &middot;
-      <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">Google Scholar</a> &middot;
-      <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">CV</a>
+  <!-- ============ CONTACT ============ -->
+  <section class="contact" id="contact">
+    <div class="container">
+      <div class="contact-box">
+        <div>
+          <h2>Let&rsquo;s work together</h2>
+          <p>Open to research collaborations, invited talks, and conversations about computer vision, photonics and teaching.</p>
+        </div>
+        <div class="contact-links">
+          <a href="mailto:joshu@graduate.utm.my">Email<span>joshu@graduate.utm.my</span></a>
+          <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">Google Scholar<span>&nearr;</span></a>
+          <a href="https://www.linkedin.com/in/joshuleonardylee" target="_blank" rel="noopener">LinkedIn<span>&nearr;</span></a>
+          <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">GitHub<span>&nearr;</span></a>
+        </div>
+      </div>
+      <footer>
+        <span>© 2026 Joshu Leonardy Lee · Made with patience &amp; tea</span>
+        <a href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV (PDF)</a>
+      </footer>
     </div>
-  </footer>
+  </section>
+
+  </main>
+
+  <button class="to-top" id="toTop" type="button" aria-label="Back to top">&uarr;</button>
 
   <script>
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Reveal on scroll
-    const revealEls = document.querySelectorAll('.reveal');
-    if (reduceMotion || !('IntersectionObserver' in window)) {
-      revealEls.forEach(el => el.classList.add('visible'));
-    } else {
-      const observer = new IntersectionObserver(entries => {
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            e.target.classList.add('visible');
-            observer.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-      revealEls.forEach(el => observer.observe(el));
-    }
-
-    const topBar = document.getElementById('topBar');
-    const toTop = document.getElementById('toTop');
-    const menuToggle = document.getElementById('menuToggle');
-    const mobileMenu = document.getElementById('mobileMenu');
-
-    // Every in-page link in either menu, grouped by the section it points at
-    const navLinks = [...document.querySelectorAll('.nav-links a[href^="#"], .mobile-menu a[href^="#"]')];
-    const trackedIds = [...new Set(navLinks.map(a => a.getAttribute('href').slice(1)))];
-    const tracked = trackedIds.map(id => document.getElementById(id)).filter(Boolean)
-      .sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
-
-    // The section whose top has passed ~35% of the screen is the one being read
-    function currentSection() {
-      const doc = document.documentElement;
-      if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4) return 'contact';
-      const line = window.innerHeight * 0.35;
-      let id = null;
-      for (const el of tracked) if (el.getBoundingClientRect().top <= line) id = el.id;
-      return id;
-    }
-
-    // Top bar border, back-to-top, and current section — rAF-throttled so they never fight the scroll
-    let scrollQueued = false, lastActive;
-    function onScroll() {
-      scrollQueued = false;
-      topBar.classList.toggle('scrolled', window.scrollY > 30);
-
-      const showTop = window.scrollY > window.innerHeight * 1.2;
-      toTop.classList.toggle('show', showTop);
-      toTop.tabIndex = showTop ? 0 : -1;
-
-      const active = currentSection();
-      if (active === lastActive) return;
-      lastActive = active;
-      navLinks.forEach(a => {
-        const on = a.getAttribute('href') === '#' + active;
-        a.classList.toggle('active', on);
-        if (on) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current');
-      });
-    }
-    window.addEventListener('scroll', () => {
-      if (scrollQueued) return;
-      scrollQueued = true;
-      requestAnimationFrame(onScroll);
-    }, { passive: true });
-    onScroll();
-
-    toTop.addEventListener('click', () => {
-      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
-      topBar.querySelector('.brand').focus({ preventScroll: true });
+    // Theme: follows the device until the visitor picks one
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      const root = document.documentElement;
+      const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      root.dataset.theme = dark ? 'light' : 'dark';
+      try { localStorage.setItem('theme', root.dataset.theme); } catch (e) {}
     });
 
     // Phone menu
+    const menuBtn = document.getElementById('menuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
     function setMenu(open) {
       mobileMenu.classList.toggle('open', open);
-      menuToggle.setAttribute('aria-expanded', String(open));
-      menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-      document.body.style.overflow = open ? 'hidden' : '';
-      if (open) mobileMenu.querySelector('a').focus({ preventScroll: true });
+      menuBtn.setAttribute('aria-expanded', String(open));
+      menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
     }
-    menuToggle.addEventListener('click', () => setMenu(!mobileMenu.classList.contains('open')));
+    menuBtn.addEventListener('click', () => setMenu(!mobileMenu.classList.contains('open')));
     mobileMenu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && mobileMenu.classList.contains('open')) { setMenu(false); menuToggle.focus(); }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
+    matchMedia('(min-width: 861px)').addEventListener('change', e => { if (e.matches) setMenu(false); });
+
+    // Earlier experience is folded away to keep the page short
+    const xpList = document.getElementById('xpList');
+    const xpMore = document.getElementById('xpMore');
+    const later = xpList.querySelectorAll('.later').length;
+    xpMore.textContent = `Show ${later} earlier roles`;
+    xpMore.addEventListener('click', () => {
+      const all = xpList.classList.toggle('all');
+      xpMore.setAttribute('aria-expanded', String(all));
+      xpMore.textContent = all ? 'Show fewer' : `Show ${later} earlier roles`;
+      if (!all) xpList.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     });
-    // Rotating to landscape can cross the breakpoint with the menu open
-    window.matchMedia('(min-width: 761px)').addEventListener('change', e => { if (e.matches) setMenu(false); });
 
-    // Rotating left vertical text — cycles through research areas
-    const verticalPhrases = [
-      '光学 · PHOTONICS · 光 学',
-      '视觉 · COMPUTER VISION · 视 觉',
-      '智能 · ARTIFICIAL INTELLIGENCE · 智 能'
-    ];
-    const leftVertical = document.querySelector('.vertical-text.left');
-    if (leftVertical && !reduceMotion) {
-      let phraseIdx = 0;
-      let cycleTimer = null;
-      const cycle = () => {
-        // Skip the swap while the tab is hidden — it would fade to nothing visible
-        if (document.hidden) return;
-        leftVertical.classList.add('fading');
-        setTimeout(() => {
-          phraseIdx = (phraseIdx + 1) % verticalPhrases.length;
-          leftVertical.textContent = verticalPhrases[phraseIdx];
-          leftVertical.classList.remove('fading');
-        }, 800);
-      };
-      // Start cycling after the initial fade-in finishes (~2.5s)
-      setTimeout(() => { cycleTimer = setInterval(cycle, 4000); }, 2500);
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden && cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
-        else if (!document.hidden && !cycleTimer) { cycleTimer = setInterval(cycle, 4000); }
+    // Publication filters and the "at a glance" counts both come from the list itself
+    const pubs = [...document.querySelectorAll('#pubList .pub')];
+    const has = (p, t) => p.dataset.type.split(' ').includes(t);
+    document.querySelectorAll('[data-count]').forEach(el => {
+      el.textContent = pubs.filter(p => el.dataset.count === 'copyright'
+        ? has(p, 'ip') && !has(p, 'patent') : has(p, el.dataset.count)).length;
+    });
+    const filters = [...document.querySelectorAll('.filter')];
+    filters.forEach(b => {
+      const f = b.dataset.f;
+      b.querySelector('span').textContent = f === 'all' ? pubs.length : pubs.filter(p => has(p, f)).length;
+      b.addEventListener('click', () => {
+        filters.forEach(x => x.classList.toggle('on', x === b));
+        pubs.forEach(p => { p.hidden = f !== 'all' && !has(p, f); });
       });
-    }
-  </script>
+    });
 
+    // Top bar border, back-to-top button and the current section in the menu
+    const topBar = document.getElementById('topBar');
+    const toTop = document.getElementById('toTop');
+    const links = [...document.querySelectorAll('.nav-links a[href^="#"]')];
+    const sections = links.map(a => document.querySelector(a.getAttribute('href')));
+    let queued = false;
+    function onScroll() {
+      queued = false;
+      topBar.classList.toggle('scrolled', scrollY > 10);
+      toTop.classList.toggle('show', scrollY > innerHeight * 1.2);
+      let current = null;
+      sections.forEach((s, i) => { if (s.getBoundingClientRect().top <= innerHeight * 0.35) current = i; });
+      links.forEach((a, i) => a.classList.toggle('active', i === current));
+    }
+    addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(onScroll); } }, { passive: true });
+    onScroll();
+    toTop.addEventListener('click', () => scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }));
+  </script>
 </body>
 </html>
