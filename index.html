@@ -245,7 +245,7 @@
   .pub-meta a:hover { text-decoration: underline; }
 
   /* Teaching */
-  .teach-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
+  .teach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
   .teach {
     display: flex; flex-direction: column; text-decoration: none; background: var(--surface); border: 1px solid var(--line);
     border-radius: 18px; padding: 28px; transition: transform .18s, box-shadow .18s, border-color .18s;
@@ -288,6 +288,8 @@
     .about-grid, .contact-box { grid-template-columns: 1fr; }
     .about-grid { gap: 36px; }
     .proj-grid { grid-template-columns: repeat(2, 1fr); }
+    .teach-grid { grid-template-columns: 1fr 1fr; }
+    .teach-grid .teach:first-child { grid-column: 1 / -1; }
     .cards-3 { grid-template-columns: 1fr 1fr; }
     .cards-3 .card:last-child { grid-column: 1 / -1; }
   }
@@ -905,6 +907,19 @@
             <li><b>Writing</b>: an essay vocabulary checker</li>
           </ul>
           <span class="teach-go">Start studying <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
+        </a>
+
+        <a href="https://joshhhlee.github.io/HSK-Learning-Website/" target="_blank" rel="noopener" class="teach">
+          <span class="teach-tag">Free study tool</span>
+          <h3>Hanzi Path</h3>
+          <p>An interactive Mandarin course for HSK 1 to 5, covering reading, writing, listening and speaking. Works in the browser, best in Microsoft Edge or Chrome.</p>
+          <ul>
+            <li><b>Pinyin</b>: tones, a sounds chart and listening drills</li>
+            <li><b>Lessons</b>: words, dialogues, grammar and practice for HSK 1 to 5</li>
+            <li><b>Puzzle &amp; Review</b>: sentence puzzles with word tiles, and spaced-repetition flashcards</li>
+            <li><b>Writing &amp; Test</b>: stroke-order tracing and HSK-style practice tests</li>
+          </ul>
+          <span class="teach-go">Start learning <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
         </a>
       </div>
     </div>
