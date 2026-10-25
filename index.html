@@ -67,11 +67,9 @@
   }
   .nav.scrolled { border-bottom-color: var(--line); }
   .nav-inner { display: flex; align-items: center; gap: 24px; height: 64px; }
-  .brand { font-weight: 700; letter-spacing: -.01em; text-decoration: none; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
-  .brand-mark {
-    width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: var(--accent-ink);
-    display: grid; place-items: center; font-size: .8rem; font-weight: 700; letter-spacing: 0;
-  }
+  .brand { font-weight: 600; letter-spacing: -.01em; text-decoration: none; white-space: nowrap; }
+  .brand:hover { color: var(--accent); }
+  .ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -.12em; flex: none; }
   .nav-links { display: flex; gap: 2px; margin-left: auto; }
   .nav-links a {
     text-decoration: none; font-size: .9rem; color: var(--muted); padding: 7px 11px; border-radius: 8px;
@@ -122,7 +120,7 @@
 
   /* ---------- Hero ---------- */
   .hero { padding: 72px 0 64px; }
-  .hero-grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 48px; align-items: center; }
+  .hero-grid > div { max-width: 760px; }
   .eyebrow {
     display: inline-flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 500; color: var(--muted);
     padding: 5px 12px 5px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
@@ -141,15 +139,6 @@
   .social a:hover { color: var(--accent); }
   .social svg { width: 16px; height: 16px; }
 
-  .glance { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 26px; box-shadow: var(--shadow); }
-  .glance h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; margin-bottom: 16px; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .stat { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-  .stat b { display: block; font-size: 1.9rem; line-height: 1.1; letter-spacing: -.03em; }
-  .stat span { font-size: .8rem; color: var(--muted); }
-  .glance ul { list-style: none; margin-top: 16px; display: grid; gap: 10px; }
-  .glance li { display: flex; gap: 10px; font-size: .9rem; color: var(--ink-soft); line-height: 1.45; }
-  .glance li::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: .5em; }
 
   /* ---------- Sections ---------- */
   section.block { padding: 72px 0; border-top: 1px solid var(--line); }
@@ -185,8 +174,8 @@
   details.more { margin-top: 12px; }
   details.more summary { cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--accent); list-style: none; }
   details.more summary::-webkit-details-marker { display: none; }
-  details.more summary::after { content: " ↓"; }
-  details.more[open] summary::after { content: " ↑"; }
+  details.more summary::after { content: ""; display: inline-block; width: .4em; height: .4em; margin-left: .45em; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-.2em) rotate(45deg); transition: transform .15s; }
+  details.more[open] summary::after { transform: translateY(.05em) rotate(-135deg); }
   details.more .plain-list { margin-top: 10px; }
 
   /* Experience */
@@ -287,7 +276,7 @@
   footer a { text-decoration: none; }
   footer a:hover { color: var(--accent); }
 
-  .to-top {
+  .to-top { display: grid; place-items: center;
     position: fixed; right: 20px; bottom: 20px; z-index: 40; width: 42px; height: 42px; border-radius: 12px;
     border: 1px solid var(--line); background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
     cursor: pointer; font-size: 1.1rem; opacity: 0; visibility: hidden; transform: translateY(8px); transition: all .2s;
@@ -296,8 +285,7 @@
 
   /* ---------- Responsive ---------- */
   @media (max-width: 960px) {
-    .hero-grid, .about-grid, .contact-box { grid-template-columns: 1fr; }
-    .hero-grid { gap: 36px; }
+    .about-grid, .contact-box { grid-template-columns: 1fr; }
     .about-grid { gap: 36px; }
     .proj-grid { grid-template-columns: repeat(2, 1fr); }
     .cards-3 { grid-template-columns: 1fr 1fr; }
@@ -315,7 +303,6 @@
     .pub { grid-template-columns: 1fr; gap: 2px; padding: 16px 0; }
     .pub-year { font-size: .8rem; }
     .teach { padding: 22px; }
-    .stat b { font-size: 1.6rem; }
     .contact { padding-top: 56px; }
   }
 </style>
@@ -326,7 +313,7 @@
   <!-- ============ TOP BAR ============ -->
   <header class="nav" id="topBar">
     <div class="container nav-inner">
-      <a href="#top" class="brand"><span class="brand-mark">JL</span>Joshu Leonardy Lee</a>
+      <a href="#top" class="brand">Home</a>
       <nav class="nav-links" aria-label="Sections">
         <a href="#profile">About</a>
         <a href="#experience">Experience</a>
@@ -366,18 +353,14 @@
         <span class="eyebrow"><span class="dot"></span>PhD Student · Universiti Teknologi Malaysia</span>
         <h1>Joshu Leonardy Lee</h1>
         <div class="cn" lang="zh">李添炜</div>
-        <p class="lead">
-          I work on <strong>computer vision</strong>, <strong>machine learning</strong> and
-          <strong>photonics</strong> &mdash; from optical fiber sensors to real-time object
-          segmentation, and the Python software that ties them together.
-        </p>
+        <p class="lead">Hello, and welcome to my personal website.</p>
         <div class="chips">
           <span class="chip accent">Computer Vision</span>
           <span class="chip accent">Artificial Intelligence</span>
           <span class="chip accent">Photonics</span>
         </div>
         <div class="hero-cta">
-          <a class="btn primary" href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV &darr;</a>
+          <a class="btn primary" href="assets/cv/CV_%20Joshu%20Leonardy_Updated_2026.pdf" target="_blank" rel="noopener">Download CV</a>
           <a class="btn" href="mailto:joshu@graduate.utm.my">Email me</a>
         </div>
         <div class="social">
@@ -390,20 +373,6 @@
         </div>
       </div>
 
-      <aside class="glance" aria-label="At a glance">
-        <h2>At a glance</h2>
-        <div class="stats">
-          <div class="stat"><b data-count="journal">6</b><span>Journal articles</span></div>
-          <div class="stat"><b data-count="conference">4</b><span>Conference papers</span></div>
-          <div class="stat"><b data-count="patent">2</b><span>Registered patents</span></div>
-          <div class="stat"><b data-count="copyright">3</b><span>Software copyrights</span></div>
-        </div>
-        <ul>
-          <li>UTM ASCEND Bright Talent International Scholarship (PhD, 2026)</li>
-          <li>Best Paper Award &mdash; IEEE conference (2024)</li>
-          <li>Research Assistant at BRIN Research Center for Photonics, 2024&ndash;2026</li>
-        </ul>
-      </aside>
     </div>
   </section>
 
@@ -686,7 +655,7 @@
             <h3>Augmented Segmentation Utility (ASU)</h3>
             <p>Object segmentation software combining YOLOv11 and SAM-2 for augmented annotation and segmentation workflows. International collaboration between BRIN, Telkom University, and Kanazawa University.</p>
             <div class="chips"><span class="chip">YOLOv11</span><span class="chip">SAM-2</span><span class="chip">Image Segmentation</span><span class="chip">Python</span></div>
-            <span class="proj-link">View details &rarr;</span>
+            <span class="proj-link">View details <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
           </div>
         </a>
 
@@ -766,7 +735,7 @@
           <div class="pub-year">2026</div>
           <div>
             <h3>Quantized LSTM for Predictive Thermal Monitoring of Temperature of Lithium-Ion Battery</h3>
-            <div class="pub-meta"><span class="badge q3">WoS Q3</span>Journal publication · <a href="https://www.researchgate.net/publication/401312609" target="_blank" rel="noopener">ResearchGate ↗</a></div>
+            <div class="pub-meta"><span class="badge q3">WoS Q3</span>Journal publication · <a href="https://www.researchgate.net/publication/401312609" target="_blank" rel="noopener">ResearchGate</a></div>
           </div>
         </li>
         <li class="pub" data-type="ip">
@@ -794,21 +763,21 @@
           <div class="pub-year">2025</div>
           <div>
             <h3>Optimized Selectivity in No-Core Fiber Sensors for High Refractive Index Detection</h3>
-            <div class="pub-meta"><span class="badge q2">Q2</span>Physica Scripta · <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank" rel="noopener">Paper ↗</a></div>
+            <div class="pub-meta"><span class="badge q2">Q2</span>Physica Scripta · <a href="https://iopscience.iop.org/article/10.1088/1402-4896/adf3f7/meta" target="_blank" rel="noopener">Paper</a></div>
           </div>
         </li>
         <li class="pub" data-type="conference">
           <div class="pub-year">2025</div>
           <div>
             <h3>Optimizing Convolutional Layer in YOLOv8: Enhancing Accuracy and Efficiency for Camouflaged Object Detection in Complex Environments</h3>
-            <div class="pub-meta"><span class="badge">IEEE</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank" rel="noopener">Paper ↗</a></div>
+            <div class="pub-meta"><span class="badge">IEEE</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/11150933" target="_blank" rel="noopener">Paper</a></div>
           </div>
         </li>
         <li class="pub" data-type="conference">
           <div class="pub-year">2025</div>
           <div>
             <h3>Effect of Surrounding Refractive Index Changes on Amplitude Response in MMI-Based Fiber Optic Sensors</h3>
-            <div class="pub-meta"><span class="badge">IEEE</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank" rel="noopener">Paper ↗</a></div>
+            <div class="pub-meta"><span class="badge">IEEE</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/11150911" target="_blank" rel="noopener">Paper</a></div>
           </div>
         </li>
         <li class="pub" data-type="journal">
@@ -822,14 +791,14 @@
           <div class="pub-year">2025</div>
           <div>
             <h3>Fabrication and Characterization of Low-Cost Optical Waveguides Using Recycled Expanded Polystyrene (EPS) as Core Material</h3>
-            <div class="pub-meta"><span class="badge q2">Q2</span>Results in Optics · <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank" rel="noopener">Paper ↗</a></div>
+            <div class="pub-meta"><span class="badge q2">Q2</span>Results in Optics · <a href="https://www.sciencedirect.com/science/article/pii/S2666950125001750" target="_blank" rel="noopener">Paper</a></div>
           </div>
         </li>
         <li class="pub" data-type="conference">
           <div class="pub-year">2024</div>
           <div>
             <h3>Development of Color Detection Based on Camera Infrared Filter with Python Image Processing</h3>
-            <div class="pub-meta"><span class="badge">IEEE</span><span class="badge award">Best Paper Award</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank" rel="noopener">Paper ↗</a></div>
+            <div class="pub-meta"><span class="badge">IEEE</span><span class="badge award">Best Paper Award</span>IEEE conference proceedings · <a href="https://ieeexplore.ieee.org/abstract/document/10872752" target="_blank" rel="noopener">Paper</a></div>
           </div>
         </li>
         <li class="pub" data-type="ip patent">
@@ -877,7 +846,7 @@
             <li><b>Image Processing</b> &mdash; seven labs following Gonzalez &amp; Woods: pixels &amp; colour, histograms, spatial and frequency-domain filtering, restoration, morphology, and edges &amp; segmentation</li>
             <li><b>Computer Vision</b> &mdash; convolution, segmentation and encoder&ndash;decoders, from the sliding window up to camouflaged object detection</li>
           </ul>
-          <span class="teach-go">Open the series &rarr;</span>
+          <span class="teach-go">Open the series <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
         </a>
 
         <a href="https://joshhhlee.github.io/ielts-study-kit/" target="_blank" rel="noopener" class="teach">
@@ -890,7 +859,7 @@
             <li><b>Reading &amp; Listening</b> &mdash; a paraphrase trainer and spelling dictation</li>
             <li><b>Writing</b> &mdash; an essay vocabulary checker</li>
           </ul>
-          <span class="teach-go">Start studying &nearr;</span>
+          <span class="teach-go">Start studying <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
         </a>
       </div>
     </div>
@@ -906,9 +875,9 @@
         </div>
         <div class="contact-links">
           <a href="mailto:joshu@graduate.utm.my">Email<span>joshu@graduate.utm.my</span></a>
-          <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">Google Scholar<span>&nearr;</span></a>
-          <a href="https://www.linkedin.com/in/joshuleonardylee" target="_blank" rel="noopener">LinkedIn<span>&nearr;</span></a>
-          <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">GitHub<span>&nearr;</span></a>
+          <a href="https://scholar.google.com/citations?user=mYujZLoAAAAJ" target="_blank" rel="noopener">Google Scholar<span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span></a>
+          <a href="https://www.linkedin.com/in/joshuleonardylee" target="_blank" rel="noopener">LinkedIn<span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span></a>
+          <a href="https://github.com/JoshhhLee" target="_blank" rel="noopener">GitHub<span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span></a>
         </div>
       </div>
       <footer>
@@ -920,7 +889,7 @@
 
   </main>
 
-  <button class="to-top" id="toTop" type="button" aria-label="Back to top">&uarr;</button>
+  <button class="to-top" id="toTop" type="button" aria-label="Back to top"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
 
   <script>
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -958,13 +927,9 @@
       if (!all) xpList.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     });
 
-    // Publication filters and the "at a glance" counts both come from the list itself
+    // Publication filters; the counts come from the list itself
     const pubs = [...document.querySelectorAll('#pubList .pub')];
     const has = (p, t) => p.dataset.type.split(' ').includes(t);
-    document.querySelectorAll('[data-count]').forEach(el => {
-      el.textContent = pubs.filter(p => el.dataset.count === 'copyright'
-        ? has(p, 'ip') && !has(p, 'patent') : has(p, el.dataset.count)).length;
-    });
     const filters = [...document.querySelectorAll('.filter')];
     filters.forEach(b => {
       const f = b.dataset.f;
